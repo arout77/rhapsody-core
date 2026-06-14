@@ -1,0 +1,56 @@
+{% extends "docs/_layout.twig" %}
+{% block doc_content %}
+    <h1>File Uploader</h1>
+    <p>
+        Rhapsody includes a modern, asynchronous file uploader that can handle multiple files and display real-time upload progress.
+        This feature relies on a combination of a JavaScript front-end and a dedicated PHP back-end handler.
+    </p>
+    
+    <h2>Architecture Overview</h2>
+    <p>
+        The progress bar feature is achieved using AJAX. A JavaScript component intercepts the form submission, sends the file(s) to a dedicated API endpoint using <code>XMLHttpRequest</code>, and listens for progress events to update the UI. The PHP back-end simply receives the files and processes them.
+    </p>
+
+    <h2>1. The Back-End: <code>FileUploader</code> Class</h2>
+    <p>
+        The <code>Core\FileUploader</code> class is the server-side engine. You can instantiate it in your controller, set rules like allowed MIME types and max file size, and then call the <code>handle()</code> method.
+    </p>
+    <p>
+        <strong>Note:</strong> The uploader automatically creates the target directory (<code>storage/uploads/</code> by default) if it does not exist.
+    </p>
+    <pre><code class="language-php">use Core\FileUploader;
+
+public function handleUpload(Request $request): Response
+{
+    $uploader = new FileUploader();
+    $uploader->setAllowedMimes(['image/jpeg', 'image/png', 'application/pdf'])
+             ->setMaxSize(5 * 1024 * 1024); // 5 MB
+
+    if ($uploader->handle('documents')) {
+        return $this->json([
+            'success' => true,
+            'files' => $uploader->getUploadedFiles()
+        ]);
+    } else {
+        return $this->json([
+            'success' => false,
+            'errors' => $uploader->getErrors()
+        ], 400);
+    }
+}</code></pre>
+
+    <h2>2. The Front-End: View & JavaScript</h2>
+    <p>
+        The view contains the HTML form and the JavaScript required to handle the asynchronous upload. The script listens for the form's <code>submit</code> event, creates progress bars, and sends the data.
+    </p>
+    <p>
+        Key points from the JavaScript implementation in <code>views/upload.twig</code>:
+    </p>
+    <ul>
+        <li><code>e.preventDefault()</code> – prevents normal full-page submission.</li>
+        <li><code>FormData</code> – builds a payload that correctly handles file data.</li>
+        <li><code>XMLHttpRequest</code> – used instead of the Fetch API because XHR has built-in <code>upload.addEventListener('progress', ...)</code> events for real-time progress tracking.</li>
+        <li><strong>API Endpoint</strong> – the JavaScript sends the <code>FormData</code> to the route you defined (e.g., <code>/upload</code>).</li>
+    </ul>
+    <p>You can use the code in <code>views/upload.twig</code> as a complete, working example for your own file upload forms.</p>
+{% endblock %}
