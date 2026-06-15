@@ -16,7 +16,7 @@ class {{ classname }} extends Middleware
     {
         // Your middleware logic here.
         // For example, to check for an admin role:
-        // if (\Core\Session::get('user_role') !== 'admin') {
+        // if (\Rhapsody\Core\Session::get('user_role') !== 'admin') {
         //     redirect('/')->with('error', 'Access Denied.');
         // }
     }

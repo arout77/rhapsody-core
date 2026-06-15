@@ -20,7 +20,7 @@ class {{ classname }} implements ListenerInterface
     /**
      * Handle the event.
      *
-     * @param  \Core\Events\Event  $event
+     * @param  \Rhapsody\Core\Events\Event  $event
      * @return void
      */
     public function handle(Event $event): void

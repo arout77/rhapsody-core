@@ -103,14 +103,20 @@ try {
     $matched = $commandRegistry[$commandName];
     
     if ($matched['type'] === 'rhapsody') {
-        // Execute the custom migration utility stream cleanly using plain string arrays
+        // Custom internal command processing requires the shifted arguments array
         $matched['instance']->execute($args);
     } else {
-        // Fire up Symfony's contextual stream abstractions for inputs/outputs
-        $input = new \Symfony\Component\Console\Input\ArgvInput($argv);
+        // Symfony expects element 0 to be the script name, and element 1 to be the FIRST actual argument
+        // We strip out the command name ('make:controller', 'cache:clear') so Symfony doesn't parse it as data
+        $symfonyArgs = $argv; 
+        
+        // Remove the command name element (index 1) safely while preserving index 0
+        array_splice($symfonyArgs, 1, 1); 
+        
+        $input = new \Symfony\Component\Console\Input\ArgvInput($symfonyArgs);
         $output = new \Symfony\Component\Console\Output\ConsoleOutput();
         
-        // Execute Symfony's decoupled architecture lifecycle
+        // Execute the Symfony command lifecycle safely
         $matched['instance']->run($input, $output);
     }
 } catch (\Throwable $e) {

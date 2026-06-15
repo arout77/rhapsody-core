@@ -8,10 +8,12 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class MakeModelCommand extends Command
 {
-    /**
-     * @var string
-     */
     protected static $defaultName = 'make:model';
+
+    public function __construct(protected string $basePath)
+    {
+        parent::__construct();
+    }
 
     protected function configure(): void
     {
@@ -22,17 +24,12 @@ class MakeModelCommand extends Command
             ->addArgument('name', InputArgument::REQUIRED, 'The name of the model (e.g., Post).');
     }
 
-    /**
-     * @param InputInterface $input
-     * @param OutputInterface $output
-     */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $name = $input->getArgument('name');
-        // It's standard practice for models to be singular (e.g., User, Post)
+        $name      = $input->getArgument('name');
         $modelName = ucfirst($name);
 
-        $directory = dirname(__DIR__) . '/Models';
+        $directory = $this->basePath . '/app/Models';
         $filepath  = $directory . '/' . $modelName . '.php';
 
         if (file_exists($filepath)) {
@@ -40,15 +37,32 @@ class MakeModelCommand extends Command
             return Command::FAILURE;
         }
 
-        $stub = file_get_contents(dirname(__DIR__, 2) . '/stubs/model.stub');
+        // Downstream app override vs framework core vendor stubs directory
+        $appStubPath  = $this->basePath . '/stubs/model.stub';
+        $coreStubPath = dirname(__DIR__, 2) . '/resources/stubs/model.stub';
+
+        if (file_exists($appStubPath)) {
+            $stubPath = $appStubPath;
+        } elseif (file_exists($coreStubPath)) {
+            $stubPath = $coreStubPath;
+        } else {
+            $output->writeln("<error>Stub template file not found!</error>");
+            return Command::FAILURE;
+        }
+
+        $stub = file_get_contents($stubPath);
         $stub = str_replace('{{ classname }}', $modelName, $stub);
+
+        if (! is_dir($directory)) {
+            mkdir($directory, 0755, true);
+        }
 
         if (file_put_contents($filepath, $stub) === false) {
             $output->writeln("<error>Failed to create model file.</error>");
             return Command::FAILURE;
         }
 
-        $output->writeln("<info>Model '{$modelName}' created successfully in app/Models.</info>");
+        $output->writeln("<info>Model '{$modelName}' created successfully at {$filepath}</info>");
         return Command::SUCCESS;
     }
 }

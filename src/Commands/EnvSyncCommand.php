@@ -7,10 +7,13 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class EnvSyncCommand extends Command
 {
-    /**
-     * @var string
-     */
     protected static $defaultName = 'env:sync';
+
+    // Inject the real application base directory root path context
+    public function __construct(protected string $basePath)
+    {
+        parent::__construct();
+    }
 
     protected function configure(): void
     {
@@ -25,12 +28,12 @@ class EnvSyncCommand extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $rootPath    = dirname(__DIR__, 2);
-        $envPath     = $rootPath . '/.env';
-        $examplePath = $rootPath . '/.env.example';
+        // FIX: Use the injected application root instead of calculating a relative directory paths
+        $envPath     = $this->basePath . '/.env';
+        $examplePath = $this->basePath . '/.env.example';
 
         if (! file_exists($examplePath)) {
-            $output->writeln('<error>.env.example file not found!</error>');
+            $output->writeln('<error>.env.example file not found at ' . $examplePath . '!</error>');
             return Command::FAILURE;
         }
 
