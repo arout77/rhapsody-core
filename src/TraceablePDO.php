@@ -1,6 +1,5 @@
 <?php
-
-namespace Core;
+namespace Rhapsody\Core;
 
 use PDO;
 
@@ -14,9 +13,9 @@ class TraceablePDO extends PDO
      * @param nullstring $password
      * @param array $options
      */
-    public function __construct( string $dsn, ?string $username = null, ?string $password = null, ?array $options = null )
+    public function __construct(string $dsn, ?string $username = null, ?string $password = null, ?array $options = null)
     {
-        parent::__construct( $dsn, $username, $password, $options );
+        parent::__construct($dsn, $username, $password, $options);
     }
 
     /**
@@ -25,11 +24,11 @@ class TraceablePDO extends PDO
      * @param null $fetch_mode_args
      * @return mixed
      */
-    public function query( string $query, ?int $fetchMode = null, ...$fetch_mode_args ): \PDOStatement  | false
+    public function query(string $query, ?int $fetchMode = null, ...$fetch_mode_args): \PDOStatement  | false
     {
-        $start  = microtime( true );
-        $result = parent::query( $query, $fetchMode, ...$fetch_mode_args );
-        $time   = microtime( true ) - $start;
+        $start  = microtime(true);
+        $result = parent::query($query, $fetchMode, ...$fetch_mode_args);
+        $time   = microtime(true) - $start;
 
         self::$log[] = [
             'sql'         => $query,
@@ -46,11 +45,11 @@ class TraceablePDO extends PDO
      * @param array $options
      * @return mixed
      */
-    public function prepare( string $query, array $options = [] ): \PDOStatement  | false
+    public function prepare(string $query, array $options = []): \PDOStatement  | false
     {
         // For prepared statements, the execution time is not measured here,
         // but we still want to log the origin of the statement.
-        $statement = parent::prepare( $query, $options );
+        $statement = parent::prepare($query, $options);
 
         self::$log[] = [
             'sql'         => '[PREPARED] ' . $query,
@@ -69,29 +68,29 @@ class TraceablePDO extends PDO
 
     private function findQueryCaller(): ?array
     {
-        $trace       = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS );
-        $projectRoot = dirname( __DIR__, 2 );
+        $trace       = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+        $projectRoot = dirname(__DIR__, 2);
 
-        foreach ( $trace as $entry ) {
-            if ( !isset( $entry['file'] ) ) {
+        foreach ($trace as $entry) {
+            if (! isset($entry['file'])) {
                 continue;
             }
 
-            $file = str_replace( '\\', '/', $entry['file'] );
+            $file = str_replace('\\', '/', $entry['file']);
 
             // If the file is outside our project root, skip it
-            if ( strpos( $file, str_replace( '\\', '/', $projectRoot ) ) === false ) {
+            if (strpos($file, str_replace('\\', '/', $projectRoot)) === false) {
                 continue;
             }
 
             // If the file is one of our core DB classes, skip it and check the next one
-            if ( str_ends_with( $file, 'TraceablePDO.php' ) || str_ends_with( $file, 'Database.php' ) ) {
+            if (str_ends_with($file, 'TraceablePDO.php') || str_ends_with($file, 'Database.php')) {
                 continue;
             }
 
             // The first file that is not a core DB class is our caller
             return [
-                'file' => str_replace( str_replace( '\\', '/', $projectRoot ) . '/', '', $file ),
+                'file' => str_replace(str_replace('\\', '/', $projectRoot) . '/', '', $file),
                 'line' => $entry['line'],
             ];
         }

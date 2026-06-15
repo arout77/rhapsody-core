@@ -1,6 +1,5 @@
 <?php
-
-namespace Core;
+namespace Rhapsody\Core;
 
 use PDO;
 

@@ -1,6 +1,5 @@
 <?php
-
-namespace Core;
+namespace Rhapsody\Core;
 
 /**
  * Represents a complete HTTP response, including status code, headers, and content.
@@ -31,7 +30,7 @@ class Response
      * @param int $code The HTTP status code (e.g., 200, 404, 500).
      * @return self
      */
-    public function setStatusCode( int $code ): self
+    public function setStatusCode(int $code): self
     {
         $this->statusCode = $code;
         return $this; // Return self for method chaining
@@ -44,7 +43,7 @@ class Response
      * @param string $value The header value (e.g., 'application/json').
      * @return self
      */
-    public function setHeader( string $name, string $value ): self
+    public function setHeader(string $name, string $value): self
     {
         $this->headers[$name] = $value;
         return $this;
@@ -56,7 +55,7 @@ class Response
      * @param string $content The HTML or string content to be sent.
      * @return self
      */
-    public function setContent( string $content ): self
+    public function setContent(string $content): self
     {
         $this->content = $content;
         return $this;
@@ -100,11 +99,11 @@ class Response
     public function send(): void
     {
         // 1. Send the status code
-        http_response_code( $this->statusCode );
+        http_response_code($this->statusCode);
 
         // 2. Send all registered headers
-        foreach ( $this->headers as $name => $value ) {
-            header( "{$name}: {$value}" );
+        foreach ($this->headers as $name => $value) {
+            header("{$name}: {$value}");
         }
 
         // 3. Send the content body

@@ -1,5 +1,5 @@
 <?php
-namespace Core;
+namespace Rhapsody\Core;
 
 /**
  * A secure, static wrapper for handling PHP sessions.

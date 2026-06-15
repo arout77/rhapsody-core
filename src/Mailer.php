@@ -1,5 +1,5 @@
 <?php
-namespace Core;
+namespace Rhapsody\Core;
 
 use Symfony\Component\Mailer\Mailer as SymfonyMailer;
 use Symfony\Component\Mailer\Transport;

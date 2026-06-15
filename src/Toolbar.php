@@ -1,33 +1,33 @@
 <?php
 // core/Toolbar.php
 
-namespace Core;
+namespace Rhapsody\Core;
 
 class Toolbar
 {
     /**
      * @param array $data
      */
-    public function __construct( protected array $data )
+    public function __construct(protected array $data)
     {}
     public function render(): string
     {
         // --- Data Preparation for Toolbar Header ---
-        $appVersion   = htmlspecialchars( $this->data['app_version'] ?? 'N/A', ENT_QUOTES, 'UTF-8' );
+        $appVersion   = htmlspecialchars($this->data['app_version'] ?? 'N/A', ENT_QUOTES, 'UTF-8');
         $execTime     = $this->data['execution_time'] ?? '0';
         $memUsage     = $this->data['memory_usage'] ?? '0';
         $responseCode = $this->data['response_code'] ?? 'N/A';
-        $queryCount   = count( $this->data['queries'] ?? [] );
+        $queryCount   = count($this->data['queries'] ?? []);
 
         // --- Data Preparation for Toolbar Panels (in PHP) ---
 
         // Format SQL queries
         $queriesHtml = '';
-        if ( $queryCount > 0 ) {
-            foreach ( $this->data['queries'] as $query ) {
-                $sql        = htmlspecialchars( $query['sql'], ENT_QUOTES, 'UTF-8' );
-                $params     = htmlspecialchars( json_encode( $query['params'] ), ENT_QUOTES, 'UTF-8' );
-                $time       = round( $query['executionMS'] * 1000, 2 );
+        if ($queryCount > 0) {
+            foreach ($this->data['queries'] as $query) {
+                $sql        = htmlspecialchars($query['sql'], ENT_QUOTES, 'UTF-8');
+                $params     = htmlspecialchars(json_encode($query['params']), ENT_QUOTES, 'UTF-8');
+                $time       = round($query['executionMS'] * 1000, 2);
                 $callerFile = $query['caller']['file'] ?? 'N/A';
                 $callerLine = $query['caller']['line'] ?? '-';
 
@@ -46,13 +46,13 @@ class Toolbar
 
         // Build the panel content array
         $panels_data = [
-            'panel-request' => '<h3>Request / Route</h3><pre>' . htmlspecialchars( json_encode( $this->data['route'] ?? 'No route matched', JSON_PRETTY_PRINT ), ENT_QUOTES, 'UTF-8' ) . '</pre>',
-            'panel-logs'    => '<h3>PHP Error Log</h3><pre>' . ( $this->data['logs']['php'] ?? 'Log not available.' ) . '</pre><h3>Apache Error Log</h3><pre>' . ( $this->data['logs']['apache'] ?? 'Log not available.' ) . '</pre>',
+            'panel-request' => '<h3>Request / Route</h3><pre>' . htmlspecialchars(json_encode($this->data['route'] ?? 'No route matched', JSON_PRETTY_PRINT), ENT_QUOTES, 'UTF-8') . '</pre>',
+            'panel-logs'    => '<h3>PHP Error Log</h3><pre>' . ($this->data['logs']['php'] ?? 'Log not available.') . '</pre><h3>Apache Error Log</h3><pre>' . ($this->data['logs']['apache'] ?? 'Log not available.') . '</pre>',
             'panel-db'      => '<h3>Database Queries</h3><div>' . $queriesHtml . '</div>',
-            'panel-session' => '<h3>Session Data</h3><pre>' . htmlspecialchars( json_encode( $this->data['session'] ?? [], JSON_PRETTY_PRINT ), ENT_QUOTES, 'UTF-8' ) . '</pre>'
+            'panel-session' => '<h3>Session Data</h3><pre>' . htmlspecialchars(json_encode($this->data['session'] ?? [], JSON_PRETTY_PRINT), ENT_QUOTES, 'UTF-8') . '</pre>'
         ];
         // Safely encode the array for JavaScript
-        $panels_json = json_encode( $panels_data );
+        $panels_json = json_encode($panels_data);
 
         // --- HEREDOC for HTML, CSS, JS ---
         return <<<HTML

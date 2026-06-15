@@ -1,6 +1,5 @@
 <?php
-
-namespace Core;
+namespace Rhapsody\Core;
 
 use Core\Cache\CacheInterface;
 
@@ -11,14 +10,14 @@ class Cache
     /**
      * @param CacheInterface $driver
      */
-    public function __construct( protected CacheInterface $driver )
+    public function __construct(protected CacheInterface $driver)
     {}
 
     /**
      * Stores the resolved Cache instance for static access.
      * Called once during bootstrapping.
      */
-    public static function setInstance( self $cache ): void
+    public static function setInstance(self $cache): void
     {
         self::$instance = $cache;
     }
@@ -29,8 +28,8 @@ class Cache
      */
     public static function getInstance(): self
     {
-        if ( self::$instance === null ) {
-            throw new \RuntimeException( 'Cache has not been initialised. Call Cache::setInstance() during bootstrapping.' );
+        if (self::$instance === null) {
+            throw new \RuntimeException('Cache has not been initialised. Call Cache::setInstance() during bootstrapping.');
         }
         return self::$instance;
     }
@@ -39,9 +38,9 @@ class Cache
      * @param $default
      * @return mixed
      */
-    public function get( string $key, $default = null )
+    public function get(string $key, $default = null)
     {
-        return $this->driver->get( $key, $default );
+        return $this->driver->get($key, $default);
     }
 
     /**
@@ -49,26 +48,26 @@ class Cache
      * @param $value
      * @param int $minutes
      */
-    public function put( string $key, $value, int $minutes ): void
+    public function put(string $key, $value, int $minutes): void
     {
-        $this->driver->put( $key, $value, $minutes );
+        $this->driver->put($key, $value, $minutes);
     }
 
     /**
      * @param string $key
      * @return mixed
      */
-    public function has( string $key ): bool
+    public function has(string $key): bool
     {
-        return $this->driver->has( $key );
+        return $this->driver->has($key);
     }
 
     /**
      * @param string $key
      */
-    public function forget( string $key ): void
+    public function forget(string $key): void
     {
-        $this->driver->forget( $key );
+        $this->driver->forget($key);
     }
 
     /**
@@ -85,14 +84,14 @@ class Cache
      * @param $callback
      * @return mixed
      */
-    public function remember( string $key, int $minutes, callable $callback )
+    public function remember(string $key, int $minutes, callable $callback)
     {
-        if ( $this->has( $key ) ) {
-            return $this->get( $key );
+        if ($this->has($key)) {
+            return $this->get($key);
         }
 
         $value = $callback();
-        $this->put( $key, $value, $minutes );
+        $this->put($key, $value, $minutes);
         return $value;
     }
 }

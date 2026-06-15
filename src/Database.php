@@ -1,6 +1,5 @@
 <?php
-
-namespace Core;
+namespace Rhapsody\Core;
 
 use PDO;
 use PDOException;
@@ -20,7 +19,7 @@ class Database
 
     public static function getInstance(): PDO
     {
-        if ( self::$instance === null ) {
+        if (self::$instance === null) {
             $config   = require __DIR__ . '/../config.php';
             $dbConfig = $config['database'];
 
@@ -34,13 +33,13 @@ class Database
 
             try {
                 // REVERT to using the $config array for the check
-                if ( ( $config['app_env'] ?? 'production' ) === 'development' ) {
-                    self::$instance = new TraceablePDO( $dsn, $dbConfig['user'], $dbConfig['password'], $options );
+                if (($config['app_env'] ?? 'production') === 'development') {
+                    self::$instance = new TraceablePDO($dsn, $dbConfig['user'], $dbConfig['password'], $options);
                 } else {
-                    self::$instance = new PDO( $dsn, $dbConfig['user'], $dbConfig['password'], $options );
+                    self::$instance = new PDO($dsn, $dbConfig['user'], $dbConfig['password'], $options);
                 }
-            } catch ( PDOException $e ) {
-                throw new PDOException( $e->getMessage(), (int) $e->getCode() );
+            } catch (PDOException $e) {
+                throw new PDOException($e->getMessage(), (int) $e->getCode());
             }
         }
 

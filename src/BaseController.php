@@ -1,5 +1,5 @@
 <?php
-namespace Core;
+namespace Rhapsody\Core;
 
 use Core\Cache;
 use Core\Database;

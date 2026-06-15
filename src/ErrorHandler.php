@@ -1,5 +1,5 @@
 <?php
-namespace Core;
+namespace Rhapsody\Core;
 
 /**
  * Global exception and error handler for Rhapsody.

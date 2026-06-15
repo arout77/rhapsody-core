@@ -1,6 +1,5 @@
 <?php
-
-namespace Core;
+namespace Rhapsody\Core;
 
 class RedirectResponse extends Response
 {
@@ -9,18 +8,18 @@ class RedirectResponse extends Response
     /**
      * @param string $url
      */
-    public function __construct( string $url )
+    public function __construct(string $url)
     {
         $this->url = $url;
-        $this->setStatusCode( 302 ); // 302 Found is a standard redirect code
+        $this->setStatusCode(302); // 302 Found is a standard redirect code
     }
 
     /**
      * Attaches a flash message to the session before redirecting.
      */
-    public function with( string $key, string $message ): self
+    public function with(string $key, string $message): self
     {
-        Session::flash( $key, $message );
+        Session::flash($key, $message);
         return $this;
     }
 
@@ -30,7 +29,7 @@ class RedirectResponse extends Response
     public function send(): void
     {
         Session::close(); // Ensure session is saved before redirecting
-        header( 'Location: ' . $this->url );
+        header('Location: ' . $this->url);
         exit();
     }
 }
