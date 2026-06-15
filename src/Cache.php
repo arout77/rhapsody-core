@@ -1,7 +1,7 @@
 <?php
 namespace Rhapsody\Core;
 
-use Core\Cache\CacheInterface;
+use Rhapsody\Core\Cache\CacheInterface;
 
 class Cache
 {

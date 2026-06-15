@@ -1,13 +1,15 @@
 <?php
 namespace Rhapsody\Core\Controllers;
 
-use Core\Container;
-use Core\Exceptions\HttpException;
-use Core\Request;
+use Rhapsody\Core\Container;
+use Rhapsody\Core\Exceptions\HttpException;
+use Rhapsody\Core\Request;
+use Rhapsody\Core\Response;
+use Rhapsody\Core\Routing\Router;
 
-class RouterController extends \Core\Router
+class RouterController extends Router
 {
-    public static function dispatch(Request $request, Container $container): \Core\Response
+    public static function dispatch(Request $request, Container $container): Response
     {
         $response = parent::dispatch($request, $container);
 

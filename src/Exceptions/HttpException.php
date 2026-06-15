@@ -1,5 +1,5 @@
 <?php
-namespace Core\Exceptions;
+namespace Rhapsody\Core\Exceptions;
 
 class HttpException extends \Exception
 {

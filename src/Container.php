@@ -27,6 +27,19 @@ class Container
     }
 
     /**
+     * Finds an entry of the container by its identifier and returns it.
+     * Maps as an alias to the autowired resolve method.
+     *
+     * @param string $id Identifier of the entry to look for.
+     * @return mixed
+     * @throws \Exception
+     */
+    public function get(string $id): mixed
+    {
+        return $this->resolve($id);
+    }
+
+    /**
      * Checks if a binding exists in the container.
      *
      * @param string $abstract The class/interface name.

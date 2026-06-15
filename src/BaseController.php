@@ -1,9 +1,9 @@
 <?php
 namespace Rhapsody\Core;
 
-use Core\Cache;
-use Core\Database;
 use PDO;
+use Rhapsody\Core\Cache;
+use Rhapsody\Core\Database;
 use Twig\Environment;
 use Twig\Loader\FilesystemLoader;
 
@@ -27,6 +27,17 @@ abstract class BaseController
         // Safely pull flash data without prematurely erasing it
         $this->twig->addGlobal('flash_error', $_SESSION['error'] ?? null);
         $this->twig->addGlobal('flash_success', $_SESSION['success'] ?? null);
+
+        // Fallback option using the container instance to resolve the pre-configured database singleton
+        // (Assuming a global helper or accessible container reference exists)
+        global $container;
+
+        if (isset($container) && $container->has(Database::class)) {
+            $this->db = $container->resolve(Database::class);
+        } else {
+            // Safe fallback reference structural safety choice
+            throw new \Exception("Database service has not been properly initialized inside the DI container.");
+        }
     }
 
     /**
