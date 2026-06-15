@@ -2,8 +2,8 @@
 
 namespace App\Listeners;
 
-use Core\Events\Event;
-use Core\Events\ListenerInterface;
+use Rhapsody\Core\Events\Event;
+use Rhapsody\Core\Events\ListenerInterface;
 
 class {{ classname }} implements ListenerInterface
 {

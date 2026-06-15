@@ -1,4 +1,4 @@
-{% extends "docs/_layout.twig" %}
+{% extends "@core/docs/_layout.twig" %}
 
 {% block doc_content %}
     <h1>Controllers</h1>
@@ -17,9 +17,9 @@
 
 namespace App\Controllers;
 
-use Core\BaseController;
-use Core\Request;
-use Core\Response;
+use Rhapsody\Core\BaseController;
+use Rhapsody\Core\Request;
+use Rhapsody\Core\Response;
 use App\Models\User;
 
 class PageController extends BaseController

@@ -2,7 +2,7 @@
 
 namespace App\Controllers;
 
-use Core\BaseController;
+use Rhapsody\Core\BaseController;
 use Twig\Environment;
 
 class {{ classname }} extends BaseController

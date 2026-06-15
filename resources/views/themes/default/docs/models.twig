@@ -1,4 +1,4 @@
-{% extends "docs/_layout.twig" %}
+{% extends "@core/docs/_layout.twig" %}
 
 {% block doc_content %}
     <h1>Models & Database</h1>
@@ -24,7 +24,7 @@
 
 namespace App\Models;
 
-use Core\BaseModel;
+use Rhapsody\Core\BaseModel;
 use PDO;
 
 class User extends BaseModel

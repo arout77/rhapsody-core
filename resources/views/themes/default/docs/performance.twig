@@ -1,4 +1,4 @@
-{% extends "docs/_layout.twig" %}
+{% extends "@core/docs/_layout.twig" %}
 
 {% block doc_content %}
     <h1>Performance & Caching</h1>
@@ -33,7 +33,7 @@ CACHE_DRIVER=redis
         <li>If it does not exist, it executes the provided function, saves its return value to the cache for a specified number of minutes, and then returns that value.</li>
     </ol>
     <pre><code class="language-php">
-use Core\Cache;
+use Rhapsody\Core\Cache;
 use App\Models\Post;
 
 class PostController extends BaseController

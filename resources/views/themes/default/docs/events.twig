@@ -1,4 +1,4 @@
-{% extends "docs/_layout.twig" %}
+{% extends "@core/docs/_layout.twig" %}
 
 {% block doc_content %}
     <h1>Events & Listeners</h1>
@@ -67,7 +67,7 @@ class EventServiceProvider
     <pre><code class="language-php">
 // in app/Controllers/AuthController.php
 use App\Events\UserRegistered;
-use Core\Events\EventDispatcher;
+use Rhapsody\Core\Events\EventDispatcher;
 
 class AuthController extends BaseController
 {

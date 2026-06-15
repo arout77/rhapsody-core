@@ -1,4 +1,4 @@
-{% extends "docs/_layout.twig" %}
+{% extends "@core/docs/_layout.twig" %}
 
 {% block doc_content %}
     <h1>Logging</h1>
@@ -34,7 +34,7 @@
     <p>
         The <code>log()</code> method is used to write messages. It automatically adds a timestamp and a log level to each entry.
     </p>
-    <pre><code class="language-php">use Core\Logger;
+    <pre><code class="language-php">use Rhapsody\Core\Logger;
 
 // Get the path from your config
 $logPath = $config['logging']['application_log_path'];
@@ -59,7 +59,7 @@ try {
     <p>
         The <code>read()</code> method allows you to retrieve the last N lines of a log file. This is particularly useful for displaying recent activity or errors, as seen in the developer toolbar.
     </p>
-    <pre><code class="language-php">use Core\Logger;
+    <pre><code class="language-php">use Rhapsody\Core\Logger;
 
 $phpErrorLog = new Logger($config['logging']['php_error_log_path']);
 

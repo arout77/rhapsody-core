@@ -1,4 +1,4 @@
-{% extends "docs/_layout.twig" %}
+{% extends "@core/docs/_layout.twig" %}
 
 {% block doc_content %}
     <h1>Error Handling & Logging</h1>
@@ -78,7 +78,7 @@
     <p>
         For more control, you can throw <code>Core\Exceptions\HttpException</code> (optional class – you need to create it). Example:
     </p>
-    <pre><code class="language-php">use Core\Exceptions\HttpException;
+    <pre><code class="language-php">use Rhapsody\Core\Exceptions\HttpException;
 
 public function show(string $id): Response
 {

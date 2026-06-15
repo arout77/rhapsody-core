@@ -1,8 +1,7 @@
 <?php
-
 namespace Core\Events;
 
-use Core\Container;
+use Rhapsody\Core\Container;
 
 /**
  * The central event dispatcher for the application.
@@ -27,18 +26,18 @@ class EventDispatcher
      * @param Event $event The event object to dispatch.
      * @return void
      */
-    public function dispatch( Event $event ): void
+    public function dispatch(Event $event): void
     {
-        $eventName = get_class( $event );
+        $eventName = get_class($event);
 
-        if ( isset( $this->listeners[$eventName] ) ) {
-            foreach ( $this->listeners[$eventName] as $listenerClass ) {
+        if (isset($this->listeners[$eventName])) {
+            foreach ($this->listeners[$eventName] as $listenerClass) {
                 // Use the container to create an instance of the listener,
                 // which automatically injects its dependencies.
-                $listener = $this->container->resolve( $listenerClass );
+                $listener = $this->container->resolve($listenerClass);
 
-                if ( $listener instanceof ListenerInterface ) {
-                    $listener->handle( $event );
+                if ($listener instanceof ListenerInterface) {
+                    $listener->handle($event);
                 }
             }
         }

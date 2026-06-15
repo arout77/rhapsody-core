@@ -2,10 +2,10 @@
 namespace Rhapsody\Core\Controllers;
 
 use App\Models\User;
-use Core\BaseController;
-use Core\Pagination;
-use Core\Request;
-use Core\Response;
+use Rhapsody\Core\BaseController;
+use Rhapsody\Core\Pagination;
+use Rhapsody\Core\Request;
+use Rhapsody\Core\Response;
 use Twig\Environment;
 
 class UserController extends BaseController

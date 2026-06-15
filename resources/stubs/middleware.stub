@@ -2,7 +2,7 @@
 
 namespace App\Middleware;
 
-use Core\Request;
+use Rhapsody\Core\Request;
 
 class {{ classname }} extends Middleware
 {

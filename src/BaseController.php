@@ -10,7 +10,7 @@ use Twig\Loader\FilesystemLoader;
 abstract class BaseController
 {
     protected Environment $twig;
-    protected PDO $db;
+    protected Database $db;
     protected Cache $cache;
 
     /**
@@ -19,7 +19,6 @@ abstract class BaseController
     public function __construct(Environment $twig)
     {
         $this->twig  = $twig;
-        $this->db    = Database::getInstance();
         $this->cache = Cache::getInstance();
 
         $this->twig->addGlobal('session', $_SESSION);
@@ -33,10 +32,11 @@ abstract class BaseController
         global $container;
 
         if (isset($container) && $container->has(Database::class)) {
+            // Retrieve the shared singleton instance that already possesses your config details
             $this->db = $container->resolve(Database::class);
         } else {
-            // Safe fallback reference structural safety choice
-            throw new \Exception("Database service has not been properly initialized inside the DI container.");
+            // Fallback safety if the container isn't initialized yet (e.g. in standalone testing)
+            throw new \Exception("Database service has not been properly initialized inside the Service Container.");
         }
     }
 

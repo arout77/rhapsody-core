@@ -1,6 +1,6 @@
 <?php
 
-use Core\RedirectResponse;
+use Rhapsody\Core\RedirectResponse;
 
 if (! function_exists('redirect')) {
     function redirect(string $url): RedirectResponse

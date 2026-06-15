@@ -3,14 +3,14 @@ namespace Rhapsody\Core\Controllers;
 
 use App\Entities\User;
 use App\Events\UserRegistered;
-use Core\Auth\AuthenticatableInterface;
-use Core\BaseController;
-use Core\Events\EventDispatcher;
-use Core\Request;
-use Core\Response;
-use Core\Session;
-use Core\Validator;
 use Doctrine\ORM\EntityManager;
+use Rhapsody\Core\Auth\AuthenticatableInterface;
+use Rhapsody\Core\BaseController;
+use Rhapsody\Core\Events\EventDispatcher;
+use Rhapsody\Core\Request;
+use Rhapsody\Core\Response;
+use Rhapsody\Core\Session;
+use Rhapsody\Core\Validator;
 use Twig\Environment;
 
 class AuthController extends BaseController implements AuthenticatableInterface

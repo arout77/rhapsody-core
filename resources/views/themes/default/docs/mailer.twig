@@ -1,4 +1,4 @@
-{% extends "docs/_layout.twig" %}
+{% extends "@core/docs/_layout.twig" %}
 
 {% block doc_content %}
     <h1>Sending Mail</h1>
@@ -17,8 +17,8 @@ MAIL_FROM_NAME="Rhapsody Framework"</code></pre>
 
     <h2>Sending an Email</h2>
     <p>The easiest way to send mail is to inject the <code>Core\Mailer</code> service into your controller's constructor via dependency injection. Then, call the <code>send()</code> method.</p>
-    <pre><code class="language-php">use Core\Mailer;
-use Core\Request;
+    <pre><code class="language-php">use Rhapsody\Core\Mailer;
+use Rhapsody\Core\Request;
 
 class ContactController extends BaseController
 {

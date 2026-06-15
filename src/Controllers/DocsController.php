@@ -1,8 +1,8 @@
 <?php
 namespace Rhapsody\Core\Controllers;
 
-use Core\BaseController;
-use Core\Response;
+use Rhapsody\Core\BaseController;
+use Rhapsody\Core\Response;
 use Twig\Environment;
 
 /**

@@ -2,7 +2,7 @@
 
 namespace App\Events;
 
-use Core\Events\Event;
+use Rhapsody\Core\Events\Event;
 
 class {{ classname }} extends Event
 {

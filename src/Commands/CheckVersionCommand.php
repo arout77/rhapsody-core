@@ -1,8 +1,8 @@
 <?php
 namespace Rhapsody\Core\Commands;
 
-use Core\Cache;
-use Core\Mailer;
+use Rhapsody\Core\Cache;
+use Rhapsody\Core\Mailer;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;

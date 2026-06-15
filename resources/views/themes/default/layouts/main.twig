@@ -77,7 +77,7 @@
 </head>
 <body class="{% block body_class %}bg-gray-200 dark:bg-gray-900 text-gray-800 dark:text-gray-200 font-sans transition-colors duration-700{% endblock %}">
     
-    {% block navigation %} {% include 'layouts/navbar.twig' %} {% endblock %}
+    {% block navigation %} {% include '@core/layouts/navbar.twig' %} {% endblock %}
 
     {% block full_width_content %}
         {# 

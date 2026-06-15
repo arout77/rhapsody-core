@@ -1,4 +1,4 @@
-{% extends "layouts/main.twig" %}
+{% extends "@core/layouts/main.twig" %}
 
 {% block full_width_content %}
 <link rel="stylesheet" href="{{ base_url }}/public/css/prism.css">
@@ -194,7 +194,7 @@
                      <pre class="language-php p-6 text-sm"><code class="text-white">
 use App\Controllers\UserController;
 use App\Models\User;
-use Core\Router;
+use Rhapsody\Core\Router;
 
 // Define a protected route
 Router::get('/users/{id}', [UserController::class, 'show'])

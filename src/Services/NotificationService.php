@@ -7,8 +7,8 @@
  */
 namespace App\Services;
 
-use Core\Cache;
-use Core\Response;
+use Rhapsody\Core\Cache;
+use Rhapsody\Core\Response;
 
 class NotificationService
 {

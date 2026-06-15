@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use Core\BaseModel;
+use Rhapsody\Core\BaseModel;
 use PDO;
 
 class {{ classname }} extends BaseModel

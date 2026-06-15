@@ -1,4 +1,4 @@
-{% extends "docs/_layout.twig" %}
+{% extends "@core/docs/_layout.twig" %}
 
 {% block doc_content %}
     <h1>Pagination</h1>
@@ -40,8 +40,8 @@ public function findPaginated(int $limit, int $offset): array
         <li>Pass both the data and the pagination object to your view.</li>
     </ol>
     <pre><code>// app/Controllers/PageController.php
-use Core\Pagination;
-use Core\Request;
+use Rhapsody\Core\Pagination;
+use Rhapsody\Core\Request;
 
 public function showUsers(Request $request): Response
 {

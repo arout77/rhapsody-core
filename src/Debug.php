@@ -1,8 +1,9 @@
 <?php
 namespace Rhapsody\Core;
 
-use Core\QueryLogger;
 use Doctrine\DBAL\Logging\DebugStack;
+use QueryLogger;
+use Rhapsody\Core\Routing\Route;
 
 /**
  * A simple data collector for the developer toolbar.
