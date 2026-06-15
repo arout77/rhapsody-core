@@ -7,18 +7,16 @@ use Symfony\Component\Mime\Email;
 
 class Mailer
 {
-    protected SymfonyMailer $mailer;
-    protected array $config;
+    // Make this nullable since it won't be instantiated if the host config is empty
+    protected ?SymfonyMailer $mailer = null;
+    protected array $mailConfig;
 
-    public function __construct()
+    public function __construct(array $mailConfig = [])
     {
-        $this->config = require dirname(__DIR__) . '/config.php';
-        $mailConfig   = $this->config['mailer'];
+        $this->mailConfig = $mailConfig;
 
         // Check if the host is empty; if so, skip initialization or use a null transport
         if (empty($mailConfig['host'])) {
-            // You can either throw a custom exception or just return early
-            // Or set a mock transport if needed
             return;
         }
 
@@ -29,20 +27,16 @@ class Mailer
 
     /**
      * Sends an email.
-     *
-     * @param string $to The recipient's email address.
-     * @param string $subject The email subject.
-     * @param string $htmlBody The HTML content of the email.
-     * @param string|null $plainTextBody Optional plain text content.
-     * @return void
      */
     public function send(string $to, string $subject, string $htmlBody, ?string $plainTextBody = null): void
     {
         if (! $this->mailer) {
             throw new \RuntimeException('Mailer not configured. Please set MAIL_HOST in .env');
         }
-        $fromAddress = $this->config['mailer']['from_address'];
-        $fromName    = $this->config['mailer']['from_name'];
+
+        // Fixed: Read straight from the correct mailConfig property array saved by the constructor
+        $fromAddress = $this->mailConfig['from_address'] ?? 'hello@example.com';
+        $fromName    = $this->mailConfig['from_name'] ?? 'Example';
 
         $email = (new Email())
             ->from("{$fromName} <{$fromAddress}>")

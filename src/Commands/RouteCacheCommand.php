@@ -2,9 +2,9 @@
 namespace Rhapsody\Core\Commands;
 
 use Rhapsody\Core\Router;
-use Symfony\\Component\\Console\\Command\\Command;
-use Symfony\\Component\\Console\\Input\\InputInterface;
-use Symfony\\Component\\Console\\Output\\OutputInterface;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 
 class RouteCacheCommand extends Command
 {
