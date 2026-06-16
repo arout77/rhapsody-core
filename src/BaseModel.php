@@ -12,7 +12,10 @@ abstract class BaseModel
 
     public function __construct()
     {
-        // Get the singleton PDO instance
-        $this->db = Database::getInstance();
+        // Get the singleton wrapper instance
+        $databaseWrapper = Database::getInstance();
+
+        // Extract the raw, native PDO connection out of the wrapper
+        $this->db = $databaseWrapper->getConnection();
     }
 }
