@@ -4,6 +4,7 @@ namespace Rhapsody\Core;
 use PDO;
 use Rhapsody\Core\Cache;
 use Rhapsody\Core\Database;
+use Rhapsody\Core\SEO\SchemaOrg;
 use Twig\Environment;
 use Twig\Loader\FilesystemLoader;
 
@@ -12,14 +13,16 @@ abstract class BaseController
     protected Environment $twig;
     protected Database $db;
     protected Cache $cache;
+    protected SchemaOrg $schema;
 
     /**
      * @param Environment $twig
      */
     public function __construct(Environment $twig)
     {
-        $this->twig  = $twig;
-        $this->cache = Cache::getInstance();
+        $this->twig   = $twig;
+        $this->cache  = Cache::getInstance();
+        $this->schema = new SchemaOrg();
 
         $this->twig->addGlobal('session', $_SESSION);
 
@@ -50,18 +53,20 @@ abstract class BaseController
      */
     protected function view(string $view, array $args = [], array $meta = []): Response
     {
-        // Add default values for meta tags
+        // 1. Merge standard layout configuration meta fields
         $defaults = [
             'title'       => 'Rhapsody - Compose your masterpiece',
             'description' => 'Rhapsody is a modern PHP framework for developers who find full-stack frameworks like Laravel too heavy for their needs, but find micro-frameworks like Slim too bare-bones. It gives you the modern tooling you love—like a powerful CLI, dependency injection, and an ORM—in a simple, performant, and elegant package. It\'s the perfect choice for building fast, maintainable web applications and APIs without the overhead.',
         ];
         $args['meta'] = array_merge($defaults, $meta);
 
+        // 2. Automatically inject the rendered JSON-LD schemas into Twig arguments
+        $args['schema_markup'] = $this->schema->render();
+
         $output = $this->twig->render($view, $args);
 
         $response = new Response();
         $response->setContent($output);
-        // echo '<script type="module" src="'. self::vite_asset('src/main.jsx') .'"></script>';
         return $response;
     }
 

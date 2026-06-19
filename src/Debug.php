@@ -40,7 +40,7 @@ class Debug
     /**
      * Gathers final data points at the end of the request.
      */
-    public function end(Response $response, array $config, Container $container, Route $route = null): void
+    public function end(Response $response, array $config, Container $container, ?Route $route = null): void
     {
         $this->data['execution_time'] = round((microtime(true) - $this->startTime) * 1000, 2);
         $this->data['memory_usage']   = round((memory_get_peak_usage() - $this->startMemory) / 1024 / 1024, 2);

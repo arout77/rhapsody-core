@@ -48,34 +48,6 @@
 
     {# Target Block for Page-Specific Styles or Early Meta Elements #}
     {% block head_extensions %}{% endblock %}
-
-    {# Protected JSON-LD Schema Markup for SEO (Isolated outside of modifiable asset containers) #}
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      "name": "Rhapsody Framework",
-      "description": "Rhapsody is a lightweight, modern PHP framework for building elegant and maintainable web applications.",
-      "applicationCategory": "DeveloperApplication",
-      "operatingSystem": "Web",
-      "softwareVersion": "{{ config.app_version }}",
-      "url": "{{ app_url }}",
-      "author": {
-        "@type": "Person",
-        "name": "Andrew Rout"
-      },
-      "programmingLanguage": {
-        "@type": "ComputerLanguage",
-        "name": "PHP"
-      },
-      "image": "{{ app_url }}/public/img/logo.png",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "USD"
-      }
-    }
-    </script>
 </head>
 <body class="{% block body_class %}bg-gray-200 dark:bg-gray-900 text-gray-800 dark:text-gray-200 font-sans transition-colors duration-700{% endblock %}">
     
@@ -251,5 +223,6 @@
 
     {# Dedicated Child Script Injection Vector #}
     {% block scripts %}{% endblock %}
+    {{ schema_markup|raw }}
 </body>
 </html>
