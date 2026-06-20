@@ -7,6 +7,7 @@ use Rhapsody\Core\Routing\Router;
 // Assumes your Router instance is injected or accessible
 Router::get('/login', [AuthController::class, 'showLoginForm']);
 Router::get('/docs', [DocsController::class, 'index']);
+Router::get('/docs/authentication', [DocsController::class, 'authentication']);
 Router::get('/docs/caching', [DocsController::class, 'performance']);
 Router::get('/docs/cli', [DocsController::class, 'cli']);
 Router::get('/docs/configuration', [DocsController::class, 'configuration']);

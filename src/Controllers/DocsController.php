@@ -351,4 +351,13 @@ class DocsController extends BaseController
             'canonical_url' => $request->getCanonicalUrl(),
         ]);
     }
+
+    public function authentication(Request $request): Response
+    {
+        return $this->view('@core/docs/authentication.twig', [], [
+            'title'         => 'User Authentication – Rhapsody Documentation',
+            'description'   => 'Learn about the built-in login and registration authentication systems.',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
 }

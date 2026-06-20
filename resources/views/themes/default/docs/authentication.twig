@@ -1,0 +1,31 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>Authentication Setup</h1>
+    <p>Rhapsody provides a simple authentication system using Doctrine ORM and the <code>User</code> entity.</p>
+
+    <h2>Prerequisites</h2>
+    <p>Make sure you have configured your database connection in <code>.env</code> and installed Doctrine.</p>
+
+    <h2>Creating the Users Table</h2>
+    <p>Before you can use the authentication system, you must create the <code>users</code> table. Run the following command:</p>
+    <pre><code class="language-bash">php rhapsody auth:install</code></pre>
+    <p>This will create the table based on the <code>App\Entities\User</code> entity definition.</p>
+
+    <h2>Using the Auth Controller</h2>
+    <p>The framework includes a <code>AuthController</code> with routes for login, registration, and logout. Make sure the routes are registered in your <code>web.php</code>:</p>
+    <pre><code>$router->get('/login', [AuthController::class, 'showLoginForm']);
+$router->post('/login', [AuthController::class, 'login']);
+$router->get('/register', [AuthController::class, 'showRegistrationForm']);
+$router->post('/register', [AuthController::class, 'register']);
+$router->post('/logout', [AuthController::class, 'logout']);</code></pre>
+
+    <h2>Middleware Protection</h2>
+    <p>To protect routes, use the <code>auth</code> middleware:</p>
+    <pre><code>$router->get('/dashboard', [DashboardController::class, 'index'])->middleware('auth');</code></pre>
+
+    <h2>Customising the User Entity</h2>
+    <p>You can extend or modify the <code>App\Entities\User</code> class to add additional fields. After changes, update the table schema using the Doctrine schema tool:</p>
+    <pre><code class="language-bash">php rhapsody doctrine:schema:update --force</code></pre>
+    <p>Or create a migration for production.</p>
+{% endblock %}
