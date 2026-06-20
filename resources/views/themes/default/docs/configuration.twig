@@ -17,6 +17,8 @@
     <p>You can create additional config files in the <code>config/</code> folder and load them in your controllers or services as needed:</p>
     <pre><code class="language-php">$myConfig = require __DIR__ . '/config/my-settings.php';</code></pre>
 
+    <hr>
+
     <h2>Environment Variables (<code>.env</code>)</h2>
     <p>
         The <code>.env</code> file contains sensitive or environment‑specific data. Never commit it to version control. Use <code>.env.example</code> as a template.
@@ -26,19 +28,68 @@ APP_BASE_URL="/rhapsody"
 DB_HOST=127.0.0.1
 CACHE_DRIVER=file</code></pre>
 
+    <hr>
+
+    <h2>View File Hierarchy & Theme System</h2>
+    <p>
+        Rhapsody uses Twig for templating. The framework looks for view files in a specific order, making it easy to override core templates or build custom themes.
+    </p>
+
+    <h3>Directory Structure</h3>
+    <p>The default view directories are:</p>
+    <pre><code class="language-bash">views/
+├── themes/
+│   ├── default/          ← Fallback theme (always available)
+│   │   
+│   └── my_custom_theme/  ← Your active theme (if set)
+│       ├── layouts/
+│       └── home/
+└── core/                  ← Core framework views (default, but overridable)
+    ├── layouts/
+    ├── docs/
+    └── ...</code></pre>
+
+    <h3>Theme Resolution Order</h3>
+    <p>When you render a view (e.g., <code>$this->view('home/index.twig')</code>), the framework searches in this order:</p>
+    <ol>
+        <li><strong>Active theme</strong> – <code>views/themes/{{ APP_THEME }}/</code></li>
+        <li><strong>Default theme</strong> – <code>views/themes/default/</code></li>
+        <li><strong>Core views</strong> – <code>views/core/</code></li>
+    </ol>
+    <p>If a template exists in your active theme, it is used. Otherwise, the framework falls back to the default theme, and finally to the core view. The application will throw a fatal error if it cannot find your template in one of the above directories.</p>
+
+    <h3>Setting the Active Theme</h3>
+    <p>Define the theme in your <code>.env</code> file:</p>
+    <pre><code class="language-bash">APP_THEME=my_custom_theme</code></pre>
+    <p>If not set, the default theme is used.</p>
+
+    <h3>Overriding Core Templates</h3>
+    <p>To override a core template (e.g., the main layout), simply create a file with the same path inside your active theme. For example, to override <code>views/core/layouts/main.twig</code>, create <code>views/themes/my_custom_theme/layouts/main.twig</code>.</p>
+    <p>You can also extend core templates using Twig’s <code>{% extends %}</code> tag with the <code>@core</code> namespace:</p>
+    <pre><code>{% extends "@core/layouts/main.twig" %}</code></pre>
+
+    <h3>Custom View Namespaces</h3>
+    <p>If you need additional view directories (e.g., for reusable modules), you can add them to the Twig loader in <code>bootstrap.php</code>:</p>
+    <pre><code class="language-php">$loader->addPath(__DIR__ . '/modules/blog/views', 'blog');</code></pre>
+    <p>Then render a view using the namespace: <code>$this->view('@blog/index.twig')</code>.</p>
+
+    <h3>Error Pages</h3>
+    <p>Custom error pages (404, 500, etc.) can be placed in <code>themes/{{ APP_THEME }}/errors/</code>. The framework will automatically use the theme’s error template if it exists, falling back to the default theme.</p>
+
+    <hr>
+
     <h2>Middleware Configuration</h2>
     <p>See the <a href="{{ base_url }}/docs/middleware">Middleware documentation</a> for details on <code>config/middleware.php</code>.</p>
 
-    <h2>Theme and View Configuration</h2>
-    <p>Set the active theme in <code>.env</code>:</p>
-    <pre><code class="language-php">APP_THEME=my_custom_theme</code></pre>
-    <p>The framework automatically looks for templates in <code>views/themes/my_custom_theme/</code> and falls back to <code>views/themes/default/</code>.</p>
+    <hr>
 
     <h2>Cache Driver</h2>
     <p>Switch between <code>file</code> and <code>redis</code> drivers in <code>.env</code>:</p>
     <pre><code class="language-bash">CACHE_DRIVER=redis
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6379</code></pre>
+
+    <hr>
 
     <h2>Logging</h2>
     <p>Configure log paths in <code>config.php</code> under the <code>logging</code> key.</p>

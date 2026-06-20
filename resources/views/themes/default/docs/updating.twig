@@ -29,17 +29,9 @@
 
     <hr>
     
-    <h2>Automatic Version Checking</h2>
+    <h2>After Updating</h2>
     <p>
-        The framework can automatically check for new releases and notify you. This is handled by the <code>app:check-version</code> command, which is designed to be run as a scheduled task (e.g., a cron job).
+        After pulling the latest framework version, always run <code>php rhapsody env:sync</code>
+        to add any new environment variables required by the new version.
     </p>
-    <pre class="command-line"><code class="language-bash"># Run this command hourly via a cron job
-php rhapsody app:check-version
-</code></pre>
-    <h3>Notification Methods</h3>
-    <ul>
-        <li><strong>Development:</strong> If <code>APP_ENV=development</code>, a non-intrusive notification banner will be injected at the bottom of your web pages. Clicking it opens a modal with the latest release notes.</li>
-        <li><strong>Production:</strong> If <code>APP_ENV=production</code>, the command will send a notification email to the address specified in the <code>MAIL_ADMIN_EMAIL</code> variable in your <code>.env</code> file.</li>
-    </ul>
-    <p>The system is designed to only send one notification per new version to avoid spam.</p>
 {% endblock %}
