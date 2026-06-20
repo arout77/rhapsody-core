@@ -59,8 +59,11 @@ CACHE_DRIVER=file</code></pre>
     <ol>
         <li><strong>Active theme</strong> – <code>views/themes/{{ APP_THEME }}/</code> <small>← this is what you currently have set in <code>.env</code></small></li>
         <li><strong>Default theme</strong> – <code>views/themes/default/</code></li>
-        <li><strong>Core views</strong> – <code>views/core/</code></li>
+        <li><strong>Core views</strong> – <code>/vendor/arout/rhapsody-core/resources/views/themes/default/</code></li>
     </ol>
+    <div class="bg-red-200 border-l-4 border-red-700 text-red-700 p-4">
+        <strong>Danger:</strong> - Never - modify or add view files in the <code>/vendor</code> directory. It is only listed above for informational purposes. Instead, if you want to use the framework's styling/theme, create a <strong>new</strong> `default` directory in <code>/views/themes/</code> if it does not already exist.
+    </div>
     <p>If a template exists in your active theme, it is used. Otherwise, the framework falls back to the default theme, and finally to the core view. The application will throw a fatal error if it cannot find your template in one of the above directories.</p>
 
     <h3>Setting the Active Theme</h3>
