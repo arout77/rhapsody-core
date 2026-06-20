@@ -3,7 +3,6 @@ namespace Rhapsody\Core\Routing;
 
 use Rhapsody\Core\Container;
 use Rhapsody\Core\Exceptions\HttpException;
-use Rhapsody\Core\Middleware\VerifyCsrfTokenMiddleware;
 use Rhapsody\Core\Request;
 use Rhapsody\Core\Response;
 
@@ -32,9 +31,7 @@ class Router
      * Global middleware runs on every matched request.
      * @var array
      */
-    protected static array $globalMiddleware = [
-        VerifyCsrfTokenMiddleware::class,
-    ];
+    protected static array $globalMiddleware = [];
 
     /**
      * The route that was successfully matched.
@@ -43,15 +40,14 @@ class Router
     protected static ?Route $matchedRoute = null;
 
     /**
-     * Set middleware configuration from the application.
+     * Set the middleware configuration from the application.
      *
-     * @param array $map Associative array of key => class name.
-     * @param array $global List of global middleware class names.
+     * @param array $config Associative array with 'global' and 'route' keys.
      */
-    public static function setMiddlewareConfig(array $map, array $global): void
+    public static function setMiddlewareConfig(array $config): void
     {
-        self::$middlewareMap    = $map;
-        self::$globalMiddleware = $global;
+        self::$globalMiddleware = $config['global'] ?? [];
+        self::$middlewareMap    = $config['route'] ?? [];
     }
 
     /**
@@ -99,7 +95,7 @@ class Router
             if ($route->matches($method, $path)) {
                 self::$matchedRoute = $route;
 
-                // Run global middleware (can return Response)
+                // Run global middleware
                 foreach (self::$globalMiddleware as $middlewareClass) {
                     $middleware = $container->resolve($middlewareClass);
                     $response   = $middleware->handle($request);
@@ -174,11 +170,17 @@ class Router
         return self::$matchedRoute;
     }
 
+    /**
+     * Returns all registered routes.
+     */
     public static function getRoutes(): array
     {
         return self::$routes;
     }
 
+    /**
+     * Sets the route collection (useful for caching).
+     */
     public static function setRoutes(array $routes): void
     {
         self::$routes = $routes;

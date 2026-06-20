@@ -1,6 +1,5 @@
 <?php
-
-namespace Core\Events;
+namespace Rhapsody\Core\Events;
 
 /**
  * Defines the contract for all event listeners.
@@ -15,5 +14,5 @@ interface ListenerInterface
      * @param Event $event The event object containing relevant data.
      * @return void
      */
-    public function handle( Event $event ): void;
+    public function handle(Event $event): void;
 }

@@ -1,6 +1,5 @@
 <?php
-
-namespace Core\Events;
+namespace Rhapsody\Core\Events;
 
 /**
  * A base class for all event objects.

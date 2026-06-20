@@ -34,10 +34,10 @@ class AuthController extends BaseController implements AuthenticatableInterface
      * Display the login form.
      * * @return Response
      */
-    public function showLoginForm()
+    public function showLoginForm(): Response
     {
         // The "@core" namespace maps directly to vendor/arout/rhapsody-core/resources/views/
-        return $this->twig->render('@core/auth/login.twig');
+        return $this->view('@core/auth/login.twig');
     }
 
     /**

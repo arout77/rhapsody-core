@@ -41,6 +41,31 @@ abstract class BaseController
             // Fallback safety if the container isn't initialized yet (e.g. in standalone testing)
             throw new \Exception("Database service has not been properly initialized inside the Service Container.");
         }
+        $appVersion = $this->cache->get('update_available'); // Or fetch via configuration setup
+        $appUrl     = $_ENV['APP_URL'] ?? 'http://localhost';
+
+        $this->schema->add('SoftwareApplication', [
+            'name'                => 'Rhapsody Framework',
+            'description'         => 'Rhapsody is a lightweight, modern PHP framework for building elegant and maintainable web applications.',
+            'applicationCategory' => 'DeveloperApplication',
+            'operatingSystem'     => 'Web',
+            'softwareVersion'     => $appVersion,
+            'url'                 => $appUrl,
+            'author'              => [
+                '@type' => 'Person',
+                'name'  => 'Andrew Rout',
+            ],
+            'programmingLanguage' => [
+                '@type' => 'ComputerLanguage',
+                'name'  => 'PHP',
+            ],
+            'image'               => $appUrl . '/public/img/logo.png',
+            'offers'              => [
+                '@type'         => 'Offer',
+                'price'         => '0',
+                'priceCurrency' => 'USD',
+            ],
+        ]);
     }
 
     /**

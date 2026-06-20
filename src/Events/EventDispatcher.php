@@ -1,5 +1,5 @@
 <?php
-namespace Core\Events;
+namespace Rhapsody\Core\Events;
 
 use Rhapsody\Core\Container;
 
