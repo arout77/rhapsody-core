@@ -2,6 +2,7 @@
 
 use Rhapsody\Core\Controllers\AuthController;
 use Rhapsody\Core\Controllers\DocsController;
+use Rhapsody\Core\Routing\Router;
 
 // Assumes your Router instance is injected or accessible
 Router::get('/login', [AuthController::class, 'showLoginForm']);
