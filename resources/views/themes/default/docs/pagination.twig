@@ -13,7 +13,7 @@
         <li>A method to count the total number of records (e.g., <code>countAll()</code>).</li>
         <li>A method to fetch a specific "slice" of records using <code>LIMIT</code> and <code>OFFSET</code> (e.g., <code>findPaginated()</code>).</li>
     </ul>
-    <pre><code>// app/Models/User.php
+    <pre><code class="language-php">// app/Models/User.php
 public function countAll(): int
 {
     $stmt = $this->db->query("SELECT COUNT(user_id) FROM users");
@@ -39,7 +39,7 @@ public function findPaginated(int $limit, int $offset): array
         <li>Use the pagination object's <code>getLimit()</code> and <code>getOffset()</code> methods to fetch the correct data slice from your model.</li>
         <li>Pass both the data and the pagination object to your view.</li>
     </ol>
-    <pre><code>// app/Controllers/PageController.php
+    <pre><code class="language-php">// app/Controllers/PageController.php
 use Rhapsody\Core\Pagination;
 use Rhapsody\Core\Request;
 
@@ -70,7 +70,7 @@ public function showUsers(Request $request): Response
         In your Twig template, you can now call the <code>render()</code> method on the pagination object to generate the navigation links.
         The <code>|raw</code> filter is required to output the HTML.
     </p>
-    <pre><code>&lt;!-- views/home/users.twig --&gt;
+    <pre><code class="language-php">&lt;!-- views/home/users.twig --&gt;
 &lt;div class="flex justify-center mt-8"&gt;
     {{ pagination.render()|raw }}
 &lt;/div&gt;</code></pre>

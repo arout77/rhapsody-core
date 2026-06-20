@@ -12,7 +12,7 @@
         In your controller, you can instantiate the validator, define your rules, and then check if the data passes.
         If validation fails, you can easily get the error messages and pass them back to the view.
     </p>
-    <pre><code>// In a controller method, e.g., handleContact()
+    <pre><code class="language-php">// In a controller method, e.g., handleContact()
 use Rhapsody\Core\Validator;
 
 $data = $request->getBody();
@@ -40,7 +40,7 @@ if ($validator->validate($data, $rules)) {
         When validation fails, the controller passes an <code>errors</code> object and an <code>old</code> object back to the view.
         You can use these to repopulate the form and display error messages next to the relevant fields.
     </p>
-    <pre><code>&lt;!-- In your Twig template --&gt;
+    <pre><code class="language-php">&lt;!-- In your Twig template --&gt;
 &lt;label for="email"&gt;Email&lt;/label&gt;
 &lt;input type="email" name="email" value="{{ old.email|e }}"
        class="{{ errors.email ? 'border-red-500' : '' }}"&gt;

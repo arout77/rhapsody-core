@@ -6,7 +6,7 @@
 
     <h2>Dynamic Meta Tags</h2>
     <p>You can provide a unique title and meta description for any page by passing a third argument to the <code>view()</code> helper in your controller. The framework will automatically use this data to generate <code>&lt;title&gt;</code>, <code>&lt;meta name="description"&gt;</code>, and Open Graph tags.</p>
-    <pre><code>// In a controller
+    <pre><code class="language-php">// In a controller
 public function viewUser(Request $request, string $user_id)
 {
     $user = $this->userModel->findById($user_id);
@@ -20,7 +20,7 @@ public function viewUser(Request $request, string $user_id)
 }</code></pre>
 
     <h2>Canonical URLs</h2>
-    <p>The main layout automatically generates a <code>&lt;link rel="canonical"&gt;</code> tag for every page. This tells search engines the preferred URL for your content, preventing duplicate content issues. The generation is handled by the <code>Request::getCanonicalUrl()</code> method, which you can customise by passing allowed query parameters.</p>
+    <p>The main layout automatically generates a <code class="language-php">&lt;link rel="canonical"&gt;</code> tag for every page. This tells search engines the preferred URL for your content, preventing duplicate content issues. The generation is handled by the <code>Request::getCanonicalUrl()</code> method, which you can customise by passing allowed query parameters.</p>
     <p>Make sure the <code>APP_URL</code> variable is set correctly in your <code>.env</code> file.</p>
 
     <h2>Structured Data with Schema.org</h2>
@@ -29,7 +29,7 @@ public function viewUser(Request $request, string $user_id)
     </p>
     <h3>Basic Usage</h3>
     <p>In your controller, create an instance of <code>SchemaOrg</code>, add schemas with the <code>add()</code> method, and then render them.</p>
-    <pre><code>use Rhapsody\Core\SEO\SchemaOrg;
+    <pre><code class="language-php">use Rhapsody\Core\SEO\SchemaOrg;
 
 $schema = new SchemaOrg();
 $schema->add('Article', [

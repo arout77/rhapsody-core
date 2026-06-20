@@ -21,7 +21,7 @@
     <p>
         The <code>.env</code> file contains sensitive or environment‑specific data. Never commit it to version control. Use <code>.env.example</code> as a template.
     </p>
-    <pre><code>APP_ENV=development
+    <pre><code class="language-bash">APP_ENV=development
 APP_BASE_URL="/rhapsody"
 DB_HOST=127.0.0.1
 CACHE_DRIVER=file</code></pre>
@@ -31,12 +31,12 @@ CACHE_DRIVER=file</code></pre>
 
     <h2>Theme and View Configuration</h2>
     <p>Set the active theme in <code>.env</code>:</p>
-    <pre><code>APP_THEME=my_custom_theme</code></pre>
+    <pre><code class="language-php">APP_THEME=my_custom_theme</code></pre>
     <p>The framework automatically looks for templates in <code>views/themes/my_custom_theme/</code> and falls back to <code>views/themes/default/</code>.</p>
 
     <h2>Cache Driver</h2>
     <p>Switch between <code>file</code> and <code>redis</code> drivers in <code>.env</code>:</p>
-    <pre><code>CACHE_DRIVER=redis
+    <pre><code class="language-bash">CACHE_DRIVER=redis
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6379</code></pre>
 

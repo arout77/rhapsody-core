@@ -14,7 +14,7 @@
         a base layout and have other templates "extend" it.
     </p>
     <p>Our framework uses <code>views/layouts/main.twig</code> as the main site template. It contains all the common HTML, including the header, navigation, and footer.</p>
-    <pre><code>&lt;!-- views/layouts/main.twig --&gt;
+    <pre><code class="language-php">&lt;!-- views/layouts/main.twig --&gt;
 &lt;!DOCTYPE html&gt;
 &lt;html&gt;
     &lt;body&gt;
@@ -28,7 +28,7 @@
     &lt;/body&gt;
 &lt;/html&gt;</code></pre>
     <p>A specific page template then extends this layout and provides content only for the <code>content</code> block.</p>
-    <pre><code>{# views/home/index.twig #}
+    <pre><code class="language-php">{# views/home/index.twig #}
 &lcub;% extends "layouts/main.twig" %&rcub;
 
 &lcub;% block content %}
@@ -38,7 +38,7 @@
 
     <h2>Displaying Data</h2>
     <p>You can print data passed from your controller using double curly braces: <code>&lcub;{ ... }&rcub;</code>. Twig automatically escapes this output to prevent XSS attacks, making it secure by default.</p>
-    <pre><code>// In your controller
+    <pre><code class="language-php">// In your controller
 return $this->view('profile.twig', ['username' => 'Alice']);
 
 {# In profile.twig #}

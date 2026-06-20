@@ -13,7 +13,7 @@
 
     <h2>Creating a Controller</h2>
     <p>Here is a basic example of a controller class.</p>
-    <pre><code>&lt;?php
+    <pre><code class="language-php">&lt;?php
 
 namespace App\Controllers;
 
@@ -41,7 +41,7 @@ class PageController extends BaseController
 
     <h3>Returning a View</h3>
     <p>The most common action is to return a rendered Twig template. The <code>view()</code> helper method handles this.</p>
-    <pre><code>public function index(): Response
+    <pre><code class="language-php">public function index(): Response
 {
     $userModel = new User();
     $users = $userModel->findAll();
@@ -58,7 +58,7 @@ class PageController extends BaseController
         The router automatically injects an instance of the <code>Core\Request</code> object as the first parameter to every controller action.
         This object is a wrapper around superglobals like <code>$_GET</code>, <code>$_POST</code>, and <code>$_FILES</code> and provides helpful methods for inspecting the incoming request.
     </p>
-    <pre><code>public function handleContact(Request $request): Response
+    <pre><code class="language-php">public function handleContact(Request $request): Response
 {
     // Get the request method (e.g., 'post')
     $method = $request->getMethod();

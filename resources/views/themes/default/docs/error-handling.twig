@@ -96,7 +96,7 @@ public function show(string $id): Response
     <p>
         Each error is logged using the <code>Core\Logger</code> class. A typical log entry looks like:
     </p>
-    <pre><code>[2025-06-15 14:32:10] ERROR: [PDOException] SQLSTATE[42S02]: Base table or view not found in /var/www/app/Models/User.php:45
+    <pre><code class="language-php">[2025-06-15 14:32:10] ERROR: [PDOException] SQLSTATE[42S02]: Base table or view not found in /var/www/app/Models/User.php:45
 Stack trace:
 #0 /var/www/app/Models/User.php(45): PDO->prepare()
 #1 /var/www/app/Controllers/UserController.php(22): App\Models\User->findById()

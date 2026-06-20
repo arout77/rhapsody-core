@@ -20,7 +20,7 @@
 
     <h2>Creating a Model</h2>
     <p>A model typically represents one database table. For example, a <code>User</code> model would handle all operations for the <code>users</code> table.</p>
-    <pre><code>&lt;?php
+    <pre><code class="language-php">&lt;?php
 
 namespace App\Models;
 
@@ -64,7 +64,7 @@ class User extends BaseModel
         The correct workflow is to use <code>prepare()</code>, then <code>bindParam()</code> or pass an array to <code>execute()</code>.
         Never concatenate variables directly into a SQL string.
     </p>
-    <pre><code>// GOOD: Secure and correct
+    <pre><code class="language-php">// GOOD: Secure and correct
 $stmt = $this->db->prepare("SELECT * FROM users WHERE email = :email");
 $stmt->execute([':email' => $email]);
 $user = $stmt->fetch();
