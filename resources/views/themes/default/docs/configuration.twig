@@ -13,6 +13,11 @@
         <li><code>config/middleware.php</code> – middleware definitions (map and global list).</li>
     </ul>
 
+    <hr>
+    <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
+        <strong>Golden Rule:</strong> If you need to change behaviour, look for a configuration file first. Only extend or replace classes – <strong>never</strong> edit core files directly.
+    </div>
+
     <h3>Adding New Configuration</h3>
     <p>You can create additional config files in the <code>config/</code> folder and load them in your controllers or services as needed:</p>
     <pre><code class="language-php">$myConfig = require __DIR__ . '/config/my-settings.php';</code></pre>
@@ -65,8 +70,8 @@ CACHE_DRIVER=file</code></pre>
 
     <h3>Overriding Core Templates</h3>
     <p>To override a core template (e.g., the main layout), simply create a file with the same path inside your active theme. For example, to override <code>views/core/layouts/main.twig</code>, create <code>views/themes/my_custom_theme/layouts/main.twig</code>.</p>
-    <p>You can also extend core templates using Twig’s <code>{% extends %}</code> tag with the <code>@core</code> namespace:</p>
-    <pre><code>{% extends "@core/layouts/main.twig" %}</code></pre>
+    <p>You can also extend core templates using Twig’s <code>{{ '{%' }} extends {{ '%}' }}</code> tag with the <code>@core</code> namespace:</p>
+    <pre><code class="language-twig">{{ '{%' }} extends "@core/layouts/main.twig" {{ '%}' }}</code></pre>
 
     <h3>Custom View Namespaces</h3>
     <p>If you need additional view directories (e.g., for reusable modules), you can add them to the Twig loader in <code>bootstrap.php</code>:</p>
@@ -93,9 +98,4 @@ REDIS_PORT=6379</code></pre>
 
     <h2>Logging</h2>
     <p>Configure log paths in <code>config.php</code> under the <code>logging</code> key.</p>
-
-    <hr>
-    <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
-        <strong>Golden Rule:</strong> If you need to change behaviour, look for a configuration file first. Only extend or replace classes – never edit core files directly.
-    </div>
 {% endblock %}
