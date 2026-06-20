@@ -1,8 +1,8 @@
 {% extends "@core/docs/_layout.twig" %}
 
 {% block doc_content %}
-    <h1>Advanced SEO</h1>
-    <p>Rhapsody includes several features to help you optimize your application for search engines and social media sharing.</p>
+    <h1>SEO Helpers</h1>
+    <p>Rhapsody provides a set of tools to help you optimise your application for search engines and social media sharing.</p>
 
     <h2>Dynamic Meta Tags</h2>
     <p>You can provide a unique title and meta description for any page by passing a third argument to the <code>view()</code> helper in your controller. The framework will automatically use this data to generate <code>&lt;title&gt;</code>, <code>&lt;meta name="description"&gt;</code>, and Open Graph tags.</p>
@@ -20,8 +20,70 @@ public function viewUser(Request $request, string $user_id)
 }</code></pre>
 
     <h2>Canonical URLs</h2>
-    <p>The main layout automatically generates a <code>&lt;link rel="canonical"&gt;</code> tag for every page. This tells search engines the preferred URL for your content, preventing duplicate content issues. This relies on the <code>APP_URL</code> variable being set correctly in your <code>.env</code> file.</p>
-    
+    <p>The main layout automatically generates a <code>&lt;link rel="canonical"&gt;</code> tag for every page. This tells search engines the preferred URL for your content, preventing duplicate content issues. The generation is handled by the <code>Request::getCanonicalUrl()</code> method, which you can customise by passing allowed query parameters.</p>
+    <p>Make sure the <code>APP_URL</code> variable is set correctly in your <code>.env</code> file.</p>
+
+    <h2>Structured Data with Schema.org</h2>
+    <p>
+        The <code>Rhapsody\Core\SEO\SchemaOrg</code> class allows you to add JSON‑LD structured data to your pages. This helps search engines understand your content and can improve your appearance in rich results.
+    </p>
+    <h3>Basic Usage</h3>
+    <p>In your controller, create an instance of <code>SchemaOrg</code>, add schemas with the <code>add()</code> method, and then render them.</p>
+    <pre><code>use Rhapsody\Core\SEO\SchemaOrg;
+
+$schema = new SchemaOrg();
+$schema->add('Article', [
+    'headline'      => 'My Great Article',
+    'author'        => ['@type' => 'Person', 'name' => 'John Doe'],
+    'datePublished' => '2025-01-01',
+    'image'         => 'https://example.com/image.jpg',
+]);
+
+// Pass the rendered markup to the view
+$args['schema_markup'] = $schema->render();</code></pre>
+    <p>
+        If you are extending <code>BaseController</code>, the <code>$this->schema</code> property is already available, and the <code>view()</code> method will automatically inject the rendered schemas into the template as <code>schema_markup</code>.
+    </p>
+    <pre><code>// Inside a controller that extends BaseController
+$this->schema->add('Product', [
+    'name'        => 'Awesome Widget',
+    'description' => 'The best widget ever.',
+    'sku'         => 'ABC123',
+    'offers'      => [
+        '@type'         => 'Offer',
+        'price'         => '19.99',
+        'priceCurrency' => 'USD',
+    ],
+]);
+
+return $this->view('product.twig', ['product' => $product]);</code></pre>
+
+    <h2>Creating URL Slugs with Sluggify</h2>
+    <p>
+        The <code>Rhapsody\Core\SEO\Sluggify</code> class provides a static method <code>transform()</code> that converts any string into a clean, SEO‑friendly URL slug. It handles accents, special characters, ampersands, and more.
+    </p>
+    <h3>Example</h3>
+    <pre><code>use Rhapsody\Core\SEO\Sluggify;
+
+$title = "1 & 2 Samuel: King David's Reign!";
+$slug = Sluggify::transform($title);
+// Result: '1-2-samuel-king-davids-reign'</code></pre>
+    <p>The transformation steps are:</p>
+    <ul>
+        <li>Replace <code>&amp;</code> with <code>and</code></li>
+        <li>Replace non‑letter/digit characters with a single dash</li>
+        <li>Transliterate accents to ASCII</li>
+        <li>Remove any remaining unwanted characters</li>
+        <li>Trim and collapse multiple dashes</li>
+        <li>Convert to lowercase</li>
+    </ul>
+    <p>If the result would be empty, it returns <code>'n-a'</code> (not available).</p>
+    <p>Use this helper when generating slugs (or full href links) for blog posts, categories, or any dynamic content:</p>
+    <pre><code>$post = new Post();
+$post->title = $request->post('title');
+$post->slug = Sluggify::transform($post->title);
+$post->save();</code></pre>
+
     <h2>Sitemap</h2>
     <p>The framework can automatically generate a <code>sitemap.xml</code> file for you. Simply navigate to <code>/sitemap.xml</code>. This file lists all your public pages, making it easy for search engines like Google to discover and index your entire site. You can customize which pages are included by editing <code>app/Controllers/SitemapController.php</code>.</p>
     

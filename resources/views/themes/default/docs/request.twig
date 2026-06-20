@@ -49,6 +49,29 @@ $email    = $allInput['email'] ?? null;</code></pre>
     // ...
 }</code></pre>
 
+    <h3>All Query Parameters</h3>
+    <p>
+        Use <code>allQueryParams()</code> to retrieve an associative array of <strong>all</strong> GET parameters from the current request. This is useful when you need to inspect or forward the entire query string.
+    </p>
+    <pre><code class="language-php">$params = $request->allQueryParams();
+// e.g., ['page' => 2, 'sort' => 'asc', 'filter' => 'active']</code></pre>
+
+    <h3>Canonical URL</h3>
+    <p>
+        The <code>getCanonicalUrl()</code> method builds a clean, SEO‑friendly canonical URL for the current request. It automatically:
+    </p>
+    <ul>
+        <li>Detects the correct protocol (<code>http://</code> or <code>https://</code>).</li>
+        <li>Uses the host from <code>$_SERVER['HTTP_HOST']</code>.</li>
+        <li>Strips the path to its bare structure (no extra text).</li>
+        <li>Retains only allowed query parameters (by default, only <code>page</code> is kept).</li>
+    </ul>
+    <p>
+        This method is used internally by the main layout to generate the <code>&lt;link rel="canonical"&gt;</code> tag, but you can also call it manually if you need the value elsewhere.
+    </p>
+    <pre><code class="language-php">// Keep only 'page' and 'category' in the canonical URL
+$canonical = $request->getCanonicalUrl(['page', 'category']);</code></pre>
+
     <h3>Retrieving Uploaded Files</h3>
     <p>You can access information about uploaded files using the <code>getFiles()</code> method, which returns the contents of the <code>$_FILES</code> superglobal.</p>
     <pre><code class="language-php">public function handleUpload(Request $request): Response
