@@ -1,17 +1,18 @@
 <!DOCTYPE html>
-<html lang="en" class="antialiased">
+<html lang="en" class="antialiased light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
     {# Dynamic Title & Description Blocks #}
     <title>{% block title %}{{ meta.title }}{% endblock %}</title>
-    <meta name="description" content="{% block description %}{{ meta.description|e('html_attr') }}{% endblock %}">
+    <meta name="description" content="{% block description %}{{ meta.description }}{% endblock %}">
     
     {# Assumes the full URL is needed for canonical and OG tags #}
     {% set current_url = app_url ~ app.request.uri %}
-    <link rel="canonical" href="{{ current_url }}">
-
+    {% if meta.canonical_url %}
+        <link rel="canonical" href="{{ meta.canonical_url }}">
+    {% endif %}
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ current_url }}">
     <meta property="og:title" content="{{ meta.title }}">
@@ -40,9 +41,12 @@
         // This script runs before the rest of the page to prevent "flashing"
         // It sets the theme based on the user's saved preference or OS setting.
         if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.remove('light');
             document.documentElement.classList.add('dark');
-        } else {
+        } 
+        else {
             document.documentElement.classList.remove('dark');
+            document.documentElement.classList.add('light');
         }
     </script>
 
@@ -147,9 +151,11 @@
                     } else {
                         localStorage.setItem('theme', theme);
                         if (theme === 'dark') {
+                            document.documentElement.classList.remove('light');
                             document.documentElement.classList.add('dark');
                         } else {
                             document.documentElement.classList.remove('dark');
+                            document.documentElement.classList.add('light');
                         }
                     }
                     updateButtonUI(theme);
@@ -168,8 +174,10 @@
                 });
 
                 const savedTheme = localStorage.getItem('theme');
-                if (savedTheme && themes.includes(savedTheme)) {
-                    applyTheme(savedTheme);
+                if (document.documentElement.classList.contains('light')) {
+                    applyTheme('light');
+                } else if (document.documentElement.classList.contains('dark')){
+                    applyTheme('dark');
                 } else {
                     applyTheme('system');
                 }

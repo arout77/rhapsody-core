@@ -12,8 +12,7 @@ class Request
 
     public function __construct()
     {
-        // Automatically sanitize all incoming $_GET data immediately on initialization
-        $this->getParams  = $this->sanitizeArray($_GET);
+        $this->getParams  = $_GET;
         $this->postParams = $_POST;
         $this->cookies    = $_COOKIE;
         $this->files      = $_FILES;
@@ -22,19 +21,33 @@ class Request
     }
 
     /**
-     * Internal helper to sanitize an input array against basic XSS and Null-Byte injection.
+     * Automatically generates a clean, standardized canonical URL tag.
+     * Filters out non-structural parameters to prevent duplicate content penalties.
+     *
+     * @param array $allowedParams Query parameters allowed to persist in the canonical link (e.g., 'page')
+     * @return string
      */
-    private function sanitizeArray(array $data): array
+    public function getCanonicalUrl(array $allowedParams = ['page']): string
     {
-        return array_map(function ($value) {
-            if (is_string($value)) {
-                // Eliminate potential hidden null-byte characters
-                $value = str_replace(chr(0), '', $value);
-                // Sanitize special characters
-                return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
-            }
-            return $value;
-        }, $data);
+        // 1. Determine the active server protocol securely
+        $protocol = (! empty($this->server['HTTPS']) && $this->server['HTTPS'] !== 'off') ? 'https://' : 'http://';
+
+        // 2. Capture the exact host domain
+        $host = $this->server['HTTP_HOST'] ?? 'localhost';
+
+        // 3. Extract only the clean structural path mapping (removes raw text strings)
+        $path = parse_url($this->server['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+
+        // 4. Isolate tracking keys using our pre-sanitized array snapshot
+        $filteredParams = array_intersect_key(
+            $this->getParams,
+            array_flip($allowedParams)
+        );
+
+        // 5. Reassemble query structure cleanly if allowed criteria are present
+        $queryString = ! empty($filteredParams) ? '?' . http_build_query($filteredParams) : '';
+
+        return $protocol . $host . $path . $queryString;
     }
 
     public function getMethod(): string
@@ -68,19 +81,26 @@ class Request
 
     /**
      * Gets the request body, supporting both traditional form data and JSON payloads.
+     * Returns raw values — sanitization is the responsibility of the Validator or controller.
+     * Behaviour is now consistent regardless of how the client sends data.
+     *
+     * @return array
      */
     public function getBody(): array
     {
+        // 1. JSON content type (always attempt, regardless of HTTP method)
         if (isset($this->server['CONTENT_TYPE']) && str_contains(strtolower($this->server['CONTENT_TYPE']), 'application/json')) {
             $json = file_get_contents('php://input');
             $data = json_decode($json, true);
             return is_array($data) ? $data : [];
         }
 
+        // 2. For POST requests with form data, return $_POST
         if ($this->getMethod() === 'post' && ! empty($this->postParams)) {
             return $this->postParams;
         }
 
+        // 3. Fallback: parse php://input for PUT/PATCH/DELETE with application/x-www-form-urlencoded
         $input = file_get_contents('php://input');
         if (! empty($input) && str_contains($input, '=')) {
             parse_str($input, $data);
@@ -91,7 +111,9 @@ class Request
     }
 
     /**
-     * Fetch a general fallback parameter (reads from the already-sanitized getParams pool).
+     * @param string $key
+     * @param $default
+     * @return mixed
      */
     public function get(string $key, $default = null)
     {
@@ -99,7 +121,9 @@ class Request
     }
 
     /**
-     * Fetch a POST parameter.
+     * @param string $key
+     * @param $default
+     * @return mixed
      */
     public function post(string $key, $default = null)
     {
@@ -107,46 +131,16 @@ class Request
     }
 
     /**
-     * Fetch a single query parameter. Now automatically safe!
-     * * @param string $key
-     * @param mixed $default
-     * @return mixed
+     * @param string $key
+     * @param $default
      */
     public function getQueryParam(string $key, $default = null)
     {
-        return $this->getParams[$key] ?? $default;
+        return filter_input(INPUT_GET, $key, FILTER_SANITIZE_SPECIAL_CHARS) ?? $default;
     }
 
     /**
-     * Fetch all query parameters as an associative array. Now automatically safe!
-     * * @return array
-     */
-    public function allQueryParams(): array
-    {
-        return $this->getParams;
-    }
-
-    /**
-     * Kept for backwards-compatibility context. Returns the pre-sanitized array.
-     * * @return array
-     */
-    public function safeQueryParams(): array
-    {
-        return $this->getParams;
-    }
-
-    /**
-     * Return raw, unfiltered query parameters explicitly if a developer ever needs them.
-     * Essential for cases where raw markup/HTML is intentionally allowed via a trusted query string.
-     * * @return array
-     */
-    public function rawQueryParams(): array
-    {
-        return $_GET;
-    }
-
-    /**
-     * @return array
+     * @return mixed
      */
     public function getFiles(): array
     {
