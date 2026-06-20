@@ -47,7 +47,7 @@ class Router
     public static function setMiddlewareConfig(array $config): void
     {
         self::$globalMiddleware = $config['global'] ?? [];
-        self::$middlewareMap    = $config['route'] ?? [];
+        self::$middlewareMap    = $config['map'] ?? [];
     }
 
     /**

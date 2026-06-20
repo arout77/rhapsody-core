@@ -1,0 +1,99 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>DDoS Protection</h1>
+    <p>
+        Rhapsody includes a built‑in DDoS (Distributed Denial of Service) protection middleware that limits the number of requests a single IP address can make within a given time window.
+        When the limit is exceeded, the middleware returns a <code>429 Too Many Requests</code> response with a <code>Retry‑After</code> header, preventing abuse.
+    </p>
+
+    <h2>How It Works</h2>
+    <p>
+        The protection is implemented as a <strong>global middleware</strong> (<code>Rhapsody\Core\Middleware\DdosMiddleware</code>). It runs on every request and tracks the request count per IP address using the framework’s cache system (file, Redis, etc.).
+    </p>
+    <p>
+        Once an IP exceeds the configured <code>max_requests</code> within the <code>time_window</code> (in seconds), it is blocked for the <code>block_duration</code> (in seconds). During the block period, all subsequent requests from that IP receive a <code>429</code> response.
+    </p>
+
+    <h2>Configuration</h2>
+    <p>
+        All settings are defined in your <code>config.php</code> file under the DDoS keys. You can also override them via environment variables in your <code>.env</code> file.
+    </p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Config Key</th>
+                <th>Environment Variable</th>
+                <th>Default</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>ddos_max_requests</code></td>
+                <td><code>DDOS_MAX_REQUESTS</code></td>
+                <td>60</td>
+                <td>Maximum allowed requests within the time window.</td>
+            </tr>
+            <tr>
+                <td><code>ddos_time_window</code></td>
+                <td><code>DDOS_TIME_WINDOW</code></td>
+                <td>60</td>
+                <td>Time window in seconds.</td>
+            </tr>
+            <tr>
+                <td><code>ddos_block_duration</code></td>
+                <td><code>DDOS_BLOCK_DURATION</code></td>
+                <td>300</td>
+                <td>How long (in seconds) to block the IP after the limit is exceeded.</td>
+            </tr>
+            <tr>
+                <td><code>ddos_whitelist</code></td>
+                <td><code>DDOS_WHITELIST</code></td>
+                <td><code>127.0.0.100,::100</code></td>
+                <td>Comma‑separated list of IP addresses that are never blocked (useful for internal services).</td>
+            </tr>
+            <tr>
+                <td><code>ddos_blacklist</code></td>
+                <td><code>DDOS_BLACKLIST</code></td>
+                <td>—</td>
+                <td>Comma‑separated list of IPs that are immediately blocked.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>Example <code>.env</code> Entries</h3>
+    <pre><code>DDOS_MAX_REQUESTS=10
+DDOS_TIME_WINDOW=30
+DDOS_BLOCK_DURATION=120
+DDOS_WHITELIST=127.0.0.1,::1,192.168.1.100</code></pre>
+
+    <h2>Enabling / Disabling</h2>
+    <p>
+        The middleware is automatically enabled when you include it in the <code>middleware.global</code> array in <code>config.php</code>.
+        To disable it, simply remove it from that list.
+    </p>
+
+    <h2>Customising the Response</h2>
+    <p>
+        The default response is a user‑friendly HTML page. If you need to return JSON (for API endpoints), you can override the <code>rateLimitExceededResponse()</code> method in your own middleware or extend the core class.
+    </p>
+
+    <h2>Cache Driver</h2>
+    <p>
+        The rate limiter uses the framework’s cache driver (<code>file</code>, <code>redis</code>, or <code>memcached</code>). For production, it is recommended to use a shared cache like Redis when running multiple servers behind a load balancer, so the request counters are synchronised.
+    </p>
+
+    <h2>Testing</h2>
+    <p>
+        You can simulate heavy traffic using tools like <code>ab</code> (Apache Bench) or a simple loop with <code>curl</code>:
+    </p>
+    <pre><code class="language-bash">for i in {1..20}; do curl -s -o /dev/null -w "Request $i: %{http_code}\n" http://your-site.com/; done</code></pre>
+    <p>After exceeding the limit, you should see <code>429</code> status codes.</p>
+
+    <h2>More Information</h2>
+    <p>
+        The DDoS protection is part of the core middleware system. For more advanced use cases (e.g., endpoint‑specific limits, CAPTCHA challenges), you can extend the provided classes or write your own middleware.
+    </p>
+{% endblock %}

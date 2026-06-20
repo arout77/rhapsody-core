@@ -1,8 +1,8 @@
 <?php
 namespace Rhapsody\Core\Middleware;
 
-use Core\Request;
-use Core\Session;
+use Rhapsody\Core\Request;
+use Rhapsody\Core\Session;
 
 class GuestMiddleware extends Middleware
 {
