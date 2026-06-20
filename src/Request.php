@@ -139,6 +139,11 @@ class Request
         return filter_input(INPUT_GET, $key, FILTER_SANITIZE_SPECIAL_CHARS) ?? $default;
     }
 
+    public function allQueryParams()
+    {
+        return $this->getParams;
+    }
+
     /**
      * @return mixed
      */
