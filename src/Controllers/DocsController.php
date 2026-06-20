@@ -360,4 +360,13 @@ class DocsController extends BaseController
             'canonical_url' => $request->getCanonicalUrl(),
         ]);
     }
+
+    public function consoleCommands(Request $request): Response
+    {
+        return $this->view('@core/docs/console-commands.twig', [], [
+            'title'         => 'Console Commands – Rhapsody Documentation',
+            'description'   => 'Complete list of Rhapsody CLI commands with examples.',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
 }

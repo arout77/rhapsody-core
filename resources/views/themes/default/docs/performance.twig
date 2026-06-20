@@ -71,4 +71,41 @@ class PostController extends BaseController
         <li><code>$this->cache->has('key')</code>: Check if an item exists in the cache.</li>
         <li><code>$this->cache->forget('key')</code>: Remove an item from the cache.</li>
     </ul>
+
+    <hr>
+
+    <h2>Twig Template Caching</h2>
+    <p>
+        Twig compiles templates into plain PHP files for faster rendering. In production, you should pre‑compile all templates to avoid the overhead of compilation on the fly. Rhapsody provides a console command to do this:
+    </p>
+    <pre><code class="language-bash">php rhapsody app:cache-warm</code></pre>
+    <p>
+        This command scans all your theme and core view directories, compiles every <code>.twig</code> template, and stores the compiled PHP files in the cache directory (usually <code>storage/cache/views</code>).
+    </p>
+    <p>
+        Run this command after deploying your application or after making changes to your templates. It ensures that your users experience the fastest possible response times.
+    </p>
+    <p>
+        You can also clear the compiled template cache with:
+    </p>
+    <pre><code class="language-bash">php rhapsody cache:clear</code></pre>
+    <p>
+        This removes all compiled templates, forcing Twig to recompile them on the next request (useful during development).
+    </p>
+
+    <hr>
+
+    <h2>Route Caching</h2>
+    <p>
+        For high‑traffic applications, you can cache your route definitions to speed up routing. Generate a route cache with:
+    </p>
+    <pre><code class="language-bash">php rhapsody route:cache</code></pre>
+    <p>
+        This compiles all your routes into a PHP file that the router loads directly, bypassing the need to parse your route files on every request. Clear the route cache with:
+    </p>
+    <pre><code class="language-bash">php rhapsody route:clear</code></pre>
+
+    <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
+        <strong>Tip:</strong> In production, run <code>cache:clear</code> and <code>route:cache</code> as part of your deployment script to ensure optimal performance.
+    </div>
 {% endblock %}

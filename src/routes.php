@@ -34,3 +34,4 @@ Router::get('/docs/updating', [DocsController::class, 'updating']);
 Router::get('/docs/validation', [DocsController::class, 'validation']);
 Router::get('/docs/views', [DocsController::class, 'views']);
 Router::get('/docs/ddos-protection', [DocsController::class, 'ddosProtection']);
+Router::get('/docs/console-commands', [DocsController::class, 'consoleCommands']);
