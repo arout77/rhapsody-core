@@ -3,47 +3,80 @@
 {% block doc_content %}
     <h1>Google reCAPTCHA Integration</h1>
     <p>
-        Protect your application's sensitive forms from automated abuse effortlessly by combining Twig view injectors with the Rhapsody <code>Validator</code> engine.
+        Protect your application's sensitive forms (login, registration, password reset, etc.)
+        from automated abuse. The Rhapsody framework provides a seamless integration with
+        Google reCAPTCHA v2 (Checkbox) through a Twig view injector and a corresponding
+        validation rule.
     </p>
+
+    <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 my-4">
+        <strong>Prerequisite:</strong> You must have a valid Google reCAPTCHA API key pair.
+        <a href="https://www.google.com/recaptcha/admin" target="_blank" class="underline">Register your site here</a>.
+        Choose "reCAPTCHA v2" and "I'm not a robot" Checkbox.
+    </div>
 
     <hr>
 
     <h2>Step 1: Environment Variables</h2>
     <p>
-        Add your Google reCAPTCHA keys securely inside the application's <code>.env</code> configuration file:
+        Store your site and secret keys inside the application's <code>.env</code> file.
+        The framework reads these values via <code>$_ENV</code>.
     </p>
     <pre><code class="language-bash">RECAPTCHA_SITE_KEY="your_site_key_here"
 RECAPTCHA_SECRET_KEY="your_secret_key_here"
 </code></pre>
+    <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 my-4">
+        <strong>Note:</strong> If either key is missing or empty, the widget will not render
+        and the server‑side validation will automatically fail. This prevents insecure
+        fallback behaviour.
+    </div>
 
     <hr>
 
     <h2>Step 2: Frontend Rendering</h2>
     <p>
-        The base controller automatically binds the reCAPTCHA script and widget payload to the <code>captcha_form</code> variable. Print it out in your Twig form. 
+        The base controller (or a custom view composer) automatically binds the reCAPTCHA
+        script and widget markup to the <code>captcha_form</code> variable. You only need
+        to print this variable inside your Twig form.
     </p>
-    <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 my-4">
-        <strong>Important:</strong> Because this variable contains raw HTML markup, you must use the Twig <code>|raw</code> filter to prevent escaping brackets into safe HTML entities.
+    <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 my-4">
+        <strong>Critical:</strong> Because the variable contains raw HTML, you <em>must</em>
+        use the Twig <code>|raw</code> filter. Without it, the browser will display the
+        markup as plain text and the widget will not work.
     </div>
     <pre><code class="language-twig">&lt;form action="/register" method="POST"&gt;
-    {# CSRF Protection #}
-    {{ "{{ csrf_field }}" }}
-    
-    &lt;label&gt;Email&lt;/label&gt;
-    &lt;input type="email" name="email"&gt;
-    
-    &lt;!-- Render reCAPTCHA widget --&gt;
-    {{ "{{ captcha_form|raw }}" }}
-    
+&lt;!-- CSRF Protection – always include for POST forms -->
+{{ '{{' }} csrf_field() }}
+
+    &lt;label for="email"&gt;Email&lt;/label&gt;
+    &lt;input type="email" name="email" id="email" required&gt;
+
+    &lt;!-- The reCAPTCHA widget will be inserted here --&gt;
+    {{ '{{' }} captcha_form|raw }}
+
     &lt;button type="submit"&gt;Register&lt;/button&gt;
 &lt;/form&gt;
 </code></pre>
+    <p>
+        The rendered HTML includes:
+    </p>
+    <ul>
+        <li>The Google API script (<code>https://www.google.com/recaptcha/api.js</code>) loaded asynchronously.</li>
+        <li>A <code>div</code> with class <code>g-recaptcha</code> and your site key as a <code>data-sitekey</code> attribute.</li>
+    </ul>
+    <p>
+        You can customise the widget by passing additional attributes (e.g., <code>data-theme</code>, <code>data-size</code>)
+        by extending the <code>Recaptcha::render()</code> method – see the source code in
+        <code>Rhapsody\Core\Helpers\Recaptcha</code>.
+    </p>
 
     <hr>
 
     <h2>Step 3: Backend Validation Rule</h2>
     <p>
-        The framework systematically validates the hidden <code>g-recaptcha-response</code> field when you append the <code>recaptcha</code> string rule to your validation array.
+        The framework's validator includes a built‑in <code>recaptcha</code> rule.
+        When applied to the field named <code>g-recaptcha-response</code>, it verifies
+        the token with Google's API using your secret key.
     </p>
     <pre><code class="language-php">public function store(Request $request)
 {
@@ -55,10 +88,63 @@ RECAPTCHA_SECRET_KEY="your_secret_key_here"
     ];
 
     if (! $this->validator->validate($request->post(), $rules)) {
+        // Redirect back with error messages (flashed to session)
         return $this->redirectBackWithErrors($this->validator->getErrors());
     }
 
-    // Process secure registration...
+    // Registration logic – only reached if reCAPTCHA is valid
+    // ...
 }
 </code></pre>
+    <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 my-4">
+        <strong>Success:</strong> The <code>recaptcha</code> rule automatically handles:
+        <ul>
+            <li>Empty or missing token → validation fails.</li>
+            <li>Invalid secret key or network errors → validation fails (logged as a warning).</li>
+            <li>Valid token → passes, and you can safely proceed.</li>
+        </ul>
+    </div>
+
+    <hr>
+
+    <h2>Manual Verification (Optional)</h2>
+    <p>
+        If you need to verify the token outside the validator (e.g., in an AJAX endpoint),
+        you can use the static <code>Recaptcha::verify()</code> helper directly:
+    </p>
+    <pre><code class="language-php">use Rhapsody\Core\Helpers\Recaptcha;
+
+$responseToken = $request->post('g-recaptcha-response');
+$clientIp      = $request->getClientIp();
+
+if (Recaptcha::verify($responseToken, $clientIp)) {
+    // Token is valid
+} else {
+    // Handle failure
+}
+</code></pre>
+    <p>
+        The <code>verify()</code> method performs a POST request to Google's siteverify API
+        using PHP's stream context – no external HTTP client is required.
+    </p>
+
+    <hr>
+
+    <h2>Troubleshooting</h2>
+    <ul>
+        <li><strong>Widget does not appear:</strong> Check that <code>RECAPTCHA_SITE_KEY</code> is set in your <code>.env</code> and that the variable is printed with <code>|raw</code>.</li>
+        <li><strong>Validation always fails:</strong> Ensure your secret key is correct and that the domain in your Google admin panel matches your application's domain (including subdomain and protocol).</li>
+        <li><strong>“Invalid input secret” error:</strong> The secret key may be mis‑typed or you may be using a different environment key than expected.</li>
+        <li><strong>Rate limiting or timeouts:</strong> Google’s API may occasionally be slow; the helper returns <code>false</code> on any network error. Consider logging these failures for monitoring.</li>
+    </ul>
+
+    <hr>
+
+    <h2>Testing reCAPTCHA in Your Test Suite</h2>
+    <p>
+        During automated testing, you might want to bypass the reCAPTCHA check. The easiest
+        way is to mock the validation rule or the <code>Recaptcha</code> helper.
+        See the <a href="{{ base_url }}/docs/testing">Testing Suite documentation</a> for details on
+        using <code>mock()</code> to simulate a successful verification.
+    </p>
 {% endblock %}

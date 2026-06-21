@@ -3,31 +3,50 @@
 {% block doc_content %}
     <h1>PHPUnit Testing Suite</h1>
     <p>
-        Rhapsody provides a plug-and-play testing environment configured out of the box via the localized <code>phpunit.xml</code> configuration and a dedicated testing bootstrap.
+        Rhapsody ships with a ready‑to‑run testing environment built on PHPUnit.
+        You get a robust base <code>TestCase</code> class that integrates with the
+        framework's container, HTTP routing, and Doctrine ORM, plus convenient traits
+        and mocks to speed up your feature and unit tests.
     </p>
+
+    <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 my-4">
+        <strong>Quick Start:</strong> Run <code>./vendor/bin/phpunit</code> from the project root.
+        All tests are located in the <code>tests/</code> directory.
+    </div>
 
     <hr>
 
     <h2>Configuration Setup</h2>
     <p>
-        Ensure your test execution securely establishes the root directory constant and registers the Composer autoloader inside <code>tests/bootstrap.php</code>:
+        The <code>phpunit.xml</code> file is already provided in the project root.
+        It points to <code>tests/bootstrap.php</code> as the bootstrap file.
+        Make sure your <code>bootstrap.php</code> defines the <code>ROOT_DIR</code>
+        constant and loads Composer's autoloader:
     </p>
     <pre><code class="language-php">&lt;?php
 // tests/bootstrap.php
 define('ROOT_DIR', dirname(__DIR__));
 require_once ROOT_DIR . '/vendor/autoload.php';
 </code></pre>
+    <p>
+        This file is executed before every test run, ensuring that your application's
+        classes are autoloaded and any global constants are defined.
+    </p>
 
     <hr>
 
-    <h2>Base Test Case & Productivity Traits</h2>
+    <h2>Base Test Case &amp; Productivity Traits</h2>
     <p>
-        By extending <code>Rhapsody\Core\Testing\TestCase</code>, your feature and unit tests inherit enterprise-grade productivity utilities.
+        All your test classes should extend <code>Rhapsody\Core\Testing\TestCase</code>.
+        This base class automatically boots a fresh application container in
+        <code>setUp()</code>, so you have access to all registered services.
     </p>
 
-    <h3>1. Doctrine Database Isolation (<code>RefreshesDatabase</code>)</h3>
+    <h3>1. Database Isolation via <code>RefreshesDatabase</code></h3>
     <p>
-        Prevent state bleed between tests by automatically wiping and rebuilding the Doctrine schema:
+        To prevent test data from interfering between tests, use the
+        <code>RefreshesDatabase</code> trait. It provides a <code>setUpDatabase()</code>
+        method that drops and recreates all tables based on your Doctrine entity metadata.
     </p>
     <pre><code class="language-php">namespace Tests\Feature;
 
@@ -41,42 +60,154 @@ class UserTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->setUpDatabase(); // Recreates tables dynamically from ORM metadata
+        $this->setUpDatabase(); // Rebuilds schema
     }
-    
-    public function test_example_feature() {
-        // ...
+
+    public function test_user_can_be_created(): void
+    {
+        $user = new User(['email' => 'test@example.com']);
+        $this->app->get('entityManager')->persist($user);
+        $this->app->get('entityManager')->flush();
+
+        $this->assertNotNull($user->getId());
     }
 }
 </code></pre>
+    <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 my-4">
+        <strong>Performance Tip:</strong> For large test suites, consider using transactions
+        instead of full rebuilds. The trait can be extended to support transaction‑based
+        rollbacks – check the framework's advanced testing guide.
+    </div>
 
     <h3>2. Fluent HTTP Response Assertions</h3>
     <p>
-        Instead of manually evaluating raw response strings and status codes, HTTP simulation calls return a chainable <code>TestResponse</code> wrapper:
+        The <code>call()</code> method dispatches a request through the router and returns
+        a <code>TestResponse</code> object. This wrapper offers a fluent interface for
+        common assertions, making your tests more readable.
     </p>
     <pre><code class="language-php">public function test_homepage_returns_successful_response(): void
 {
     $this->call('GET', '/')
-         ->assertOk()
-         ->assertSee('Welcome to Rhapsody');
+         ->assertOk()                  // status 200
+         ->assertSee('Welcome to Rhapsody')
+         ->assertDontSee('Error');
+}
+
+public function test_login_validation_fails(): void
+{
+    $response = $this->call('POST', '/login', [
+        'email' => 'invalid',
+        'password' => 'short',
+    ]);
+
+    $response->assertStatus(302)       // redirect
+             ->assertSessionHasErrors(['email', 'password']);
 }
 </code></pre>
+    <p>
+        Available assertion methods include:
+    </p>
+    <ul>
+        <li><code>assertOk()</code>, <code>assertStatus($code)</code></li>
+        <li><code>assertSee($text)</code>, <code>assertDontSee($text)</code></li>
+        <li><code>assertJson(array $data)</code>, <code>assertJsonMissing(array $data)</code></li>
+        <li><code>assertRedirect($uri)</code></li>
+        <li><code>assertSessionHas($key, $value)</code>, <code>assertSessionHasErrors()</code></li>
+    </ul>
 
     <h3>3. Dependency Injection Container Mocks</h3>
     <p>
-        Swap out core services or external API integrations on the fly by registering mocks directly into the DI container:
+        Two helper methods (<code>swap()</code> and <code>mock()</code>) allow you to
+        substitute real services with test doubles.
     </p>
-    <pre><code class="language-php">public function test_it_handles_payments(): void
+    <ul>
+        <li>
+            <strong><code>swap($abstract, $instance)</code></strong> – replaces the container's
+            binding for the given interface or class with your own object.
+        </li>
+        <li>
+            <strong><code>mock($abstract, callable $mockDefinition)</code></strong> – creates
+            a PHPUnit mock, lets you configure expectations, and then swaps it into the container
+            in one step.
+        </li>
+    </ul>
+    <pre><code class="language-php">public function test_payment_flow(): void
 {
+    // Swap with a custom fake
+    $fakeGateway = new FakePaymentGateway();
+    $this->swap(PaymentGatewayInterface::class, $fakeGateway);
+
+    // Or create a mock with expectations
     $this->mock(PaymentGatewayInterface::class, function ($mock) {
         $mock->expects($this->once())
              ->method('charge')
+             ->with(100.00)
              ->willReturn(true);
     });
 
-    $this->call('POST', '/checkout')
+    $this->call('POST', '/checkout', ['amount' => 100])
          ->assertOk()
          ->assertSee('Payment Successful');
 }
 </code></pre>
+    <p>
+        This approach allows you to test controller logic without hitting external APIs
+        or relying on real implementations.
+    </p>
+
+    <hr>
+
+    <h2>Testing with reCAPTCHA</h2>
+    <p>
+        When testing forms that include a reCAPTCHA widget, you can mock the validation
+        rule or the <code>Recaptcha</code> helper to always return success. For example:
+    </p>
+    <pre><code class="language-php">use Rhapsody\Core\Helpers\Recaptcha;
+
+public function test_registration_with_recaptcha(): void
+{
+    // Make the verify() method always return true
+    $this->mock(Recaptcha::class, function ($mock) {
+        $mock->method('verify')->willReturn(true);
+    });
+
+    $this->call('POST', '/register', [
+        'name' => 'John Doe',
+        'email' => 'john@example.com',
+        'password' => 'secret123',
+        'password_confirmation' => 'secret123',
+        'g-recaptcha-response' => 'dummy-token', // still required, but validation passes
+    ])->assertRedirect('/dashboard');
+}
+</code></pre>
+    <p>
+        Alternatively, you can disable the rule entirely in your test environment by
+        using a conditional validation rule (e.g., only apply <code>recaptcha</code>
+        if <code>APP_ENV !== 'testing'</code>).
+    </p>
+
+    <hr>
+
+    <h2>Additional Tips</h2>
+    <ul>
+        <li><strong>Test coverage:</strong> Use <code>phpunit --coverage-html coverage/</code> to generate an HTML coverage report (requires Xdebug or pcov).</li>
+        <li><strong>Parallel testing:</strong> For large suites, consider using <code>paratest</code> or PHPUnit's process isolation.</li>
+        <li><strong>Environment separation:</strong> Create a separate <code>.env.testing</code> file for test‑specific settings (e.g., database credentials, mail drivers).</li>
+        <li><strong>Custom assertions:</strong> Extend <code>TestResponse</code> to add your own helpers for domain‑specific responses.</li>
+    </ul>
+
+    <hr>
+
+    <h2>Common Pitfalls</h2>
+    <ul>
+        <li><strong>Container not refreshed:</strong> Each test method runs in a fresh container. Do not rely on global state between tests.</li>
+        <li><strong>Database not rebuilt:</strong> Always call <code>setUpDatabase()</code> if using <code>RefreshesDatabase</code>. You can also call it in <code>setUp()</code> or in a <code>@before</code> annotation.</li>
+        <li><strong>Mocking final classes:</strong> PHPUnit cannot mock final classes; use <code>swap()</code> with a custom implementation instead.</li>
+        <li><strong>Response content missing:</strong> Ensure the router actually returns a response; if a controller throws an exception, the test will fail early.</li>
+    </ul>
+
+    <p>
+        For further details, refer to the official PHPUnit documentation and the
+        framework's source code in <code>Rhapsody\Core\Testing</code>.
+    </p>
 {% endblock %}
