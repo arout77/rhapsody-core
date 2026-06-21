@@ -1,0 +1,64 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>Google reCAPTCHA Integration</h1>
+    <p>
+        Protect your application's sensitive forms from automated abuse effortlessly by combining Twig view injectors with the Rhapsody <code>Validator</code> engine.
+    </p>
+
+    <hr>
+
+    <h2>Step 1: Environment Variables</h2>
+    <p>
+        Add your Google reCAPTCHA keys securely inside the application's <code>.env</code> configuration file:
+    </p>
+    <pre><code class="language-bash">RECAPTCHA_SITE_KEY="your_site_key_here"
+RECAPTCHA_SECRET_KEY="your_secret_key_here"
+</code></pre>
+
+    <hr>
+
+    <h2>Step 2: Frontend Rendering</h2>
+    <p>
+        The base controller automatically binds the reCAPTCHA script and widget payload to the <code>captcha_form</code> variable. Print it out in your Twig form. 
+    </p>
+    <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 my-4">
+        <strong>Important:</strong> Because this variable contains raw HTML markup, you must use the Twig <code>|raw</code> filter to prevent escaping brackets into safe HTML entities.
+    </div>
+    <pre><code class="language-twig">&lt;form action="/register" method="POST"&gt;
+    {# CSRF Protection #}
+    {{ "{{ csrf_field }}" }}
+    
+    &lt;label&gt;Email&lt;/label&gt;
+    &lt;input type="email" name="email"&gt;
+    
+    &lt;!-- Render reCAPTCHA widget --&gt;
+    {{ "{{ captcha_form|raw }}" }}
+    
+    &lt;button type="submit"&gt;Register&lt;/button&gt;
+&lt;/form&gt;
+</code></pre>
+
+    <hr>
+
+    <h2>Step 3: Backend Validation Rule</h2>
+    <p>
+        The framework systematically validates the hidden <code>g-recaptcha-response</code> field when you append the <code>recaptcha</code> string rule to your validation array.
+    </p>
+    <pre><code class="language-php">public function store(Request $request)
+{
+    $rules = [
+        'name'                 => 'required|alpha_num|min:3',
+        'email'                => 'required|email|unique:User',
+        'password'             => 'required|min:8|confirmed',
+        'g-recaptcha-response' => 'required|recaptcha'
+    ];
+
+    if (! $this->validator->validate($request->post(), $rules)) {
+        return $this->redirectBackWithErrors($this->validator->getErrors());
+    }
+
+    // Process secure registration...
+}
+</code></pre>
+{% endblock %}

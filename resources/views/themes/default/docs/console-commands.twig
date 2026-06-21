@@ -1,82 +1,181 @@
 {% extends "@core/docs/_layout.twig" %}
 
 {% block doc_content %}
-    <h1>Console Commands</h1>
-    <p>
-        Rhapsody includes a powerful CLI tool to help you with common development and maintenance tasks. You can run it with <code>php rhapsody</code> followed by the command name. For a quick list, type:
-    </p>
-    <pre><code class="language-bash">php rhapsody list</code></pre>
+    <div class="max-w-6xl mx-auto px-4 py-12">
 
-    <h2>Application Commands</h2>
+        <!-- Header -->
+        <header class="mb-12 text-center">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-indigo-600">
+                Rhapsody CLI Command Reference
+            </h1>
+            <p class="mt-4 text-slate-400 text-lg max-w-3xl mx-auto">
+                Run the framework’s command-line utility from your project root using <code class="bg-slate-700 px-3 py-1 rounded text-white font-mono">php rhapsody</code> followed by the command name.
+            </p>
+            <div class="mt-3 flex flex-wrap justify-center gap-4 text-sm">
+                <span class="bg-indigo-100 px-4 py-2 rounded-full border border-indigo-700 dark:text-indigo-500">
+                    📋 List all commands: <code class="text-indigo-300">php rhapsody list</code>
+                </span>
+                <span class="bg-green-100 px-4 py-2 rounded-full border border-green-700 dark:text-indigo-500">
+                    🆘 Get help: <code class="text-indigo-300">php rhapsody help [command]</code>
+                </span>
+            </div>
+        </header>
 
-    <h3><code>app:cache-warm</code></h3>
-    <p>Pre‑compiles all Twig templates for faster production performance.</p>
-    <pre><code class="language-bash">php rhapsody app:cache-warm</code></pre>
+        <!-- ==================== SECTION 1 ==================== -->
+        <section class="section-card dark:bg-gray-700 backdrop-blur-sm p-6 mb-10">
+            <h2 class="text-2xl font-bold text-indigo-400 flex items-center gap-2 mb-4">
+                <span class="text-3xl">⚡</span> Application &amp; Optimization Commands
+            </h2>
+            <p class="text-slate-400 mb-6 text-sm">
+                These utilities manage your production optimizations, template pre‑compilation, environment files, and system state.
+            </p>
+            <div class="overflow-x-auto">
+                <table class="w-full bg-gray-100 dark:bg-gray-800 text-sm text-left">
+                    <thead class="text-xs uppercase text-gray-400 dark:text-black border-b border-gray-300 dark:border-gray-600">
+                        <tr>
+                            <th scope="col" class="px-4 py-3 font-semibold">Command</th>
+                            <th scope="col" class="px-4 py-3 font-semibold">Description</th>
+                            <th scope="col" class="px-4 py-3 font-semibold">Syntax</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700/50">
+                        <tr>
+                            <td class="px-4 py-4 font-mono text-indigo-600 dark:text-indigo-400">app:cache-warm</td>
+                            <td class="px-4 py-4 text-slate-300">Pre‑compiles all Twig templates under your application directory for faster production performance.</td>
+                            <td class="px-4 py-4"><code class="command-syntax text-indigo-600 dark:text-indigo-400">php rhapsody app:cache-warm</code></td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-4 font-mono text-indigo-600 dark:text-indigo-400">cache:clear</td>
+                            <td class="px-4 py-4 text-slate-300">Flushes the application cache, including Twig compilation files, data cache components, and OPcache if configured.</td>
+                            <td class="px-4 py-4"><code class="command-syntax text-indigo-600 dark:text-indigo-400">php rhapsody cache:clear</code></td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-4 font-mono text-indigo-600 dark:text-indigo-400">env:sync</td>
+                            <td class="px-4 py-4 text-slate-300">Scans <code class="text-slate-400">.env.example</code> and appends any missing variables to your active <code class="text-slate-400">.env</code> file without overwriting your existing values.</td>
+                            <td class="px-4 py-4"><code class="command-syntax text-indigo-600 dark:text-indigo-400">php rhapsody env:sync</code></td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-4 font-mono text-indigo-600 dark:text-indigo-400">route:cache</td>
+                            <td class="px-4 py-4 text-slate-300">Compiles all active route definitions into a single performance‑optimized PHP file to bypass runtime parsing.</td>
+                            <td class="px-4 py-4"><code class="command-syntax text-indigo-600 dark:text-indigo-400">php rhapsody route:cache</code></td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-4 font-mono text-indigo-600 dark:text-indigo-400">route:clear</td>
+                            <td class="px-4 py-4 text-slate-300">Deletes the generated route cache file, forcing the router to fall back to live definition parsing.</td>
+                            <td class="px-4 py-4"><code class="command-syntax text-indigo-600 dark:text-indigo-400">php rhapsody route:clear</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
 
-    <h3><code>cache:clear</code></h3>
-    <p>Clears the application cache (Twig cache, route cache, and OPcache if enabled).</p>
-    <pre><code class="language-bash">php rhapsody cache:clear</code></pre>
+        <!-- ==================== SECTION 2 ==================== -->
+        <section class="section-card dark:bg-gray-700 backdrop-blur-sm p-6 mb-10">
+            <h2 class="text-2xl font-bold text-emerald-300 flex items-center gap-2 mb-4">
+                <span class="text-3xl">🛠️</span> Code Generation &amp; Database Commands
+            </h2>
+            <p class="text-slate-400 mb-6 text-sm">
+                Boilerplate scaffolding tools that respect the decoupled application architecture, writing clean files directly into your active <code class="text-slate-400">rhapsody-app</code> directory structural roots.
+            </p>
+            <div class="overflow-x-auto">
+                <table class="w-full bg-gray-100 dark:bg-gray-800 text-sm text-left">
+                    <thead class="text-xs uppercase text-gray-400 dark:text-black border-b border-gray-300 dark:border-gray-600">
+                        <tr>
+                            <th scope="col" class="px-4 py-3 font-semibold">Command</th>
+                            <th scope="col" class="px-4 py-3 font-semibold">Description</th>
+                            <th scope="col" class="px-4 py-3 font-semibold">Syntax</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700/50">
+                        <tr>
+                            <td class="px-4 py-4 font-mono text-emerald-300">make:controller</td>
+                            <td class="px-4 py-4 text-slate-300">Generates a new controller class block under your application’s namespace layer.</td>
+                            <td class="px-4 py-4"><code class="command-syntax text-emerald-300">php rhapsody make:controller UserController</code></td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-4 font-mono text-emerald-300">make:model</td>
+                            <td class="px-4 py-4 text-slate-300">Generates a new database data model or entity file.</td>
+                            <td class="px-4 py-4"><code class="command-syntax text-emerald-300">php rhapsody make:model Post</code></td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-4 font-mono text-emerald-300">make:middleware</td>
+                            <td class="px-4 py-4 text-slate-300">Scaffolds a global or route‑specific request‑response lifecycle middleware block.</td>
+                            <td class="px-4 py-4"><code class="command-syntax text-emerald-300">php rhapsody make:middleware CheckAdmin</code></td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-4 font-mono text-emerald-300">make:event</td>
+                            <td class="px-4 py-4 text-slate-300">Creates a standard event payload container class.</td>
+                            <td class="px-4 py-4"><code class="command-syntax text-emerald-300">php rhapsody make:event OrderShipped</code></td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-4 font-mono text-emerald-300">make:listener</td>
+                            <td class="px-4 py-4 text-slate-300">Creates an event listener class capable of hooking into the core event infrastructure engine.</td>
+                            <td class="px-4 py-4"><code class="command-syntax text-emerald-300">php rhapsody make:listener SendOrderConfirmation</code></td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-4 font-mono text-emerald-300">make:migration</td>
+                            <td class="px-4 py-4 text-slate-300">Builds a timestamped database schema delta/migration boilerplate structure.</td>
+                            <td class="px-4 py-4"><code class="command-syntax text-emerald-300">php rhapsody make:migration create_posts_table</code></td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-4 font-mono text-emerald-300">migrate</td>
+                            <td class="px-4 py-4 text-slate-300">Processes and executes any outstanding pending sequential migration updates against your active database context.</td>
+                            <td class="px-4 py-4"><code class="command-syntax text-emerald-300">php rhapsody migrate</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
 
-    <h3><code>env:sync</code></h3>
-    <p>Adds any missing environment variables from <code>.env.example</code> to your <code>.env</code> file without overwriting existing values.</p>
-    <pre><code class="language-bash">php rhapsody env:sync</code></pre>
+        <!-- ==================== SECTION 3 ==================== -->
+        <section class="section-card dark:bg-gray-700 backdrop-blur-sm p-6 mb-10">
+            <h2 class="text-2xl font-bold text-amber-300 flex items-center gap-2 mb-4">
+                <span class="text-3xl">🔄</span> Version &amp; Package Utilities
+            </h2>
+            <p class="text-slate-400 mb-6 text-sm">
+                Keeps your application’s core framework vendor dependency synchronizations healthy and transparent.
+            </p>
+            <div class="overflow-x-auto">
+                <table class="w-full bg-gray-100 dark:bg-gray-800 text-sm text-left">
+                    <thead class="text-xs uppercase text-gray-400 dark:text-black border-b border-gray-300 dark:border-gray-600">
+                        <tr>
+                            <th scope="col" class="px-4 py-3 font-semibold">Command</th>
+                            <th scope="col" class="px-4 py-3 font-semibold">Description</th>
+                            <th scope="col" class="px-4 py-3 font-semibold">Syntax</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700/50">
+                        <tr>
+                            <td class="px-4 py-4 font-mono text-amber-300">check-version</td>
+                            <td class="px-4 py-4 text-slate-300">Queries upstream sources to check if a newer release of the <code class="text-slate-400">rhapsody-core</code> framework core package is available.</td>
+                            <td class="px-4 py-4"><code class="command-syntax text-amber-300">php rhapsody check-version</code></td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-4 font-mono text-amber-300">update</td>
+                            <td class="px-4 py-4 text-slate-300">Leverages Composer under the hood to fetch, lock, and integrate the latest framework core codebase.</td>
+                            <td class="px-4 py-4"><code class="command-syntax text-amber-300">php rhapsody update</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
 
-    <h3><code>route:cache</code></h3>
-    <p>Compiles all route definitions into a cached PHP file for faster routing.</p>
-    <pre><code class="language-bash">php rhapsody route:cache</code></pre>
+        <!-- Pro-Tip -->
+        <aside class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4">
+            <div class="flex items-start gap-4">
+                <div>
+                    <h3 class="text-lg font-bold text-green-600 dark:text-green-600"><span class="text-xl">💡</span> Developer Pro‑Tip</h3>
+                    <p class="text-slate-300 text-sm leading-relaxed">
+                        When executing generation commands like <code class="text-indigo-300">make:controller</code>, the core code generator dynamically references your localized root directory configuration. This ensures that even though the execution logic rests securely inside the <code class="text-indigo-300">vendor/rhapsody-core</code> package wrapper, code files are always properly written to your local <code class="text-indigo-300">app/Controllers/</code> context!
+                    </p>
+                </div>
+            </div>
+        </aside>
 
-    <h3><code>route:clear</code></h3>
-    <p>Removes the route cache file.</p>
-    <pre><code class="language-bash">php rhapsody route:clear</code></pre>
+        <!-- Footer -->
+        <footer class="mt-16 text-center text-slate-500 text-sm border-t border-slate-800 pt-8">
+            <p>Rhapsody Framework — CLI Reference &bull; Generated with ❤️</p>
+        </footer>
 
-    <hr>
-
-    <h2>Code Generation Commands</h2>
-    <p>These commands help you quickly generate boilerplate code for your application.</p>
-
-    <h3><code>make:controller</code></h3>
-    <p>Create a new controller class.</p>
-    <pre><code class="language-bash">php rhapsody make:controller UserController</code></pre>
-
-    <h3><code>make:model</code></h3>
-    <p>Create a new model class.</p>
-    <pre><code class="language-bash">php rhapsody make:model Post</code></pre>
-
-    <h3><code>make:middleware</code></h3>
-    <p>Create a new middleware class.</p>
-    <pre><code class="language-bash">php rhapsody make:middleware CheckAdmin</code></pre>
-
-    <h3><code>make:event</code></h3>
-    <p>Create a new event class.</p>
-    <pre><code class="language-bash">php rhapsody make:event OrderShipped</code></pre>
-
-    <h3><code>make:listener</code></h3>
-    <p>Create a new listener class.</p>
-    <pre><code class="language-bash">php rhapsody make:listener SendOrderConfirmation</code></pre>
-
-    <h3><code>make:migration</code></h3>
-    <p>Create a new database migration.</p>
-    <pre><code class="language-bash">php rhapsody make:migration create_posts_table</code></pre>
-
-    <h3><code>migrate</code></h3>
-    <p>Run all pending migrations.</p>
-    <pre><code class="language-bash">php rhapsody migrate</code></pre>
-
-    <hr>
-
-    <h2>Version & Update Commands</h2>
-
-    <h3><code>check-version</code></h3>
-    <p>Check if a newer version of the framework is available.</p>
-    <pre><code class="language-bash">php rhapsody check-version</code></pre>
-
-    <h3><code>update</code></h3>
-    <p>Update the framework to the latest version (if using Composer).</p>
-    <pre><code class="language-bash">php rhapsody update</code></pre>
-
-    <hr>
-
-    <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4">
-        <strong>Tip:</strong> Use <code>php rhapsody help [command]</code> to see detailed help for any command, e.g., <code>php rhapsody help make:controller</code>.
     </div>
 {% endblock %}

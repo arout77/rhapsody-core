@@ -1,0 +1,82 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>PHPUnit Testing Suite</h1>
+    <p>
+        Rhapsody provides a plug-and-play testing environment configured out of the box via the localized <code>phpunit.xml</code> configuration and a dedicated testing bootstrap.
+    </p>
+
+    <hr>
+
+    <h2>Configuration Setup</h2>
+    <p>
+        Ensure your test execution securely establishes the root directory constant and registers the Composer autoloader inside <code>tests/bootstrap.php</code>:
+    </p>
+    <pre><code class="language-php">&lt;?php
+// tests/bootstrap.php
+define('ROOT_DIR', dirname(__DIR__));
+require_once ROOT_DIR . '/vendor/autoload.php';
+</code></pre>
+
+    <hr>
+
+    <h2>Base Test Case & Productivity Traits</h2>
+    <p>
+        By extending <code>Rhapsody\Core\Testing\TestCase</code>, your feature and unit tests inherit enterprise-grade productivity utilities.
+    </p>
+
+    <h3>1. Doctrine Database Isolation (<code>RefreshesDatabase</code>)</h3>
+    <p>
+        Prevent state bleed between tests by automatically wiping and rebuilding the Doctrine schema:
+    </p>
+    <pre><code class="language-php">namespace Tests\Feature;
+
+use Rhapsody\Core\Testing\TestCase;
+use Rhapsody\Core\Testing\Traits\RefreshesDatabase;
+
+class UserTest extends TestCase
+{
+    use RefreshesDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->setUpDatabase(); // Recreates tables dynamically from ORM metadata
+    }
+    
+    public function test_example_feature() {
+        // ...
+    }
+}
+</code></pre>
+
+    <h3>2. Fluent HTTP Response Assertions</h3>
+    <p>
+        Instead of manually evaluating raw response strings and status codes, HTTP simulation calls return a chainable <code>TestResponse</code> wrapper:
+    </p>
+    <pre><code class="language-php">public function test_homepage_returns_successful_response(): void
+{
+    $this->call('GET', '/')
+         ->assertOk()
+         ->assertSee('Welcome to Rhapsody');
+}
+</code></pre>
+
+    <h3>3. Dependency Injection Container Mocks</h3>
+    <p>
+        Swap out core services or external API integrations on the fly by registering mocks directly into the DI container:
+    </p>
+    <pre><code class="language-php">public function test_it_handles_payments(): void
+{
+    $this->mock(PaymentGatewayInterface::class, function ($mock) {
+        $mock->expects($this->once())
+             ->method('charge')
+             ->willReturn(true);
+    });
+
+    $this->call('POST', '/checkout')
+         ->assertOk()
+         ->assertSee('Payment Successful');
+}
+</code></pre>
+{% endblock %}

@@ -1,9 +1,18 @@
 <?php
 namespace Rhapsody\Core\Cache;
 
+use Rhapsody\Core\Helpers\Path;
+
 class FileCacheDriver implements CacheInterface
 {
-    protected string $cachePath = __DIR__ . '/../../storage/cache/app/';
+    protected string $cachePath;
+
+    public function __construct()
+    {
+        // Dynamically resolve the absolute path to the downstream app's storage folder
+        // and append an OS-native trailing separator so md5($key) appends cleanly.
+        $this->cachePath = Path::storage('cache/app') . DIRECTORY_SEPARATOR;
+    }
 
     /**
      * @param string $key

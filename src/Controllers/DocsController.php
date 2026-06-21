@@ -369,4 +369,22 @@ class DocsController extends BaseController
             'canonical_url' => $request->getCanonicalUrl(),
         ]);
     }
+
+    public function recaptcha(Request $request): Response
+    {
+        return $this->view('@core/docs/recaptcha.twig', [], [
+            'title'         => 'Recaptcha – Rhapsody Documentation',
+            'description'   => 'How to seamlessly implement Recaptcha in your forms',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
+
+    public function testing(Request $request): Response
+    {
+        return $this->view('@core/docs/testing.twig', [], [
+            'title'         => 'Unit Testing – Rhapsody Documentation',
+            'description'   => 'Unit testing made easy!',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
 }

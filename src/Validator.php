@@ -2,6 +2,7 @@
 namespace Rhapsody\Core;
 
 use Doctrine\ORM\EntityManager;
+use Rhapsody\Core\Helpers\Recaptcha;
 
 class Validator
 {
@@ -327,6 +328,22 @@ class Validator
 
         if (! in_array($fileMimeType, $allowedMimeTypes)) {
             $this->errors[$field][] = "The file type for {$field} is invalid. Allowed types are: {$param}.";
+        }
+    }
+
+    /**
+     * Verifies the Google Recaptcha response token.
+     * * @param string $field
+     * @param $value
+     */
+    protected function validateRecaptcha(string $field, $value): void
+    {
+        // If the token is entirely missing, the 'required' rule should catch it,
+        // but we ensure it fails the API check here as well just in case.
+        $ipAddress = $_SERVER['REMOTE_ADDR'] ?? null;
+
+        if (! Recaptcha::verify((string) $value, $ipAddress)) {
+            $this->errors[$field][] = "Please verify that you are not a robot.";
         }
     }
 }

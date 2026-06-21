@@ -33,5 +33,7 @@ Router::get('/docs/themes', [DocsController::class, 'themes']);
 Router::get('/docs/updating', [DocsController::class, 'updating']);
 Router::get('/docs/validation', [DocsController::class, 'validation']);
 Router::get('/docs/views', [DocsController::class, 'views']);
+Router::get('/docs/recaptcha', [DocsController::class, 'recaptcha']);
+Router::get('/docs/testing', [DocsController::class, 'testing']);
 Router::get('/docs/ddos-protection', [DocsController::class, 'ddosProtection']);
 Router::get('/docs/console-commands', [DocsController::class, 'consoleCommands']);

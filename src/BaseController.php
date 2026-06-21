@@ -4,6 +4,7 @@ namespace Rhapsody\Core;
 use PDO;
 use Rhapsody\Core\Cache;
 use Rhapsody\Core\Database;
+use Rhapsody\Core\Helpers\Recaptcha;
 use Rhapsody\Core\SEO\SchemaOrg;
 use Twig\Environment;
 use Twig\Loader\FilesystemLoader;
@@ -87,6 +88,9 @@ abstract class BaseController
 
         // 2. Automatically inject the rendered JSON-LD schemas into Twig arguments
         $args['schema_markup'] = $this->schema->render();
+
+        // 3. Add Recaptcha form
+        $args['captcha_form'] = Recaptcha::render();
 
         $output = $this->twig->render($view, $args);
 
