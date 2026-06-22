@@ -13,6 +13,8 @@
         <li>PHP 8.2 or higher</li>
         <li>Composer installed</li>
         <li>A local server environment like MAMP, WAMP, or Laravel Herd</li>
+        <li><var>mod_rewrite</var> must be enabled on Apache servers</li>
+        <li>PHP's <var>GD</var> extension should be enabled if you plan on using the image resizing/caching helper</li>
         <li>A MySQL-compatible database</li>
     </ul>
 
@@ -24,15 +26,17 @@
     <p>This command will download the framework, install all dependencies, and set up the basic structure for you.</p>
 
     <p>Navigate into your new project directory:</p>
-    <pre><code>cd your-site-name</code></pre>
+    <pre class="command-line"><code class="language-bash">cd your-site-name</code></pre>
+    <p>Then run Composer update to ensure all of the dependencies are up to date.
+    <pre class="command-line"><code class="language-bash">composer update</code></pre>
 
     <h2>3. Environment Configuration</h2>
     <p>Rhapsody uses a <code>.env</code> file to manage environment-specific variables like database credentials. This keeps your secrets out of version control.</p>
     <p>First, if the .env file was not automatically generated, copy the example file:</p>
-    <pre><code>cp .env.example .env</code></pre>
+    <pre class="command-line"><code class="language-bash">cp .env.example .env</code></pre>
     <p>Next, open the newly created <code>.env</code> file and configure it for your local machine. The most important variables are for the database connection:</p>
     
-<pre class="command-line"><code class="language-bash">APP_BASE_URL="/your-site-name"
+<pre><code class="language-bash">APP_BASE_URL="/your-site-name"
 DB_HOST="127.0.0.1"
 DB_PORT="3306"
 DB_NAME="database_name"
