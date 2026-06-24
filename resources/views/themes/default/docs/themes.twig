@@ -1,159 +1,375 @@
-{# /views/docs/themes.twig #}
 {% extends "@core/docs/_layout.twig" %}
 
 {% block doc_content %}
-    <div class="space-y-8 max-w-4xl mx-auto py-4">
-        
-        <header class="space-y-2">
-            <h1 class="text-3xl font-black text-white tracking-tight">Theme Customization &amp; Architecture</h1>
-            <p class="text-slate-400 text-lg">
-                Discover how to seamlessly customize layouts, preserve core system updates, or implement entirely custom design systems using Rhapsody's extensible layout inheritance architecture.
+<div class="space-y-8 max-w-6xl mx-auto py-4">
+
+    <header class="space-y-2">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Theme Customization &amp; Architecture</h1>
+        <p class="text-gray-600 dark:text-gray-400 text-lg">
+            Understand the separation between Rhapsody's core views and your application's custom themes.
+            Learn how to safely override, extend, or completely replace the default design system.
+        </p>
+    </header>
+
+    <hr class="border-gray-200 dark:border-gray-800">
+
+    <!-- ============================================================ -->
+    <!--  THE GOLDEN RULE                                              -->
+    <!-- ============================================================ -->
+    <section class="space-y-4">
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
+            <span class="text-red-500 dark:text-red-400">⛔</span> The Golden Rule: Never Modify <code class="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">@core</code>
+        </h2>
+
+        <div class="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl p-5 space-y-3">
+            <p class="text-gray-800 dark:text-gray-200 leading-relaxed">
+                <strong class="text-red-600 dark:text-red-400 font-semibold">Critical:</strong> The <code class="text-sm bg-red-100 dark:bg-red-900/50 px-2 py-0.5 rounded text-red-800 dark:text-red-300">@core</code> namespace points to 
+                <code class="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">vendor/arout/rhapsody-core/resources/views/</code> – the framework's internal view files.
+                <span class="text-red-600 dark:text-red-400 font-bold">You must never edit these files directly.</span>
             </p>
-        </header>
-
-        <hr class="border-slate-800">
-
-        <section class="space-y-4">
-            <h2 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-                The Golden Rule: Inheritance vs. Overriding
-            </h2>
-            <p class="text-slate-300 leading-relaxed">
-                Historically, customizing web application layouts meant copy-pasting the framework's main layout file directly into a custom folder and modifying it. 
-                <strong class="text-rose-400 font-semibold">This approach is a critical anti-pattern.</strong> When you duplicate the entire main layout file, your custom theme forks away from the core codebase. If a future framework update introduces a mandatory security wrapper, critical metadata structures, or new diagnostic UI features, your layout remains blind to them, breaking layout consistency or core functionality during an update.
+            <p class="text-gray-600 dark:text-gray-400 leading-relaxed text-sm">
+                Modifying core views will break your application when you update the framework. All customizations 
+                <strong class="text-amber-600 dark:text-amber-400">must</strong> live in your application's <code class="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">views/</code> directory.
             </p>
-            <p class="text-slate-300 leading-relaxed">
-                Instead, Rhapsody leverages <strong class="text-indigo-400">Twig Template Inheritance</strong> and a fallback cascade pathing mechanism. By establishing protected, granular blocks inside the base architecture, you can target, append to, or rewrite individual elements (like page titles, unique body styles, scripts, or stylesheets) while ensuring that baseline layouts, analytic payloads, and functional framework states remain updated globally.
-            </p>
-        </section>
+        </div>
 
-        <hr class="border-slate-800">
+        <p class="text-gray-700 dark:text-gray-300 leading-relaxed">
+            Rhapsody uses <strong class="text-indigo-600 dark:text-indigo-400">Twig Template Inheritance</strong> with a cascading file loader.
+            This allows you to override specific views by placing files in your application's theme directory,
+            while keeping the core framework untouched and updatable.
+        </p>
+    </section>
 
-        <section class="space-y-4">
-            <h2 class="text-2xl font-bold text-white tracking-tight">The Theme Filesystem Cascade</h2>
-            <p class="text-slate-300 leading-relaxed">
-                The framework uses a cascading loader array configured via the dependency injection container. When your controllers request a view template file path, the engine dynamically looks up files according to the following strict inheritance hierarchy:
-            </p>
-            
-            <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-3 font-mono text-xs">
-                <div class="flex items-start gap-3">
-                    <span class="bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded font-bold uppercase tracking-wider">Priority 1</span>
-                    <div>
-                        <span class="text-slate-200 block font-semibold text-sm">Application Theme Workspace Override</span>
-                        <span class="text-slate-500">my-awesome-app/views/themes/{active_theme}/...</span>
-                    </div>
-                </div>
-                <div class="border-t border-slate-900 my-2"></div>
-                <div class="flex items-start gap-3">
-                    <span class="bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded font-bold uppercase tracking-wider">Priority 2</span>
-                    <div>
-                        <span class="text-slate-200 block font-semibold text-sm">Application Root Views</span>
-                        <span class="text-slate-500">my-awesome-app/views/...</span>
-                    </div>
-                </div>
-                <div class="border-t border-slate-900 my-2"></div>
-                <div class="flex items-start gap-3">
-                    <span class="bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded font-bold uppercase tracking-wider">Priority 3</span>
-                    <div>
-                        <span class="text-slate-200 block font-semibold text-sm">Core Core Vendor Fallback</span>
-                        <span class="text-slate-500">vendor/arout/rhapsody-core/resources/views/themes/default/...</span>
-                    </div>
-                </div>
-            </div>
-            <p class="text-slate-300 leading-relaxed">
-                This behavior enables you to design brand new views within your workspace layout folders or copy individual components to your local application structure to act as an instantaneous override. If a file is omitted in the downstream workspace application layout, the framework smoothly defaults back to its vendor counterpart.
-            </p>
-        </section>
+    <hr class="border-gray-200 dark:border-gray-800">
 
-        <hr class="border-slate-800">
+    <!-- ============================================================ -->
+    <!--  CORE VS THEME: WHAT'S THE DIFFERENCE?                        -->
+    <!-- ============================================================ -->
+    <section class="space-y-4">
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Understanding <code class="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">@core</code> vs. Your Theme</h2>
 
-        <section class="space-y-4">
-            <h2 class="text-2xl font-bold text-white tracking-tight">Core Layout Architecture (<code>main.twig</code>)</h2>
-            <p class="text-slate-300">
-                The standard structural shell is located at <code>@core/layouts/main.twig</code>. It isolates the underlying document into distinct, targetable structural blocks:
-            </p>
-            
-            <ul class="space-y-3 text-slate-300 pl-4 list-disc marker:text-indigo-500">
-                <li><code class="text-indigo-400 font-semibold">{{ '{%' }} block title {{ '%}' }}</code>: Updates the browser page title. Defaults smoothly to system metadata arrays.</li>
-                <li><code class="text-indigo-400 font-semibold">{{ '{%' }} block description {{ '%}' }}</code>: Safely populates and HTML-escapes search engine indexing tags.</li>
-                <li><code class="text-indigo-400 font-semibold">{{ '{%' }} block styles {{ '%}' }}</code>: Contains core framework stylesheets (Tailwind CSS and Montserrat). Overridable to eject default fonts and weights.</li>
-                <li><code class="text-indigo-400 font-semibold">{{ '{%' }} block head_extensions {{ '%}' }}</code>: Appends custom conditional headers, third-party CDNs, or unique styling rules early in document parsing.</li>
-                <li><code class="text-indigo-400 font-semibold">{{ '{%' }} block body_class {{ '%}' }}</code>: Injects structural or state utility classes (e.g., <code>is-dashboard</code>) straight to the <code>&lt;body&gt;</code> element.</li>
-                <li><code class="text-indigo-400 font-semibold">{{ '{%' }} block content {{ '%}' }}</code>: Primary application rendering slot. Accepts unique page views inside custom elements.</li>
-                <li><code class="text-indigo-400 font-semibold">{{ '{%' }} block scripts {{ '%}' }}</code>: Fires script tags at the very base of the page, directly following framework modal engines and light/dark theme managers.</li>
-            </ul>
-        </section>
-
-        <hr class="border-slate-800">
-
-        <section class="space-y-4">
-            <h2 class="text-2xl font-bold text-white tracking-tight">Step-by-Step Extension Example</h2>
-            <p class="text-slate-300">
-                To build custom page templates, create a file within your workspace application layout theme and utilize an explicit path namespace fallback pointing to the core skeleton framework. Here is a clean example:
-            </p>
-
-            <div class="space-y-2">
-                <span class="text-xs font-semibold tracking-wider text-slate-400 uppercase block">Example File Path:</span>
-                <div class="bg-slate-950 px-4 py-2 rounded-lg text-xs font-mono text-emerald-400 border border-slate-800">
-                    my-awesome-app/views/themes/default/profile/show.twig
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 space-y-2">
+                <h3 class="text-lg font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
+                    <span>📦</span> <code class="text-sm bg-indigo-50 dark:bg-indigo-950/50 px-2 py-0.5 rounded">@core</code> (Framework)
+                </h3>
+                <ul class="space-y-2 text-sm text-gray-700 dark:text-gray-300 list-disc pl-4">
+                    <li>Located in <code class="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">vendor/arout/rhapsody-core/resources/views/</code></li>
+                    <li>Contains base layouts, error pages, and core templates</li>
+                    <li><strong class="text-red-600 dark:text-red-400">Read‑only</strong> – never modify these files</li>
+                    <li>Updated automatically when you run <code class="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">composer update</code></li>
+                    <li>Provides the <strong>fallback</strong> when your theme doesn't override a file</li>
+                </ul>
+                <div class="mt-3 bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2 font-mono text-xs text-gray-600 dark:text-gray-400">
+                    vendor/arout/rhapsody-core/resources/views/<br>
+                    └── layouts/main.twig
                 </div>
             </div>
 
-            <pre><code class="language-twig">{{ '{%' }} extends "@core/layouts/main.twig" {{ '%}' }}
+            <div class="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 space-y-2">
+                <h3 class="text-lg font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
+                    <span>🎨</span> Your Theme
+                </h3>
+                <ul class="space-y-2 text-sm text-gray-700 dark:text-gray-300 list-disc pl-4">
+                    <li>Located in <code class="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">app/views/themes/{theme_name}/</code></li>
+                    <li><strong class="text-emerald-600 dark:text-emerald-400">Your workspace</strong> – all customizations go here</li>
+                    <li>Override any core view by creating a file with the same path</li>
+                    <li>Fully under your version control</li>
+                    <li>Priority <strong>1</strong> in the loader cascade</li>
+                </ul>
+                <div class="mt-3 bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2 font-mono text-xs text-gray-600 dark:text-gray-400">
+                    app/views/themes/default/<br>
+                    └── layouts/main.twig  ← overrides core
+                </div>
+            </div>
+        </div>
 
-{{ '{%' }} block title {{ '%}' }}User Profile - {{ '{{ profile.name }}' }}{{ '{%' }} endblock {{ '%}' }}
+        <div class="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+            <p class="text-amber-800 dark:text-amber-200 text-sm">
+                <strong>💡 Key Insight:</strong> When you extend <code class="text-xs bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 rounded">@core/layouts/main.twig</code>, you're inheriting 
+                from the framework's base layout. But your <strong>child template</strong> should live in 
+                <code class="text-xs bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 rounded">views/themes/default/</code> – never in <code class="text-xs bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 rounded">@core</code>.
+            </p>
+        </div>
+    </section>
 
-{{ '{%' }} block body_class {{ '%}' }}profile-dashboard-layout custom-bg-pattern{{ '{%' }} endblock {{ '%}' }}
+    <hr class="border-gray-200 dark:border-gray-800">
 
-{{ '{%' }} block content {{ '%}' }}
-    &lt;div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow"&gt;
-        &lt;h1 class="text-2xl font-bold text-gray-900 dark:text-white"&gt;Welcome back, {{ '{{ profile.name }}' }}!&lt;/h1&gt;
-        &lt;p class="text-sm text-gray-500 mt-1"&gt;Manage your account parameters below.&lt;/p&gt;
+    <!-- ============================================================ -->
+    <!--  THE FILESYSTEM CASCADE                                       -->
+    <!-- ============================================================ -->
+    <section class="space-y-4">
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">The Theme Loader Cascade</h2>
+        <p class="text-gray-700 dark:text-gray-300 leading-relaxed">
+            When you request a view (e.g., <code class="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">$this->view('profile/show.twig')</code>), the loader checks
+            locations in this exact order:
+        </p>
+
+        <div class="bg-gray-100 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-xl p-5 space-y-3 font-mono text-xs">
+            <div class="flex items-start gap-3">
+                <span class="bg-emerald-500/20 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded font-bold uppercase tracking-wider">1</span>
+                <div>
+                    <span class="text-gray-800 dark:text-gray-200 block font-semibold text-sm">Application Theme (Active)</span>
+                    <span class="text-gray-500 dark:text-gray-400">app/views/themes/{active_theme}/profile/show.twig</span>
+                </div>
+            </div>
+            <div class="border-t border-gray-200 dark:border-gray-800 my-2"></div>
+            <div class="flex items-start gap-3">
+                <span class="bg-indigo-500/20 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded font-bold uppercase tracking-wider">2</span>
+                <div>
+                    <span class="text-gray-800 dark:text-gray-200 block font-semibold text-sm">Application Root Views</span>
+                    <span class="text-gray-500 dark:text-gray-400">app/views/profile/show.twig</span>
+                </div>
+            </div>
+            <div class="border-t border-gray-200 dark:border-gray-800 my-2"></div>
+            <div class="flex items-start gap-3">
+                <span class="bg-amber-500/20 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded font-bold uppercase tracking-wider">3</span>
+                <div>
+                    <span class="text-gray-800 dark:text-gray-200 block font-semibold text-sm">Core Vendor Fallback</span>
+                    <span class="text-gray-500 dark:text-gray-400">vendor/arout/rhapsody-core/resources/views/profile/show.twig</span>
+                </div>
+            </div>
+        </div>
+
+        <p class="text-gray-700 dark:text-gray-300 leading-relaxed">
+            This cascade ensures that your customizations take priority, but the framework always has a fallback.
+            You can override <strong>any</strong> core view by placing a file with the same relative path in your theme.
+        </p>
+    </section>
+
+    <hr class="border-gray-200 dark:border-gray-800">
+
+    <!-- ============================================================ -->
+    <!--  UNDERSTANDING `@core` IN EXTENDS                             -->
+    <!-- ============================================================ -->
+    <section class="space-y-4">
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Using <code class="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">@core</code> in <code class="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">{% verbatim %}{% extends %}{% endverbatim %}</code></h2>
+
+        <p class="text-gray-700 dark:text-gray-300 leading-relaxed">
+            The <code class="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">@core</code> namespace in <code class="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">{% verbatim %}{% extends "@core/layouts/main.twig" %}{% endverbatim %}</code>
+            <strong>does not</strong> mean you're creating a file in the core. It means you're <strong>inheriting from</strong>
+            the core layout file. Your actual template file <strong>must</strong> live in your application's theme directory.
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl p-4">
+                <h4 class="text-sm font-bold text-red-700 dark:text-red-400">❌ Wrong</h4>
+                <pre class="text-xs text-gray-700 dark:text-gray-300 mt-2 bg-white dark:bg-gray-900 p-3 rounded border border-red-100 dark:border-red-900"><code># DON'T create files in @core
+vendor/arout/rhapsody-core/resources/views/
+└── auth/login.twig  ← ❌ Never modify this!</code></pre>
+            </div>
+            <div class="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4">
+                <h4 class="text-sm font-bold text-emerald-700 dark:text-emerald-400">✅ Correct</h4>
+                <pre class="text-xs text-gray-700 dark:text-gray-300 mt-2 bg-white dark:bg-gray-900 p-3 rounded border border-emerald-100 dark:border-emerald-900"><code># Create files in your theme
+app/views/themes/default/
+└── auth/login.twig  ← ✅ Override core here!</code></pre>
+            </div>
+        </div>
+
+        <p class="text-gray-700 dark:text-gray-300 leading-relaxed">
+            When you want to customize <code class="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">auth/login.twig</code>, you <strong>copy</strong> it from the core
+            to your theme, then modify it. The core file stays untouched, and your version takes priority.
+        </p>
+    </section>
+
+    <hr class="border-gray-200 dark:border-gray-800">
+
+    <!-- ============================================================ -->
+    <!--  STEP-BY-STEP EXAMPLE                                         -->
+    <!-- ============================================================ -->
+    <section class="space-y-4">
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Step-by-Step: Creating a Custom Theme</h2>
+
+        <div class="space-y-6">
+            <div class="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 space-y-3">
+                <h4 class="text-sm font-bold text-indigo-600 dark:text-indigo-400">1. Create your theme directory</h4>
+                <pre class="text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-950 p-3 rounded border border-gray-200 dark:border-gray-800"><code>app/views/themes/my-theme/
+├── layouts/
+│   └── main.twig        ← Override core layout
+├── auth/
+│   └── login.twig       ← Custom login page
+└── errors/
+    ├── 404.twig         ← Custom 404 page
+    └── 500.twig         ← Custom 500 page</code></pre>
+            </div>
+
+            <div class="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 space-y-3">
+                <h4 class="text-sm font-bold text-indigo-600 dark:text-indigo-400">2. Set the active theme in <code class="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">.env</code></h4>
+                <pre class="text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-950 p-3 rounded border border-gray-200 dark:border-gray-800"><code>APP_THEME=my-theme</code></pre>
+            </div>
+
+            <div class="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 space-y-3">
+                <h4 class="text-sm font-bold text-indigo-600 dark:text-indigo-400">3. Create a custom main layout</h4>
+                <pre class="text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-950 p-3 rounded border border-gray-200 dark:border-gray-800"><code>{# app/views/themes/my-theme/layouts/main.twig #}
+{% verbatim %}
+{% extends "@core/layouts/main.twig" %}
+
+{% block title %}My Custom App - {{ parent() }}{% endblock %}
+
+{% block styles %}
+    &lt;!-- Override default styles --&gt;
+    &lt;link href="{{ base_url }}/public/css/my-app.css" rel="stylesheet"&gt;
+{% endblock %}
+
+{% block content %}
+    &lt;div class="custom-wrapper"&gt;
+        {{ parent() }}
     &lt;/div&gt;
-{{ '{%' }} endblock {{ '%}' }}
+{% endblock %}{% endverbatim %}</code></pre>
+            </div>
+        </div>
+    </section>
 
-{{ '{%' }} block scripts {{ '%}' }}
-    &lt;script src="{{ '{{ base_url }}' }}/public/js/profile-validator.js"&gt;&lt;/script&gt;
-{{ '{%' }} endblock {{ '%}' }}</code></pre>
-        </section>
+    <hr class="border-gray-200 dark:border-gray-800">
 
-        <hr class="border-slate-800">
+    <!-- ============================================================ -->
+    <!--  EXTENDING VS. OVERRIDING                                     -->
+    <!-- ============================================================ -->
+    <section class="space-y-4">
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Extending vs. Overriding</h2>
 
-        <section class="space-y-4">
-            <h2 class="text-2xl font-bold text-white tracking-tight">Opting Out of Framework Styles</h2>
-            <p class="text-slate-300 leading-relaxed">
-                Rhapsody values design flexibility and remains completely unopinionated about your front-end utility choices. If you wish to build custom styles that reject utility frameworks entirely (such as using Bootstrap, custom Sass layers, or clean vanilla CSS structures), you don't need to change any core framework package vendor source files.
-            </p>
-            <p class="text-slate-300 leading-relaxed">
-                Simply declare an empty or custom-mapped <code class="text-indigo-400 font-semibold">{{ '{%' }} block styles {{ '%}' }}</code> container inside your child workspace template file. This intercepts the asset compilation stage, stripping out Tailwind CSS and Google Fonts, allowing you to establish a fresh stylesheet context from scratch:
-            </p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 space-y-2">
+                <h3 class="text-lg font-bold text-indigo-600 dark:text-indigo-400">📐 Extending</h3>
+                <p class="text-sm text-gray-700 dark:text-gray-300">You inherit the core layout and <strong>add</strong> your customizations.</p>
+                <pre class="text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-950 p-3 rounded border border-gray-200 dark:border-gray-800 mt-2"><code>{% verbatim %}{% extends "@core/layouts/main.twig" %}
 
-            <pre><code class="language-twig">{{ '{%' }} extends "@core/layouts/main.twig" {{ '%}' }}
+{% block content %}
+    &lt;div class="my-wrapper"&gt;
+        {{ parent() }}  ← Keep core content
+    &lt;/div&gt;
+{% endblock %}{% endverbatim %}</code></pre>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Use this when you want to create a completely custom theme.</p>
+            </div>
+
+            <div class="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 space-y-2">
+                <h3 class="text-lg font-bold text-amber-600 dark:text-amber-400">🔁 Overriding</h3>
+                <p class="text-sm text-gray-700 dark:text-gray-300">You <strong>completely replace</strong> a core block with your own.</p>
+                <pre class="text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-950 p-3 rounded border border-gray-200 dark:border-gray-800 mt-2"><code>{% verbatim %}{% extends "@core/layouts/main.twig" %}
+
+{% block content %}
+    &lt;!-- Completely custom HTML --&gt;
+    &lt;div class="full-custom"&gt;
+        No parent() here.
+    &lt;/div&gt;
+{% endblock %}{% endverbatim %}</code></pre>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Use this when you want to rebuild a theme from scratch.</p>
+            </div>
+        </div>
+    </section>
+
+    <hr class="border-gray-200 dark:border-gray-800">
+
+    <section class="space-y-4">
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Required blocks when creating custom themes</h2>
+        <p class="text-gray-700 dark:text-gray-300 leading-relaxed">
+            Creating your theme as detailed above gives you a completely blank canvas to design from. However, every page <strong>must</strong> contain the following Twig 
+            blocks.
+        </p>
+        <ul>
+            <li>{% verbatim %}{% block head %}{% endverbatim %}</li>
+            <li>{% verbatim %}{% block head_extensions %}{% endverbatim %}</li>
+            <li>{% verbatim %}{% block content %}{% endverbatim %}</li>
+        </ul>
+        <p>
+            Additionally, your &lt;head>&lt;/head> tags must contain the following:
+        </p>
+        <p>
+            <div>
+            {% verbatim %}
+            {% if meta.canonical_url %}
+                &lt;link rel="canonical" href="{{ meta.canonical_url }}">
+            {% endif %}
+            {% endverbatim %}
+            </div>
+
+            <div>
+            {% verbatim %}
+            &lt;title>{% block title %}{{ meta.title }}{% endblock %}&lt;/title>
+            {% endverbatim %}
+            </div>
+
+            <div>
+            {% verbatim %}
+            &lt;meta name="description" content="{% block description %}{{ meta.description }}{% endblock %}">
+            {% endverbatim %}
+            </div>
+
+            <div>
+            {% verbatim %}
+            &lt;meta property="og:type" content="website"><br>
+            &lt;meta property="og:url" content="{{ current_url }}"><br>
+            &lt;meta property="og:title" content="{{ meta.title }}"><br>
+            &lt;meta property="og:description" content="{{ meta.description }}"><br>
+            &lt;meta property="og:image" content="{{ base_url }}/public/img/logo.png"><br>
+
+            &lt;meta property="twitter:card" content="summary_large_image"><br>
+            &lt;meta property="twitter:url" content="{{ current_url }}"><br>
+            &lt;meta property="twitter:title" content="{{ meta.title }}"><br>
+            &lt;meta property="twitter:description" content="{{ meta.description }}"><br>
+            &lt;meta property="twitter:image" content="{{ base_url }}/public/img/logo.png"><br>
+            &lt;link rel="icon" href="{{ base_url }}/favicon.ico" type="image/x-icon">
+            {% endverbatim %}
+            </div>
+        </p>
+    </section>
+
+    <hr class="border-gray-200 dark:border-gray-800">
+
+    <!-- ============================================================ -->
+    <!--  OPTING OUT OF FRAMEWORK STYLES                               -->
+    <!-- ============================================================ -->
+    <section class="space-y-4">
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Opting Out of Framework Styles</h2>
+        <p class="text-gray-700 dark:text-gray-300 leading-relaxed">
+            If you want to use Bootstrap, custom Sass, or vanilla CSS instead of Tailwind, simply override
+            the <code class="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">{% verbatim %}{% block styles %}{% endverbatim %}</code> block in your theme.
+        </p>
+
+        <pre class="bg-gray-100 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-xl p-5"><code class="language-twig">{% verbatim %}{% extends "@core/layouts/main.twig" %}
 
 {# --- BYPASS DEFAULT TAILWIND STYLING STACK --- #}
-{{ '{%' }} block styles {{ '%}' }}
-    &lt;!-- Load Bootstrap or a completely alternative asset pipeline instead --&gt;
+{% block styles %}
+    &lt;!-- Bootstrap instead of Tailwind --&gt;
     &lt;link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"&gt;
-    &lt;link href="{{ '{{ base_url }}' }}/public/themes/custom/legacy-app.css" rel="stylesheet"&gt;
-{{ '{%' }} endblock {{ '%}' }}
+    &lt;link href="{{ base_url }}/public/themes/custom/app.css" rel="stylesheet"&gt;
+{% endblock %}
 
-{{ '{%' }} block body_class {{ '%}' }}container py-5 bootstrap-context{{ '{%' }} endblock {{ '%}' }}
-
-{{ '{%' }} block content {{ '%}' }}
-    &lt;div class="card shadow-sm"&gt;
-        &lt;div class="card-body"&gt;
-            &lt;h3 class="card-title text-primary"&gt;Decoupled Engine Instance&lt;/h3&gt;
-            &lt;p class="card-text text-muted"&gt;Tailwind was completely dropped at parsing. Core SEO schemas and scripts remain active.&lt;/p&gt;
+{% block content %}
+    &lt;div class="container mt-5"&gt;
+        &lt;div class="card shadow"&gt;
+            &lt;div class="card-body"&gt;
+                &lt;h3 class="card-title text-primary"&gt;Bootstrap Powered&lt;/h3&gt;
+                &lt;p class="card-text"&gt;Tailwind was completely replaced. Core schemas remain active.&lt;/p&gt;
+            &lt;/div&gt;
         &lt;/div&gt;
-    &lt;/div custody&gt;
-{{ '{%' }} endblock {{ '%}' }}</code></pre>
+    &lt;/div&gt;
+{% endblock %}{% endverbatim %}</code></pre>
 
-            <div class="p-4 bg-slate-950 border border-indigo-500/20 rounded-xl space-y-1">
-                <h4 class="text-xs font-bold text-indigo-400 tracking-wider uppercase">Architectural Note</h4>
-                <p class="text-slate-400 text-sm leading-relaxed">
-                    Even when you override the default <code>styles</code> block, core processes—such as session notification flash messages, dark-mode preference handlers, application version update alerts, and rich structured microdata JSON-LD schemas for search engines—remain fully secure and functional at the root layer.
-                </p>
-            </div>
-        </section>
+        <div class="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 rounded-xl p-4">
+            <p class="text-indigo-800 dark:text-indigo-200 text-sm">
+                <strong>🔒 Important:</strong> Even when you replace the styles, the core functionality — session flashes,
+                CSRF protection, debug toolbar, SEO schemas, and authentication state — remains fully intact.
+            </p>
+        </div>
+    </section>
 
-    </div>
+    <hr class="border-gray-200 dark:border-gray-800">
+
+    <!-- ============================================================ -->
+    <!--  SUMMARY                                                      -->
+    <!-- ============================================================ -->
+    <section class="space-y-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6">
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">📋 Summary</h2>
+        <ul class="space-y-3 text-gray-700 dark:text-gray-300 list-disc pl-4">
+            <li><strong class="text-red-600 dark:text-red-400">Never modify</strong> files inside <code class="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">@core</code> – they belong to the framework.</li>
+            <li><strong class="text-emerald-600 dark:text-emerald-400">All customizations</strong> go in <code class="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">app/views/themes/{theme_name}/</code>.</li>
+            <li>Use <code class="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">{% verbatim %}{% extends "@core/layouts/main.twig" %}{% endverbatim %}</code> to inherit from the core.</li>
+            <li>Override individual blocks (like <code class="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">styles</code>, <code class="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">content</code>, <code class="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">scripts</code>) in your theme.</li>
+            <li>Set <code class="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">APP_THEME=my-theme</code> in your <code class="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">.env</code> to activate your custom theme.</li>
+            <li>The core serves as a <strong>fallback</strong> – if a file is missing in your theme, the core version is used.</li>
+        </ul>
+    </section>
+
+</div>
 {% endblock %}

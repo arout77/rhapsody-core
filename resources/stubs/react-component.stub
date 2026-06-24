@@ -1,0 +1,19 @@
+import React from 'react';
+
+/**
+ * {{ componentname }}
+ *
+ * Props are passed from PHP via $this->react('{{ componentname }}', $props).
+ * Destructure whatever keys your controller provides.
+ */
+export default function {{ componentname }}(props) {
+    return (
+        <div className="{{ componentname }}-page">
+            <h1>{{ componentname }}</h1>
+            {/* Remove this debug block once you're wired up */}
+            <pre style={{ fontFamily: 'monospace', fontSize: '0.85rem', opacity: 0.6 }}>
+                {JSON.stringify(props, null, 2)}
+            </pre>
+        </div>
+    );
+}

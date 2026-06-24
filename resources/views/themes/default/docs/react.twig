@@ -1,0 +1,511 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>React + Vite Integration</h1>
+    <p>
+        Rhapsody's React integration gives you the best of both worlds: the power and interactivity of React
+        components within your traditional Twig templates. Whether you want to embed a single interactive
+        component ("React Islands") or build a full single-page application, the integration seamlessly
+        bridges your PHP backend with a modern React + Vite frontend.
+    </p>
+
+    <div class="bg-indigo-50 dark:bg-indigo-950/40 border-l-4 border-indigo-500 dark:border-indigo-400 p-4 mb-6 rounded-r-lg">
+        <strong class="text-indigo-800 dark:text-indigo-300">Key Benefits:</strong>
+        <ul class="mt-2 space-y-1 text-indigo-800 dark:text-indigo-300">
+            <li>✅ <strong>React Islands</strong> – embed components directly in Twig templates</li>
+            <li>✅ <strong>Full SPA Support</strong> – render entire pages with React</li>
+            <li>✅ <strong>Vite HMR</strong> – instant hot module reloading during development</li>
+            <li>✅ <strong>XSS-Safe Props</strong> – JSON props embedded in safe script blocks</li>
+            <li>✅ <strong>CSRF Protection</strong> – automatic token injection for secure POST requests</li>
+            <li>✅ <strong>Production Manifest</strong> – fingerprinted assets with import preloading</li>
+        </ul>
+    </div>
+
+    <hr>
+
+    <h2>Installation</h2>
+    <p>
+        The React integration is available as a core feature. To install it into your application, run:
+    </p>
+
+    <pre class="command-line"><code class="language-bash">php rhapsody react:install</code></pre>
+
+    <p>
+        This command scaffolds:
+    </p>
+    <ul>
+        <li><code>vite.config.js</code> – Vite build configuration</li>
+        <li><code>package.json</code> – npm manifest with React + Vite dependencies</li>
+        <li><code>resources/js/app.jsx</code> – JavaScript entry point (the Rhapsody bridge)</li>
+        <li><code>resources/js/components/Welcome.jsx</code> – example component</li>
+        <li>Updates <code>.env</code> and <code>.env.example</code> with Vite configuration variables</li>
+    </ul>
+
+    <div class="bg-amber-50 dark:bg-amber-950/40 border-l-4 border-amber-500 dark:border-amber-400 p-4 rounded-r-lg">
+        <strong class="text-amber-800 dark:text-amber-300">Next Steps:</strong>
+        <ol class="mt-2 space-y-1 text-amber-800 dark:text-amber-300">
+            <li>1. Run <code>npm install</code> to install JavaScript dependencies</li>
+            <li>2. Development: set <code>VITE_DEV_SERVER=true</code> in <code>.env</code> and run <code>npm run dev</code></li>
+            <li>3. Production: run <code>npm run build</code></li>
+        </ol>
+    </div>
+
+    <hr>
+
+    <h2>Environment Variables</h2>
+    <p>
+        The React integration uses two environment variables that control how assets are loaded:
+    </p>
+
+    <h3><code>VITE_DEV_SERVER</code></h3>
+    <p>
+        When set to <code>true</code>, assets are served from the Vite dev server running on <code>localhost:5173</code>.
+        This enables Hot Module Replacement (HMR) for instant feedback during development.
+    </p>
+    <pre class="command-line"><code class="language-bash">VITE_DEV_SERVER=true</code></pre>
+
+    <h3><code>VITE_PORT</code></h3>
+    <p>
+        The port Vite runs on. Defaults to <code>5173</code>. Change this if you're running multiple Vite instances.
+    </p>
+    <pre class="command-line"><code class="language-bash">VITE_PORT=5173</code></pre>
+
+    <div class="bg-blue-50 dark:bg-blue-950/40 border-l-4 border-blue-500 dark:border-blue-400 p-4 rounded-r-lg">
+        <strong class="text-blue-800 dark:text-blue-300">Production Ready:</strong>
+        <p class="text-blue-800 dark:text-blue-300 mt-1">
+            When <code>VITE_DEV_SERVER=false</code> or omitted, the integration automatically uses the production build
+            from <code>{ROOT_DIRECTORY}/public/build/</code> with fingerprinted asset URLs from the Vite manifest.
+        </p>
+    </div>
+
+    <hr>
+
+    <h2>Using React in Controllers</h2>
+
+    <h3>Full React Pages</h3>
+    <p>
+        For single-page applications or pages entirely powered by React, use the <code>react()</code> method in your controller (in place of the normal <var>view()</var> call):
+    </p>
+
+    <pre><code class="language-php">// In a controller
+class DashboardController extends BaseController
+{
+    public function index(): Response
+    {
+        return $this->react('Dashboard', [
+            'user' => [
+                'id' => 1,
+                'name' => 'John Doe',
+                'email' => 'john@example.com',
+            ],
+            'stats' => [
+                'posts' => 42,
+                'followers' => 128,
+            ],
+        ], [
+            'title' => 'Dashboard',
+            'description' => 'User dashboard with live statistics',
+        ]);
+    }
+}</code></pre>
+
+    <p>
+        This renders a full HTML page with:
+    </p>
+    <ul>
+        <li>Your component mounted at <code>#rhapsody-root</code></li>
+        <li>Props passed safely via a <code>&lt;script type="application/json"&gt;</code> block</li>
+        <li>CSRF token available as a <code>&lt;meta&gt;</code> tag</li>
+        <li>Vite assets automatically injected (dev server or production manifest)</li>
+    </ul>
+
+    <p>
+        The component is resolved from <code>resources/js/components/{ComponentName}.jsx</code>.
+        Nested paths are supported: <code>$this->react('Users/ProfileCard', $props)</code>.
+    </p>
+
+    <h3>React Islands in Twig</h3>
+    <p>
+        For embedding React components within traditional Twig templates, use the <code>react_component()</code> function:
+    </p>
+
+    {% verbatim %}
+    <pre><code class="language-twig">{# In your Twig template #}
+{% extends "@core/layouts/main.twig" %}
+
+{% block content %}
+    &lt;h1&gt;Welcome to your dashboard&lt;/h1&gt;
+
+    &lt;p&gt;Here's your live statistics:&lt;/p&gt;
+
+    {{ react_component('UserStats', {
+        userId: auth.user.id,
+        period: 'monthly',
+        stats: stats
+    }) }}
+
+    &lt;p&gt;And your recent activity:&lt;/p&gt;
+
+    {{ react_component('ActivityFeed', { limit: 10 }) }}
+{% endblock %}</code></pre>
+    {% endverbatim %}
+
+    <p>
+        Each component gets its own mount point with isolated props. The JavaScript bridge
+        automatically finds all <code>.rhapsody-island</code> elements and mounts the specified components.
+    </p>
+
+    <hr>
+
+    <h2>JavaScript Bridge</h2>
+    <p>
+        The <code>resources/js/app.jsx</code> entry point contains the Rhapsody bridge that
+        automatically mounts both full-page components and islands:
+    </p>
+
+    <pre><code class="language-javascript">// resources/js/app.jsx
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './App.jsx';  // Full-page application
+
+// Import your components
+import UserStats from './components/UserStats.jsx';
+import ActivityFeed from './components/ActivityFeed.jsx';
+
+// --- 1. Full-Page React App ---
+const root = document.getElementById('rhapsody-root');
+if (root) {
+    const componentName = root.getAttribute('data-component');
+    const props = JSON.parse(
+        document.getElementById('rhapsody-props').textContent
+    );
+
+    // Dynamic import based on component name
+    // This keeps the bundle size small
+    import(`./components/${componentName}.jsx`)
+        .then(module => {
+            const Component = module.default;
+            const reactRoot = createRoot(root);
+            reactRoot.render(&lt;Component {...props} /&gt;);
+        });
+}
+
+// --- 2. React Islands ---
+document.querySelectorAll('.rhapsody-island').forEach(element => {
+    const componentName = element.getAttribute('data-component');
+    const propsElement = element.querySelector('.rhapsody-island-props');
+    const props = JSON.parse(propsElement.textContent);
+
+    import(`./components/${componentName}.jsx`)
+        .then(module => {
+            const Component = module.default;
+            const reactRoot = createRoot(element);
+            reactRoot.render(&lt;Component {...props} /&gt;);
+        });
+});</code></pre>
+
+    <hr>
+
+    <h2>Creating Components</h2>
+
+    <h3>Using the CLI Generator</h3>
+    <p>
+        Generate new React components quickly with the <code>make:react</code> command:
+    </p>
+
+    <pre class="command-line"><code class="language-bash"># Simple component
+php rhapsody make:react Dashboard
+
+# Nested component
+php rhapsody make:react Users/ProfileCard
+
+# Any level of nesting
+php rhapsody make:react Admin/Settings/UserPreferences
+</code></pre>
+
+    <p>
+        Components are created in <code>resources/js/components/</code> with a preconfigured template.
+        The component name must be <strong>PascalCase</strong> (e.g., <code>UserProfile</code>, <code>ActivityFeed</code>).
+    </p>
+
+    <h3>Component Template</h3>
+    <p>
+        The generated component stub looks like this:
+    </p>
+
+    <pre><code class="language-javascript">// resources/js/components/Dashboard.jsx
+import React from 'react';
+
+/**
+ * Dashboard component
+ *
+ * Props:
+ * @param {Object} user - Current user data
+ * @param {Array} stats - User statistics
+ */
+export default function Dashboard({ user, stats }) {
+    return (
+        &lt;div className="p-6"&gt;
+            &lt;h1 className="text-2xl font-bold"&gt;Welcome, {user.name}!&lt;/h1&gt;
+            &lt;p&gt;You have {stats?.length || 0} items.&lt;/p&gt;
+        &lt;/div&gt;
+    );
+}</code></pre>
+
+    <hr>
+
+    <h2>CSRF Token Handling</h2>
+    <p>
+        The integration automatically injects the CSRF token as a <code>&lt;meta&gt;</code> tag:
+    </p>
+
+    <pre><code class="language-html">&lt;meta name="csrf-token" content="your_csrf_token_here"&gt;</code></pre>
+
+    <p>
+        In React, you can read it for secure POST requests:
+    </p>
+
+    <pre><code class="language-javascript">// In your React component
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+
+const response = await fetch('/api/data', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': csrfToken,
+    },
+    body: JSON.stringify(data),
+});</code></pre>
+
+    <p>
+        You can also access the CSRF token directly in Twig using the <code>csrf_token()</code> function:
+    </p>
+
+    {% verbatim %}
+    <pre><code class="language-twig">&lt;meta name="csrf-token" content="{{ csrf_token() }}"&gt;</code></pre>
+    {% endverbatim %}
+
+    <hr>
+
+    <h2>Vite Asset Management</h2>
+
+    <h3>Development Mode</h3>
+    <p>
+        When <code>VITE_DEV_SERVER=true</code>, assets are served from the Vite dev server.
+        This provides:
+    </p>
+    <ul>
+        <li>Hot Module Replacement (HMR) – instant updates without page reload</li>
+        <li>Fast build times – only what's needed is compiled</li>
+        <li>Source maps for debugging</li>
+    </ul>
+
+    <p>
+        Run the dev server:
+    </p>
+    <pre class="command-line"><code class="language-bash">npm run dev</code></pre>
+
+    <h3>Production Mode</h3>
+    <p>
+        When <code>VITE_DEV_SERVER=false</code>, assets are built and served from the production manifest.
+        This provides:
+    </p>
+    <ul>
+        <li>Minified, optimized assets</li>
+        <li>Fingerprinted filenames for cache busting</li>
+        <li>Automatic preloading of imported modules</li>
+        <li>CSS extraction and optimization</li>
+    </ul>
+
+    <p>
+        Build for production:
+    </p>
+    <pre class="command-line"><code class="language-bash">npm run build</code></pre>
+
+    <h3>Manual Asset Inclusion</h3>
+    <p>
+        In any Twig template, you can manually include Vite assets with the <code>vite_assets()</code> function:
+    </p>
+
+    {% verbatim %}
+    <pre><code class="language-twig">{% block head %}
+    {{ vite_assets('resources/js/app.jsx') }}
+{% endblock %}</code></pre>
+    {% endverbatim %}
+
+    <p>
+        This emits the correct tags:
+    </p>
+    <ul>
+        <li><strong>Development:</strong> <code>&lt;script type="module" src="http://localhost:5173/@vite/client"&gt;</code> + your entry script</li>
+        <li><strong>Production:</strong> <code>&lt;link rel="stylesheet"&gt;</code>, <code>&lt;link rel="modulepreload"&gt;</code>, and <code>&lt;script type="module"&gt;</code> tags</li>
+    </ul>
+
+    <hr>
+
+    <h2>Architecture Overview</h2>
+
+    <div class="bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl p-6 font-mono text-sm">
+        <div class="space-y-2">
+            <div class="text-gray-800 dark:text-gray-200">1. <span class="text-indigo-600 dark:text-indigo-400">Controller</span> → <span class="text-emerald-600 dark:text-emerald-400">$this-&gt;react()</span> or <span class="text-emerald-600 dark:text-emerald-400">$this-&gt;view()</span></div>
+            <div class="text-gray-600 dark:text-gray-400 ml-6">└── <span class="text-amber-600 dark:text-amber-400">BaseController</span> renders the page with embedded props</div>
+            <div class="text-gray-600 dark:text-gray-400 ml-6">└── <span class="text-amber-600 dark:text-amber-400">ViteManifest</span> resolves asset URLs</div>
+            <div class="text-gray-800 dark:text-gray-200 mt-2">2. <span class="text-purple-600 dark:text-purple-400">Browser</span> loads the page</div>
+            <div class="text-gray-600 dark:text-gray-400 ml-6">└── <span class="text-cyan-600 dark:text-cyan-400">HTML</span> contains mount point(s) and props</div>
+            <div class="text-gray-600 dark:text-gray-400 ml-6">└── <span class="text-cyan-600 dark:text-cyan-400">JavaScript</span> loads the Rhapsody bridge</div>
+            <div class="text-gray-800 dark:text-gray-200 mt-2">3. <span class="text-pink-600 dark:text-pink-400">React</span> renders the component</div>
+            <div class="text-gray-600 dark:text-gray-400 ml-6">└── <span class="text-rose-600 dark:text-rose-400">Full-page</span> → single root mount</div>
+            <div class="text-gray-600 dark:text-gray-400 ml-6">└── <span class="text-rose-600 dark:text-rose-400">Islands</span> → multiple independent mounts</div>
+        </div>
+    </div>
+
+    <h3>Data Flow</h3>
+
+    <pre><code class="language-plaintext">┌─────────────────────────────────────────────────────────────────────┐
+│  PHP Backend (Controller)                                          │
+│  ┌─────────────────────────────────────────────────────────────────┐ │
+│  │  $this->react('Dashboard', ['user' => $user]);                │ │
+│  └─────────────────────────────────────────────────────────────────┘ │
+│                              │                                        │
+│                              ▼                                        │
+│  ┌─────────────────────────────────────────────────────────────────┐ │
+│  │  $this->twig->addExtension(new ReactIslandExtension());        │ │
+│  │  // Props are JSON-encoded with JSON_HEX_TAG for XSS safety    │ │
+│  └─────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  HTML Output                                                       │
+│  ┌─────────────────────────────────────────────────────────────────┐ │
+│  │  &lt;div id="rhapsody-root" data-component="Dashboard"&gt;&lt;/div&gt;    │ │
+│  │  &lt;script type="application/json" id="rhapsody-props"&gt;          │ │
+│  │    {"user":{"id":1,"name":"John"}}                              │ │
+│  │  &lt;/script&gt;                                                     │ │
+│  └─────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  JavaScript Bridge (app.jsx)                                      │
+│  ┌─────────────────────────────────────────────────────────────────┐ │
+│  │  const props = JSON.parse(                                     │ │
+│  │    document.getElementById('rhapsody-props').textContent       │ │
+│  │  );                                                           │ │
+│  │  import(`./components/${componentName}.jsx`)                  │ │
+│  │    .then(module => {                                          │ │
+│  │      createRoot(root).render(&lt;Component {...props} /&gt;);      │ │
+│  │    });                                                       │ │
+│  └─────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  React Component (resources/js/components/Dashboard.jsx)          │
+│  ┌─────────────────────────────────────────────────────────────────┐ │
+│  │  export default function Dashboard({ user }) {                 │ │
+│  │    return &lt;h1&gt;Welcome, {user.name}!&lt;/h1&gt;;                     │ │
+│  │  }                                                             │ │
+│  └─────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────┘</code></pre>
+
+    <hr>
+
+    <h2>Security Considerations</h2>
+
+    <h3>XSS Protection</h3>
+    <p>
+        Props are serialised with <code>JSON_HEX_TAG</code>, which escapes <code>&lt;/script&gt;</code> sequences:
+    </p>
+    <pre><code class="language-php">$propsJson = json_encode($props, JSON_HEX_TAG | JSON_UNESCAPED_UNICODE);</code></pre>
+
+    <p>
+        This prevents <code>&lt;/script&gt;</code> injection inside the JSON block, making it safe to embed
+        arbitrary user data.
+    </p>
+
+    <h3>CSRF Protection</h3>
+    <p>
+        The integration automatically injects the CSRF token as a <code>&lt;meta&gt;</code> tag.
+        Use it in your React components for secure POST requests as shown above.
+    </p>
+
+    <h3>Content Security Policy (CSP)</h3>
+    <p>
+        If you use a strict CSP, the development mode (<code>VITE_DEV_SERVER=true</code>) may require
+        <code>connect-src</code> and <code>script-src</code> to allow the Vite dev server.
+        Add this to your CSP policy:
+    </p>
+    <pre><code class="language-http">connect-src http://localhost:5173;
+script-src http://localhost:5173;</code></pre>
+
+    <hr>
+
+    <h2>Common Workflows</h2>
+
+    <h3>1. Build a new React page</h3>
+    <ol>
+        <li>Generate the component: <code>php rhapsody make:react Dashboard</code></li>
+        <li>Edit <code>resources/js/components/Dashboard.jsx</code></li>
+        <li>In a controller: <code>return $this->react('Dashboard', $props);</code></li>
+        <li>Start Vite: <code>npm run dev</code></li>
+    </ol>
+
+    <h3>2. Embed an interactive component in a Twig template</h3>
+    <ol>
+        <li>Generate the component: <code>php rhapsody make:react UserSearch</code></li>
+        {% verbatim %}
+        <li>In your Twig template: <code>{{ react_component('UserSearch', { endpoint: '/api/users' }) }}</code></li>
+        {% endverbatim %}
+        <li>Start Vite: <code>npm run dev</code></li>
+    </ol>
+
+    <h3>3. Switch to production</h3>
+    <ol>
+        <li>Set <code>VITE_DEV_SERVER=false</code> in <code>.env</code></li>
+        <li>Build assets: <code>npm run build</code></li>
+        <li>Deploy as usual</li>
+    </ol>
+
+    <hr>
+
+    <h2>Troubleshooting</h2>
+
+    <h3>Component not found</h3>
+    <pre><code class="language-plaintext">[Rhapsody/React] Vite manifest entry 'resources/js/app.jsx' not found.</code></pre>
+    <p>
+        <strong>Solution:</strong> Run <code>npm run build</code> or set <code>VITE_DEV_SERVER=true</code>.
+    </p>
+
+    <h3>CSRF token missing</h3>
+    <pre><code class="language-plaintext">document.querySelector('meta[name="csrf-token"]') is null</code></pre>
+    <p>
+        <strong>Solution:</strong> Ensure the session is started before rendering the React page.
+        The <code>Session::start()</code> must be called before <code>$this->react()</code>.
+    </p>
+
+    <h3>HMR not working</h3>
+    <ul>
+        <li>Check that <code>VITE_DEV_SERVER=true</code> is set in <code>.env</code></li>
+        <li>Ensure <code>npm run dev</code> is running</li>
+        <li>Check that <code>VITE_PORT</code> matches the port Vite is running on</li>
+        <li>Clear your browser cache</li>
+    </ul>
+
+    <h3>Props not updating</h3>
+    <p>
+        Props are static values set at render time. If you need live data, fetch it from an API
+        endpoint inside your React component.
+    </p>
+
+    <hr>
+
+    <div class="bg-green-50 dark:bg-green-950/40 border-l-4 border-green-500 dark:border-green-400 p-4 rounded-r-lg">
+        <strong class="text-green-800 dark:text-green-300">Need Help?</strong>
+        <p class="text-green-800 dark:text-green-300 mt-1">
+            Check the <a href="{{ base_url }}/docs/faq" class="text-green-800 dark:text-green-300 underline">FAQ</a>
+            or open an issue on GitHub.
+        </p>
+    </div>
+
+{% endblock %}

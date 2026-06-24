@@ -18,6 +18,30 @@ class Path
     }
 
     /**
+     * Get the absolute path to the core application source directory (usually 'app').
+     */
+    public static function app(string $path = ''): string
+    {
+        return self::root('app/' . ltrim($path, '/\\'));
+    }
+
+    /**
+     * Get the absolute path to the configuration directory.
+     */
+    public static function config(string $path = ''): string
+    {
+        return self::root('config/' . ltrim($path, '/\\'));
+    }
+
+    /**
+     * Get the absolute path to the public web root directory.
+     */
+    public static function public(string $path = ''): string
+    {
+        return self::root('public/' . ltrim($path, '/\\'));
+    }
+
+    /**
      * Get the absolute path to the storage directory.
      */
     public static function storage(string $path = ''): string
@@ -26,10 +50,42 @@ class Path
     }
 
     /**
+     * Get the absolute path to the framework or app cache directory.
+     */
+    public static function cache(string $path = ''): string
+    {
+        return self::storage('framework/cache/' . ltrim($path, '/\\'));
+    }
+
+    /**
+     * Get the absolute path to the application logs directory.
+     */
+    public static function logs(string $path = ''): string
+    {
+        return self::storage('logs/' . ltrim($path, '/\\'));
+    }
+
+    /**
+     * Get the absolute path to the resources directory.
+     */
+    public static function resources(string $path = ''): string
+    {
+        return self::root('resources/' . ltrim($path, '/\\'));
+    }
+
+    /**
      * Get the absolute path to the views directory.
      */
     public static function views(string $path = ''): string
     {
-        return self::root('resources/views/' . ltrim($path, '/\\'));
+        return self::resources('views/' . ltrim($path, '/\\'));
+    }
+
+    /**
+     * Get the absolute path to the database directory (migrations, seeds, etc.).
+     */
+    public static function database(string $path = ''): string
+    {
+        return self::root('db/' . ltrim($path, '/\\'));
     }
 }

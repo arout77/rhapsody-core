@@ -387,4 +387,13 @@ class DocsController extends BaseController
             'canonical_url' => $request->getCanonicalUrl(),
         ]);
     }
+
+    public function reactjs(Request $request): Response
+    {
+        return $this->view('@core/docs/react.twig', [], [
+            'title'         => 'Reactjs + Rhapsody – Rhapsody Documentation',
+            'description'   => 'A marriage made in heaven! Learn about Rhapsody\'s seamless integration of Reactjs, and how to quickly buid your own SPA\'s and React Islands.',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
 }
