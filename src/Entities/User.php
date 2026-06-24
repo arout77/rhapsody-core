@@ -1,5 +1,5 @@
 <?php
-namespace App\Entities;
+namespace Rhapsody\Core\Entities;
 
 use Doctrine\ORM\Mapping as ORM;
 

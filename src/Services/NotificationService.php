@@ -1,106 +1,80 @@
 <?php
-/**
- * This service checks Git for updates to the framework.
- * It uses a flag in the cache to determine when the last
- * check was made; and runs once every 6 hours to prevent
- * hitting GitHub API limits.
- */
-namespace App\Services;
+namespace Rhapsody\Core\Services;
 
-use Rhapsody\Core\Cache;
-use Rhapsody\Core\Response;
+use Rhapsody\Core\Cache\CacheInterface;
+use Rhapsody\Core\Kernel;
 
 class NotificationService
 {
-    // Define your current running version string and the target repository endpoint
-    protected const CURRENT_VERSION = 'v1.4.8';
-    protected const GITHUB_API_URL  = 'https://api.github.com/repos/arout77/rhapsody/releases/latest';
+    protected CacheInterface $cache;
+    protected string $updateUrl  = 'https://iwf-wrestling.com/rhapsody/v1/updates';
+    protected int $cacheDuration = 86400; // 24-hour gatekeeper window
 
-    /**
-     * @param Cache $cache
-     */
-    public function __construct(protected Cache $cache)
-    {}
-
-    /**
-     * Injects an update notification banner into an HTML response if an update is available.
-     */
-    public function injectBanner(Response $response): Response
+    public function __construct(CacheInterface $cache)
     {
-        // 1. Run the silent automated background update check (Throttled to every 12 hours)
-        $this->checkForUpdatesThrottled();
-
-        // 2. Look for the cached banner trigger key
-        $newVersion = $this->cache->get('update_available');
-
-        if (! $newVersion) {
-            return $response; // No update or up-to-date, do nothing
-        }
-
-        $content = $response->getContent(); //
-
-        if (! str_contains($content, '</body>')) { //
-            return $response;
-        }
-
-        $bannerHtml = $this->createBannerHtml($newVersion); //
-
-        $modifiedContent = str_ireplace('</body>', $bannerHtml . '</body>', $content); //
-        $response->setContent($modifiedContent);                                       //
-
-        return $response;
+        $this->cache = $cache;
     }
 
     /**
-     * Safely queries the GitHub API while enforcing a strict cache-based cooldown window.
+     * Determine if a framework core update is available.
+     * Returns update payload array if true, or null if up to date/offline.
      */
-    protected function checkForUpdatesThrottled(): void
+    public function getAvailableUpdate(): ?array
     {
-        // If our 6-hour cooling period is still active, exit immediately (0ms overhead)
-        if ($this->cache->get('rhapsody_last_update_check')) {
-            return;
+        // 1. Check local cache baseline to avoid hitting the external network on every request
+        if ($this->cache->has('rhapsody_latest_version_meta')) {
+            $latestData = $this->cache->get('rhapsody_latest_version_meta');
+            return $this->compareVersions($latestData);
         }
 
-        // Set the 6-hour lock key instantly to prevent concurrent page loads from double-pinging
-        $this->cache->set('rhapsody_last_update_check', true, 26600);
+        // 2. Cache missing or expired; fetch safely from the remote server
+        try {
+            $latestData = $this->fetchRemoteMetaData();
 
-        $options = [
+            if ($latestData) {
+                $this->cache->set('rhapsody_latest_version_meta', $latestData, $this->cacheDuration);
+                return $this->compareVersions($latestData);
+            }
+        } catch (\Throwable $e) {
+            // Fail silently. Never crash a consumer's application because your update server is down.
+            return null;
+        }
+
+        return null;
+    }
+
+    protected function fetchRemoteMetaData(): ?array
+    {
+        $ctx = stream_context_create([
             'http' => [
-                'method' => 'GET',
-                'header' => "User-Agent: Rhapsody-Framework-Update-Checker\r\n",
+                'timeout' => 1.5, // Aggressive low timeout to preserve user load speeds
+                'header'  => "User-Agent: RhapsodyKernel/" . Kernel::getVersion() . "\r\n",
             ],
-        ];
+        ]);
 
-        $context  = stream_context_create($options);
-        $response = @file_get_contents(self::GITHUB_API_URL, false, $context);
-
-        if ($response === false) {
-            return; // Silently abort if the GitHub API is down, rate-limited, or offline
+        $payload = @file_get_contents($this->updateUrl, false, $ctx);
+        if ($payload === false) {
+            return null;
         }
 
-        $data          = json_decode($response, true);
-        $latestVersion = $data['tag_name'] ?? null;
-
-        // Compare GitHub's newest tag release with your active local instance version
-        if ($latestVersion && version_compare($latestVersion, self::CURRENT_VERSION, '>')) {
-            $this->cache->set('update_available', $latestVersion, 86400 * 4); // Keep banner cache for 96 hours
-        } else {
-            $this->cache->delete('update_available'); // User is up-to-date, clear old values
-        }
+        return json_decode($payload, true);
     }
 
-    /**
-     * @param string $version
-     */
-    private function createBannerHtml(string $version): string
+    protected function compareVersions(array $remoteData): ?array
     {
-        // Using inline styles to ensure the banner is always visible and styled correctly
-        return <<<HTML
-            <div id="rhapsody-update-banner" style="position: fixed; bottom: 0; left: 0; width: 100%; background-color: #1F2937; color: #F9FAFB; padding: 12px; z-index: 99999; display: flex; justify-content: center; align-items: center; font-family: sans-serif; font-size: 14px; border-top: 1px solid #4B5563;">
-                <span class="bg-pink-700 text-white animate-pulse" style="font-weight: bold; font-size: 10px; padding: 2px 8px; border-radius: 9999px; margin-right: 12px;">UPDATE</span>
-                A new version of Rhapsody is available! &nbsp;<strong>($version)</strong>
-                <a href="#" id="update-notification-link" data-version="$version" style="color: #60A5FA; font-weight: bold; text-decoration: underline; margin-left: 16px;">View Details & Release Notes</a>
-            </div>
-        HTML;
+        $current = Kernel::getVersion();
+        $latest  = $remoteData['version'] ?? '1.0.0';
+
+        // standard semantic version matching natively managed by PHP
+        if (version_compare($current, $latest, '<')) {
+            return [
+                'current'       => $current,
+                'latest'        => $latest,
+                'changelog_url' => $remoteData['changelog_url'] ?? '',
+                'is_critical'   => $remoteData['security_patch'] ?? false,
+            ];
+        }
+
+        return null;
     }
 }

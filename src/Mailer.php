@@ -7,26 +7,46 @@ use Symfony\Component\Mime\Email;
 
 class Mailer
 {
-    // Make this nullable since it won't be instantiated if the host config is empty
+    /**
+     * The underlying Symfony Mailer instance or null if unconfigured.
+     */
     protected ?SymfonyMailer $mailer = null;
+
+    /**
+     * @var array<string, mixed>
+     */
     protected array $mailConfig;
 
+    /**
+     * @param array<string, mixed> $mailConfig
+     */
     public function __construct(array $mailConfig = [])
     {
         $this->mailConfig = $mailConfig;
 
-        // Check if the host is empty; if so, skip initialization or use a null transport
+        // Check if the host is empty; if so, skip initialization
         if (empty($mailConfig['host'])) {
             return;
         }
 
-        $dsn          = "{$mailConfig['transport']}://{$mailConfig['username']}:{$mailConfig['password']}@{$mailConfig['host']}:{$mailConfig['port']}";
+        $transportStr = $mailConfig['transport'] ?? 'smtp';
+        $username     = $mailConfig['username'] ?? '';
+        $password     = $mailConfig['password'] ?? '';
+        $host         = $mailConfig['host'];
+        $port         = $mailConfig['port'] ?? 25;
+
+        $dsn          = "{$transportStr}://{$username}:{$password}@{$host}:{$port}";
         $transport    = Transport::fromDsn($dsn);
         $this->mailer = new SymfonyMailer($transport);
     }
 
     /**
      * Sends an email.
+     * * @param string $to
+     * @param string $subject
+     * @param string $htmlBody
+     * @param string|null $plainTextBody
+     * @throws \RuntimeException
      */
     public function send(string $to, string $subject, string $htmlBody, ?string $plainTextBody = null): void
     {
@@ -34,9 +54,8 @@ class Mailer
             throw new \RuntimeException('Mailer not configured. Please set MAIL_HOST in .env');
         }
 
-        // Fixed: Read straight from the correct mailConfig property array saved by the constructor
-        $fromAddress = $this->mailConfig['from_address'] ?? 'hello@example.com';
-        $fromName    = $this->mailConfig['from_name'] ?? 'Example';
+        $fromAddress = (string) ($this->mailConfig['from_address'] ?? 'hello@example.com');
+        $fromName    = (string) ($this->mailConfig['from_name'] ?? 'Example');
 
         $email = (new Email())
             ->from("{$fromName} <{$fromAddress}>")
@@ -44,7 +63,7 @@ class Mailer
             ->subject($subject)
             ->html($htmlBody);
 
-        if ($plainTextBody) {
+        if ($plainTextBody !== null) {
             $email->text($plainTextBody);
         }
 

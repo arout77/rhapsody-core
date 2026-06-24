@@ -1,6 +1,9 @@
 <?php
 namespace Rhapsody\Core;
 
+use Rhapsody\Core\Exceptions\HttpException;
+use Rhapsody\Core\Logger;
+
 /**
  * Global exception and error handler for Rhapsody.
  * Logs all errors and displays appropriate error pages.
@@ -31,12 +34,17 @@ class ErrorHandler
     /**
      * Convert PHP errors into ErrorException and forward to exception handler.
      */
-    public static function handleError(int $level, string $message, string $file, int $line): bool
+    public static function handleError($level, $message, $file, $line)
     {
+        // Prevent Whoops/HTTP header warnings from causing a double-fault crash
+        if (str_contains($message, 'http_response_code()')) {
+            return false; // Let PHP ignore it and continue execution
+        }
+
+        // Your existing logic that converts errors to exceptions:
         if (error_reporting() & $level) {
             throw new \ErrorException($message, 0, $level, $file, $line);
         }
-        return true;
     }
 
     /**
@@ -46,7 +54,7 @@ class ErrorHandler
     {
         self::logError($e);
 
-        $isHttp404 = ($e instanceof \Core\Exceptions\HttpException  && $e->getStatusCode() === 404);
+        $isHttp404 = ($e instanceof HttpException && $e->getStatusCode() === 404);
 
         if (self::isDevelopment() && ! $isHttp404) {
             // Show Whoops for non-404 errors in development
@@ -102,9 +110,15 @@ class ErrorHandler
      */
     private static function renderWhoops(\Throwable $e): void
     {
-        $whoops = new \Whoops\Run();
-        $whoops->pushHandler(new \Whoops\Handler\PrettyPageHandler());
-        $whoops->handleException($e);
+        // Avoid Whoops setting status code if headers already sent
+        if (! headers_sent()) {
+            $whoops = new \Whoops\Run();
+            $whoops->pushHandler(new \Whoops\Handler\PrettyPageHandler());
+            $whoops->handleException($e);
+        } else {
+            // Fallback to production error page
+            self::renderProductionError($e);
+        }
     }
 
     /**
@@ -117,8 +131,12 @@ class ErrorHandler
     private static function renderProductionError(\Throwable $e): void
     {
         // Determine HTTP status code from exception, default to 500
-        $statusCode = ($e instanceof \Core\Exceptions\HttpException) ? $e->getStatusCode() : 500;
-        http_response_code($statusCode);
+        $statusCode = ($e instanceof HttpException) ? $e->getStatusCode() : 500;
+
+        // Only set status code if headers not already sent
+        if (! headers_sent()) {
+            http_response_code($statusCode);
+        }
 
         // Get the active theme from config (set in .env)
         $theme         = self::$config['theme'] ?? 'default';

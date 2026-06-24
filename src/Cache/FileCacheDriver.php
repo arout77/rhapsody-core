@@ -10,50 +10,60 @@ class FileCacheDriver implements CacheInterface
     public function __construct()
     {
         // Dynamically resolve the absolute path to the downstream app's storage folder
-        // and append an OS-native trailing separator so md5($key) appends cleanly.
         $this->cachePath = Path::storage('cache/app') . DIRECTORY_SEPARATOR;
     }
 
     /**
      * @param string $key
-     * @param $default
+     * @param mixed $default
      * @return mixed
      */
-    public function get(string $key, $default = null)
+    public function get(string $key, mixed $default = null): mixed
     {
         $path = $this->cachePath . md5($key);
         if (! file_exists($path)) {
             return $default;
         }
 
-        $data = unserialize(file_get_contents($path));
-        if (time() > $data['expires']) {
+        $content = file_get_contents($path);
+        if ($content === false) {
+            return $default;
+        }
+
+        $data = unserialize($content);
+        if (! is_array($data) || ! isset($data['expires'])) {
+            return $default;
+        }
+
+        if (time() > (int) $data['expires']) {
             unlink($path);
             return $default;
         }
-        return $data['value'];
+
+        return $data['value'] ?? $default;
     }
 
     /**
      * @param string $key
-     * @param $value
+     * @param mixed $value
      * @param int $minutes
      */
-    public function put(string $key, $value, int $minutes): void
+    public function put(string $key, mixed $value, int $minutes): void
     {
         if (! is_dir($this->cachePath)) {
             mkdir($this->cachePath, 0777, true);
         }
+
         $data = [
             'value'   => $value,
             'expires' => time() + ($minutes * 60),
         ];
+
         file_put_contents($this->cachePath . md5($key), serialize($data));
     }
 
     /**
-     * Checks for key existence and expiry directly, without calling get().
-     * Fixes false negatives for legitimately cached falsy values (null, 0, false, '').
+     * Checks for key existence and expiry directly.
      *
      * @param string $key
      * @return bool
@@ -64,11 +74,22 @@ class FileCacheDriver implements CacheInterface
         if (! file_exists($path)) {
             return false;
         }
-        $data = unserialize(file_get_contents($path));
-        if (time() > $data['expires']) {
+
+        $content = file_get_contents($path);
+        if ($content === false) {
+            return false;
+        }
+
+        $data = unserialize($content);
+        if (! is_array($data) || ! isset($data['expires'])) {
+            return false;
+        }
+
+        if (time() > (int) $data['expires']) {
             unlink($path);
             return false;
         }
+
         return true;
     }
 
@@ -83,14 +104,26 @@ class FileCacheDriver implements CacheInterface
         }
     }
 
+    /**
+     * Delete all cached entries by clearing all files in the cache directory.
+     */
     public function flush(): bool
     {
+        if (! is_dir($this->cachePath)) {
+            return false;
+        }
+
         $files = glob($this->cachePath . '*');
+        if ($files === false) {
+            return false;
+        }
+
         foreach ($files as $file) {
             if (is_file($file)) {
                 unlink($file);
             }
         }
+
         return true;
     }
 }

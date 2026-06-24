@@ -42,7 +42,7 @@ class Router
     /**
      * Set the middleware configuration from the application.
      *
-     * @param array $config Associative array with 'global' and 'route' keys.
+     * @param array $config Associative array with 'global' and 'map' keys.
      */
     public static function setMiddlewareConfig(array $config): void
     {
@@ -60,63 +60,60 @@ class Router
         return $route;
     }
 
-    /**
-     * Registers a GET route.
-     */
     public static function get(string $path, mixed $callback): Route
     {
-        return self::add('get', $path, $callback);
+        return self::add('GET', $path, $callback);
     }
 
-    /**
-     * Registers a POST route.
-     */
     public static function post(string $path, mixed $callback): Route
     {
-        return self::add('post', $path, $callback);
+        return self::add('POST', $path, $callback);
+    }
+
+    public static function put(string $path, mixed $callback): Route
+    {
+        return self::add('PUT', $path, $callback);
+    }
+
+    public static function delete(string $path, mixed $callback): Route
+    {
+        return self::add('DELETE', $path, $callback);
     }
 
     /**
-     * Finds the matching route, executes middleware, and dispatches it.
+     * Dispatches the incoming request, matching it against registered routes,
+     * executing global and route-specific middleware, and returning a Response.
      *
-     * Global middleware runs only after a route is matched.
-     * Middleware can short‑circuit by returning a Response object.
-     *
-     * @param Request   $request   The incoming request object.
-     * @param Container $container The application's service container.
+     * @param Request $request
+     * @param Container $container
      * @return Response
      */
     public static function dispatch(Request $request, Container $container): Response
     {
-        $path   = $request->getPath();
+        $uri    = $request->getPath(); // Use getPath() to handle base URL stripping
         $method = $request->getMethod();
 
         foreach (self::$routes as $route) {
-            if ($route->matches($method, $path)) {
+            // Route::matches() does both method and path matching
+            if ($route->matches($method, $uri)) {
                 self::$matchedRoute = $route;
 
-                // Run global middleware
+                // 1. RUN GLOBAL MIDDLEWARE
                 foreach (self::$globalMiddleware as $middlewareClass) {
-                    $middleware = $container->resolve($middlewareClass);
-                    $response   = $middleware->handle($request);
-                    if ($response instanceof Response) {
-                        return $response;
+                    $middlewareInstance = $container->resolve($middlewareClass);
+                    $middlewareInstance->handle($request);
+                }
+
+                // 2. RUN ROUTE-SPECIFIC MIDDLEWARE
+                foreach ($route->getMiddleware() as $middlewareKey) {
+                    if (isset(self::$middlewareMap[$middlewareKey])) {
+                        $middlewareInstance = $container->resolve(self::$middlewareMap[$middlewareKey]);
+                        // Pass the route as the second argument
+                        $middlewareInstance->handle($request, $route);
                     }
                 }
 
-                // Run route‑specific middleware (resolved via container)
-                $middlewareKey = $route->getMiddleware();
-                if ($middlewareKey) {
-                    $middlewareClass = self::$middlewareMap[$middlewareKey] ?? null;
-                    if ($middlewareClass && class_exists($middlewareClass)) {
-                        $middleware = $container->resolve($middlewareClass);
-                        $response   = $middleware->handle($request);
-                        if ($response instanceof Response) {
-                            return $response;
-                        }
-                    }
-                }
-
+                // 3. EXECUTE CONTROLLER
                 return self::execute($route, $request, $container);
             }
         }
@@ -125,10 +122,10 @@ class Router
     }
 
     /**
-     * Executes the controller action for a matched route.
+     * Safely executes the resolved route callback.
      *
-     * @param Route     $route     The matched route object.
-     * @param Request   $request   The incoming request object.
+     * @param Route $route
+     * @param Request $request
      * @param Container $container The application's service container.
      * @return Response
      */
@@ -146,8 +143,14 @@ class Router
         }
 
         if ($callback instanceof \Closure) {
+            $result = call_user_func($callback, $request, ...$params);
+            // If the closure already returns a Response, return it directly
+            if ($result instanceof Response) {
+                return $result;
+            }
+            // Otherwise, wrap it in a Response object
             $response = new Response();
-            $response->setContent(call_user_func($callback, $request, ...$params));
+            $response->setContent($result);
             return $response;
         }
 

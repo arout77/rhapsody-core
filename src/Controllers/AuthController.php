@@ -1,12 +1,12 @@
 <?php
 namespace Rhapsody\Core\Controllers;
 
-use App\Entities\User;
-use App\Events\UserRegistered;
 use Doctrine\ORM\EntityManager;
 use Rhapsody\Core\Auth\AuthenticatableInterface;
 use Rhapsody\Core\BaseController;
+use Rhapsody\Core\Entities\User;
 use Rhapsody\Core\Events\EventDispatcher;
+use Rhapsody\Core\Events\UserRegistered;
 use Rhapsody\Core\Request;
 use Rhapsody\Core\Response;
 use Rhapsody\Core\Session;
@@ -49,19 +49,27 @@ class AuthController extends BaseController implements AuthenticatableInterface
     {
         $data = $request->getBody();
 
-        // Find the user by email using the EntityManager
         $user = $this->em->getRepository(User::class)->findOneBy(['email' => $data['email']]);
 
+        // DEBUG: Log the user and password verification
+        error_log("User found: " . ($user ? 'yes' : 'no'));
+        if ($user) {
+            error_log("Password verify result: " . (password_verify($data['password'], $user->getPassword()) ? 'true' : 'false'));
+            error_log("Input password: " . $data['password']);
+            error_log("Stored hash: " . $user->getPassword());
+        }
+
         if ($user && password_verify($data['password'], $user->getPassword())) {
+            error_log("Login successful, redirecting to /dashboard");
             Session::regenerate();
             Session::set('user_id', $user->getUserId());
+            Session::set('user_name', $user->getName());
+            Session::set('user_email', $user->getEmail());
             return redirect('/dashboard');
         }
 
-        return $this->view('@core/auth/login.twig', [
-            'errors' => ['login' => 'Invalid email or password.'],
-            'old'    => ['email' => $data['email'] ?? ''],
-        ]);
+        error_log("Login failed, redirecting to /login with error");
+        return redirect('/login')->with('error', 'Invalid email or password.');
     }
 
     /**
@@ -92,7 +100,8 @@ class AuthController extends BaseController implements AuthenticatableInterface
             $user = new User();
             $user->setName($data['name']);
             $user->setEmail($data['email']);
-            $user->setPassword(password_hash($data['password'], PASSWORD_BCRYPT));
+            // Password is encrypted in entity
+            $user->setPassword($data['password']);
 
             // Tell Doctrine to save the user
             $this->em->persist($user);

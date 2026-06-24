@@ -140,6 +140,15 @@ class Request
     }
 
     /**
+     * @param string $key
+     * @param $default
+     */
+    public function allQueryParams(string $key, $default = null)
+    {
+        return $this->getParams;
+    }
+
+    /**
      * @return mixed
      */
     public function getFiles(): array

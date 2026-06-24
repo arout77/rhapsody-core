@@ -6,11 +6,12 @@ use Rhapsody\Core\Helpers\Recaptcha;
 
 class Validator
 {
+    /** @var array<string, array<int, string>> */
     protected array $errors = [];
     protected EntityManager $em;
 
     /**
-     * UPDATED: Inject the EntityManager
+     * Inject the EntityManager
      */
     public function __construct(EntityManager $em)
     {
@@ -18,13 +19,13 @@ class Validator
     }
 
     /**
-     * NEW: Check if a value is unique in a database table.
+     * Check if a value is unique in a database table.
      * @param string $field The field name (e.g., 'email')
-     * @param $value The value to check (e.g., 'test@example.com')
+     * @param mixed $value The value to check (e.g., 'test@example.com')
      * @param ?string $param The Entity name (e.g., 'User')
-     * @param array $data
+     * @param array<string, mixed> $data
      */
-    protected function validateUnique(string $field, $value, ?string $param, array $data): void
+    protected function validateUnique(string $field, mixed $value, ?string $param, array $data): void
     {
         if (empty($value) || empty($param)) {
             return;
@@ -42,16 +43,14 @@ class Validator
                 $this->errors[$field][] = "The {$field} is already associated with another account.";
             }
         } catch (\Exception $e) {
-            // This catches errors like the Entity not being found.
-            // Log this for debugging.
             error_log("Validator Error: " . $e->getMessage());
             $this->errors[$field][] = "There was an error checking if the {$field} is unique.";
         }
     }
 
     /**
-     * @param array $data
-     * @param array $rules
+     * @param array<string, mixed> $data
+     * @param array<string, mixed> $rules
      */
     public function validate(array $data, array $rules): bool
     {
@@ -71,7 +70,7 @@ class Validator
 
                 $methodName = 'validate' . ucfirst($ruleName);
                 if (method_exists($this, $methodName)) {
-                    // Pass the full data array to allow for rules like 'confirmed'
+                    // @phpstan-ignore-next-line
                     $this->$methodName($field, $value, $ruleParam, $data);
                 }
             }
@@ -81,20 +80,18 @@ class Validator
     }
 
     /**
-     * @return mixed
+     * @return array
      */
     public function getErrors(): array
     {
         return $this->errors;
     }
 
-    // --- EXISTING RULES ---
-
     /**
      * @param string $field
-     * @param $value
+     * @param mixed $value
      */
-    protected function validateRequired(string $field, $value): void
+    protected function validateRequired(string $field, mixed $value): void
     {
         if (empty($value) || (is_array($value) && empty($value['tmp_name']))) {
             $this->errors[$field][] = "The {$field} field is required.";
@@ -103,9 +100,9 @@ class Validator
 
     /**
      * @param string $field
-     * @param $value
+     * @param ?string $value
      */
-    protected function validateEmail(string $field, $value): void
+    protected function validateEmail(string $field, ?string $value): void
     {
         if (! empty($value) && ! filter_var($value, FILTER_VALIDATE_EMAIL)) {
             $this->errors[$field][] = "The {$field} must be a valid email address.";
@@ -113,70 +110,60 @@ class Validator
     }
 
     /**
+     * FIX: Changed `int $value` to `mixed $value` to prevent TypeErrors on string validation.
      * @param string $field
-     * @param $value
-     * @param string $param
+     * @param mixed $value
+     * @param ?string $param
      */
-    protected function validateMin(string $field, $value, ?string $param): void
+    protected function validateMin(string $field, mixed $value, ?string $param): void
     {
-        if (empty($value) || empty($param)) {
+        if (($value === null || $value === '') || empty($param)) {
             return;
         }
 
         $paramValue = (int) $param;
 
-        // --- START FIX ---
-        // Check if the value is numeric and the rule is for a number
         if (is_numeric($value)) {
-            // It's a number, so compare its value
             if ((float) $value < $paramValue) {
                 $this->errors[$field][] = "The {$field} must be at least {$param}.";
             }
         } else {
-            // It's a string, so compare its length
-            if (strlen(trim($value)) < $paramValue) {
+            if (strlen(trim((string) $value)) < $paramValue) {
                 $this->errors[$field][] = "The {$field} must be at least {$param} characters.";
             }
         }
-        // --- END FIX ---
     }
 
     /**
+     * FIX: Changed `int $value` to `mixed $value` to prevent TypeErrors on string validation.
      * @param string $field
-     * @param $value
-     * @param string $param
+     * @param mixed $value
+     * @param ?string $param
      */
-    protected function validateMax(string $field, $value, ?string $param): void
+    protected function validateMax(string $field, mixed $value, ?string $param): void
     {
-        if (empty($value) || empty($param)) {
+        if (($value === null || $value === '') || empty($param)) {
             return;
         }
 
         $paramValue = (int) $param;
 
-        // --- START FIX ---
-        // Check if the value is numeric and the rule is for a number
         if (is_numeric($value)) {
-            // It's a number, so compare its value
             if ((float) $value > $paramValue) {
                 $this->errors[$field][] = "The {$field} must not be greater than {$param}.";
             }
         } else {
-            // It's a string, so compare its length
-            if (strlen(trim($value)) > $paramValue) {
+            if (strlen(trim((string) $value)) > $paramValue) {
                 $this->errors[$field][] = "The {$field} must not exceed {$param} characters.";
             }
         }
-        // --- END FIX ---
     }
-
-    // --- NEW VALIDATION RULES ---
 
     /**
      * @param string $field
-     * @param $value
+     * @param ?string $value
      */
-    protected function validateUrl(string $field, $value): void
+    protected function validateUrl(string $field, ?string $value): void
     {
         if (! empty($value) && ! filter_var($value, FILTER_VALIDATE_URL)) {
             $this->errors[$field][] = "The {$field} must be a valid URL.";
@@ -185,11 +172,10 @@ class Validator
 
     /**
      * @param string $field
-     * @param $value
-     * @param string $param
-     * @return null
+     * @param ?string $value
+     * @param ?string $param
      */
-    protected function validateDateFormat(string $field, $value, ?string $param): void
+    protected function validateDateFormat(string $field, ?string $value, ?string $param): void
     {
         if (empty($param) || empty($value)) {
             return;
@@ -203,9 +189,9 @@ class Validator
 
     /**
      * @param string $field
-     * @param $value
+     * @param mixed $value
      */
-    protected function validateNumeric(string $field, $value): void
+    protected function validateNumeric(string $field, mixed $value): void
     {
         if (! empty($value) && ! is_numeric($value)) {
             $this->errors[$field][] = "The {$field} must only contain numbers.";
@@ -214,9 +200,9 @@ class Validator
 
     /**
      * @param string $field
-     * @param $value
+     * @param ?string $value
      */
-    protected function validateAlpha(string $field, $value): void
+    protected function validateAlpha(string $field, ?string $value): void
     {
         if (! empty($value) && ! ctype_alpha($value)) {
             $this->errors[$field][] = "The {$field} must only contain letters.";
@@ -225,9 +211,9 @@ class Validator
 
     /**
      * @param string $field
-     * @param $value
+     * @param ?string $value
      */
-    protected function validateAlphaNum(string $field, $value): void
+    protected function validateAlphaNum(string $field, ?string $value): void
     {
         if (! empty($value) && ! ctype_alnum($value)) {
             $this->errors[$field][] = "The {$field} must only contain letters and numbers.";
@@ -236,11 +222,11 @@ class Validator
 
     /**
      * @param string $field
-     * @param $value
-     * @param string $param
+     * @param ?string $value
+     * @param ?string $param
      * @param array $data
      */
-    protected function validateConfirmed(string $field, $value, ?string $param, array $data): void
+    protected function validateConfirmed(string $field, ?string $value, ?string $param, array $data): void
     {
         $confirmationField = $field . '_confirmation';
         if ($value !== ($data[$confirmationField] ?? null)) {
@@ -250,11 +236,10 @@ class Validator
 
     /**
      * @param string $field
-     * @param $value
-     * @param string $param
-     * @return null
+     * @param mixed $value
+     * @param ?string $param
      */
-    protected function validateIn(string $field, $value, ?string $param): void
+    protected function validateIn(string $field, mixed $value, ?string $param): void
     {
         if (empty($param)) {
             return;
@@ -268,11 +253,10 @@ class Validator
 
     /**
      * @param string $field
-     * @param $value
-     * @param string $param
-     * @return null
+     * @param mixed $value
+     * @param ?string $param
      */
-    protected function validateNotIn(string $field, $value, ?string $param): void
+    protected function validateNotIn(string $field, mixed $value, ?string $param): void
     {
         if (empty($param)) {
             return;
@@ -286,9 +270,9 @@ class Validator
 
     /**
      * @param string $field
-     * @param $value
+     * @param mixed $value
      */
-    protected function validateImage(string $field, $value): void
+    protected function validateImage(string $field, mixed $value): void
     {
         if (! empty($value) && is_array($value) && ! empty($value['tmp_name'])) {
             if ($value['error'] !== UPLOAD_ERR_OK || ! getimagesize($value['tmp_name'])) {
@@ -299,11 +283,10 @@ class Validator
 
     /**
      * @param string $field
-     * @param $value
-     * @param string $param
-     * @return null
+     * @param mixed $value
+     * @param ?string $param
      */
-    protected function validateMimes(string $field, $value, ?string $param): void
+    protected function validateMimes(string $field, mixed $value, ?string $param): void
     {
         if (empty($param) || ! is_array($value) || empty($value['tmp_name'])) {
             return;
@@ -332,14 +315,11 @@ class Validator
     }
 
     /**
-     * Verifies the Google Recaptcha response token.
-     * * @param string $field
-     * @param $value
+     * @param string $field
+     * @param mixed $value
      */
-    protected function validateRecaptcha(string $field, $value): void
+    protected function validateRecaptcha(string $field, mixed $value): void
     {
-        // If the token is entirely missing, the 'required' rule should catch it,
-        // but we ensure it fails the API check here as well just in case.
         $ipAddress = $_SERVER['REMOTE_ADDR'] ?? null;
 
         if (! Recaptcha::verify((string) $value, $ipAddress)) {

@@ -27,7 +27,10 @@ class VerifyCsrfTokenMiddleware extends Middleware
         if ($this->isPostRequest($request) && ! $this->inExceptArray($request)) {
             $token = $request->get('_token') ?? ($request->getBody()['_token'] ?? null);
             if (! Session::verifyCsrfToken($token)) {
-                http_response_code(419);
+                if (! headers_sent()) {
+                    http_response_code(419);
+                }
+
                 echo "CSRF token mismatch.";
                 exit;
             }

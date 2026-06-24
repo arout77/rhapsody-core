@@ -54,6 +54,14 @@ class Cache
     }
 
     /**
+     * Alias for put()
+     */
+    public function set(string $key, $value, int $minutes): void
+    {
+        $this->put($key, $value, $minutes);
+    }
+
+    /**
      * @param string $key
      * @return mixed
      */

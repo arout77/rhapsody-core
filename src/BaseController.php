@@ -1,13 +1,11 @@
 <?php
 namespace Rhapsody\Core;
 
-use PDO;
 use Rhapsody\Core\Cache;
 use Rhapsody\Core\Database;
 use Rhapsody\Core\Helpers\Recaptcha;
 use Rhapsody\Core\SEO\SchemaOrg;
 use Twig\Environment;
-use Twig\Loader\FilesystemLoader;
 
 abstract class BaseController
 {
@@ -18,6 +16,7 @@ abstract class BaseController
 
     /**
      * @param Environment $twig
+     * @throws \Exception
      */
     public function __construct(Environment $twig)
     {
@@ -25,24 +24,23 @@ abstract class BaseController
         $this->cache  = Cache::getInstance();
         $this->schema = new SchemaOrg();
 
-        $this->twig->addGlobal('session', $_SESSION);
-
-        // Safely pull flash data without prematurely erasing it
+        // Safely bridge session states into the view engine context
+        $this->twig->addGlobal('session', $_SESSION ?? []);
         $this->twig->addGlobal('flash_error', $_SESSION['error'] ?? null);
         $this->twig->addGlobal('flash_success', $_SESSION['success'] ?? null);
 
         // Fallback option using the container instance to resolve the pre-configured database singleton
-        // (Assuming a global helper or accessible container reference exists)
         global $container;
+        /** @var \Rhapsody\Core\Container|null $container */
 
         if (isset($container) && $container->has(Database::class)) {
-            // Retrieve the shared singleton instance that already possesses your config details
+            // @phpstan-ignore-next-line
             $this->db = $container->resolve(Database::class);
         } else {
-            // Fallback safety if the container isn't initialized yet (e.g. in standalone testing)
             throw new \Exception("Database service has not been properly initialized inside the Service Container.");
         }
-        $appVersion = $this->cache->get('update_available'); // Or fetch via configuration setup
+
+        $appVersion = $this->cache->get('update_available') ?? '1.0.0';
         $appUrl     = $_ENV['APP_URL'] ?? 'http://localhost';
 
         $this->schema->add('SoftwareApplication', [
@@ -73,24 +71,21 @@ abstract class BaseController
      * Renders a view file using Twig.
      *
      * @param string $view The view file to render.
-     * @param array  $args Associative array of data to pass to the view.
-     * @param array  $meta SEO metadata for the page (e.g., ['title' => 'My Title']).
+     * @param array<string, mixed> $args Associative array of data to pass to the view.
+     * @param array<string, mixed> $meta SEO metadata for the page (e.g., ['title' => 'My Title']).
      * @return Response
      */
     protected function view(string $view, array $args = [], array $meta = []): Response
     {
-        // 1. Merge standard layout configuration meta fields
         $defaults = [
             'title'       => 'Rhapsody - Compose your masterpiece',
-            'description' => 'Rhapsody is a modern PHP framework for developers who find full-stack frameworks like Laravel too heavy for their needs, but find micro-frameworks like Slim too bare-bones. It gives you the modern tooling you love—like a powerful CLI, dependency injection, and an ORM—in a simple, performant, and elegant package. It\'s the perfect choice for building fast, maintainable web applications and APIs without the overhead.',
+            'description' => 'Rhapsody is a modern PHP framework for developers who find full-stack frameworks like Laravel too heavy for their needs, but find micro-frameworks like Slim too bare-bones.',
         ];
         $args['meta'] = array_merge($defaults, $meta);
 
-        // 2. Automatically inject the rendered JSON-LD schemas into Twig arguments
+        // Inject engine variables cleanly prior to compilation context execution
         $args['schema_markup'] = $this->schema->render();
-
-        // 3. Add Recaptcha form
-        $args['captcha_form'] = Recaptcha::render();
+        $args['captcha_form']  = Recaptcha::render();
 
         $output = $this->twig->render($view, $args);
 
@@ -102,7 +97,7 @@ abstract class BaseController
     /**
      * Creates and returns a JSON response.
      *
-     * @param array $data The data to be encoded as JSON.
+     * @param array<mixed> $data The data to be encoded as JSON.
      * @param int $statusCode The HTTP status code for the response (defaults to 200 OK).
      * @return Response
      */
@@ -111,8 +106,7 @@ abstract class BaseController
         $response = new Response();
         $response->setStatusCode($statusCode);
         $response->setHeader('Content-Type', 'application/json');
-        $response->setContent(json_encode($data, JSON_PRETTY_PRINT)); // JSON_PRETTY_PRINT makes it readable
+        $response->setContent(json_encode($data, JSON_PRETTY_PRINT));
         return $response;
     }
-
 }

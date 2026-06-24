@@ -26,6 +26,13 @@ class Container
         $this->bindings[$abstract] = $concrete;
     }
 
+    public function instance(string $abstract, $instance): void
+    {
+        $this->bindings[$abstract] = function () use ($instance) {
+            return $instance;
+        };
+    }
+
     /**
      * Finds an entry of the container by its identifier and returns it.
      * Maps as an alias to the autowired resolve method.

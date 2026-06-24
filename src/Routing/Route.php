@@ -9,7 +9,7 @@ class Route
      */
     protected array $params = [];
 
-    protected ?string $middleware = null;
+    protected array $middleware = [];
 
     /**
      * Middleware mapping (loaded from config).
@@ -28,6 +28,7 @@ class Route
         protected string $path,
         protected mixed $callback
     ) {
+        $this->method = strtolower($method);
     }
 
     /**
@@ -133,14 +134,14 @@ class Route
      */
     public function middleware(string $key): self
     {
-        $this->middleware = $key;
-        return $this; // Return self to allow chaining
+        $this->middleware[] = $key; // Append to the array; allows chaining middleware when defining routes
+        return $this;
     }
 
     /**
      * @return mixed
      */
-    public function getMiddleware(): ?string
+    public function getMiddleware(): array
     {
         return $this->middleware;
     }

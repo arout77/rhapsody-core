@@ -99,11 +99,13 @@ class Response
     public function send(): void
     {
         // 1. Send the status code
-        http_response_code($this->statusCode);
+        if (! headers_sent()) {
+            http_response_code($this->statusCode);
 
-        // 2. Send all registered headers
-        foreach ($this->headers as $name => $value) {
-            header("{$name}: {$value}");
+            // 2. Send all registered headers
+            foreach ($this->headers as $name => $value) {
+                header("{$name}: {$value}");
+            }
         }
 
         // 3. Send the content body
