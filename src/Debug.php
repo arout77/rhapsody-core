@@ -27,6 +27,29 @@ class Debug
     }
 
     /**
+     * Converts php.ini memory shorthand (e.g., '128M', '2G') into absolute bytes.
+     */
+    private function getMemoryLimitBytes(): int
+    {
+        $limit = ini_get('memory_limit');
+        if ($limit === '-1') {
+            return -1; // Unlimited
+        }
+
+        $val  = trim($limit);
+        $last = strtolower($val[strlen($val) - 1]);
+        $val  = (int) $val;
+
+        switch ($last) {
+            case 'g':$val *= 1024;
+            case 'm':$val *= 1024;
+            case 'k':$val *= 1024;
+        }
+
+        return $val;
+    }
+
+    /**
      * Starts the timer and records initial memory usage.
      * Should be called at the very beginning of the request.
      */
@@ -64,6 +87,35 @@ class Debug
         // Use the new Logger class to read the logs
         $phpLogger    = new Logger($config['logging']['php_error_log_path'] ?? '');
         $apacheLogger = new Logger($config['logging']['apache_error_log_path'] ?? '');
+
+        $peakUsage  = memory_get_peak_usage();
+        $limitBytes = $this->getMemoryLimitBytes();
+
+        $usedMb  = round($peakUsage / 1024 / 1024, 2);
+        $limitMb = $limitBytes === -1 ? 'Unlimited' : round($limitBytes / 1024 / 1024, 2);
+
+        $percentage = 0;
+        if ($limitBytes > 0) {
+            $percentage = round(($peakUsage / $limitBytes) * 100, 2);
+        }
+
+        // Determine warning states dynamically
+        $status = 'ok';
+        if ($percentage > 80) {
+            $status = 'warning';
+        }
+
+        if ($percentage > 95) {
+            $status = 'critical';
+        }
+
+        // Export as a structured array for React
+        $this->data['memory'] = [
+            'used_mb'  => $usedMb,
+            'limit_mb' => $limitMb,
+            'percent'  => $percentage,
+            'status'   => $status,
+        ];
 
         $this->data['logs'] = [
             'php'    => $phpLogger->read(50),
