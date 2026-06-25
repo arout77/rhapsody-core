@@ -1,6 +1,7 @@
 <?php
-
 namespace Rhapsody\Core\React;
+
+use Rhapsody\Core\Helpers\Path;
 
 /**
  * ViteManifest
@@ -45,14 +46,14 @@ class ViteManifest
     {
         $manifest = self::load();
 
-        if (!isset($manifest[$entry])) {
+        if (! isset($manifest[$entry])) {
             throw new \RuntimeException(
                 "[Rhapsody/React] Vite manifest entry '{$entry}' not found. " .
                 "Run 'npm run build' to generate it."
             );
         }
 
-        return '/build/' . $manifest[$entry]['file'];
+        return self::getBasePath() . '/public/build/' . $manifest[$entry]['file'];
     }
 
     // -------------------------------------------------------------------------
@@ -62,7 +63,7 @@ class ViteManifest
     private static function devTags(string $entry): string
     {
         $port = (int) (self::env('VITE_PORT') ?: 5173);
-        $base = "http://localhost:{$port}";
+        $base = $_ENV['APP_URL'] . $_ENV['APP_BASE_URL'] . ":{$port}";
 
         // @vite/client must come first — it sets up HMR and CSS injection.
         $client = '<script type="module" src="' . $base . '/@vite/client"></script>';
@@ -75,32 +76,33 @@ class ViteManifest
     {
         $manifest = self::load();
 
-        if (!isset($manifest[$entry])) {
+        if (! isset($manifest[$entry])) {
             throw new \RuntimeException(
                 "[Rhapsody/React] Vite manifest entry '{$entry}' not found. " .
                 "Run 'npm run build' or check your entry path."
             );
         }
 
-        $chunk = $manifest[$entry];
-        $tags  = '';
+        $chunk    = $manifest[$entry];
+        $tags     = '';
+        $basePath = Path::root();
 
         // CSS files generated for this entry
         foreach ($chunk['css'] ?? [] as $css) {
-            $url   = htmlspecialchars('/build/' . $css, ENT_QUOTES, 'UTF-8');
+            $url   = htmlspecialchars($basePath . '/public/build/' . $css, ENT_QUOTES, 'UTF-8');
             $tags .= '<link rel="stylesheet" href="' . $url . '">' . "\n    ";
         }
 
         // Import-mapped preload hints for better LCP
         foreach ($chunk['imports'] ?? [] as $importKey) {
             if (isset($manifest[$importKey]['file'])) {
-                $url   = htmlspecialchars('/build/' . $manifest[$importKey]['file'], ENT_QUOTES, 'UTF-8');
+                $url   = htmlspecialchars($_ENV['APP_URL'] . $_ENV['APP_BASE_URL'] . '/public/build/' . $manifest[$importKey]['file'], ENT_QUOTES, 'UTF-8');
                 $tags .= '<link rel="modulepreload" href="' . $url . '">' . "\n    ";
             }
         }
 
         // The main entry script
-        $src   = htmlspecialchars('/build/' . $chunk['file'], ENT_QUOTES, 'UTF-8');
+        $src  = htmlspecialchars($_ENV['APP_URL'] . $_ENV['APP_BASE_URL'] . '/public/build/' . $chunk['file'], ENT_QUOTES, 'UTF-8');
         $tags .= '<script type="module" src="' . $src . '"></script>';
 
         return $tags;
@@ -141,7 +143,7 @@ class ViteManifest
 
         $data = json_decode((string) file_get_contents($path), true);
 
-        if (!is_array($data)) {
+        if (! is_array($data)) {
             throw new \RuntimeException("[Rhapsody/React] Failed to parse Vite manifest at {$path}.");
         }
 
@@ -156,9 +158,22 @@ class ViteManifest
     }
 
     /**
+     * Get the base path from environment (APP_BASE_URL) for subdirectory deployments.
+     */
+    private static function getBasePath(): string
+    {
+        $base = Path::root();
+        // Ensure it starts with / and ends without /
+        if (! empty($base) && $base !== '/') {
+            return rtrim($base, '/');
+        }
+        return '';
+    }
+
+    /**
      * Read a value from $_ENV, then getenv() as fallback.
      */
-    private static function env(string $key): string|false
+    private static function env(string $key): string | false
     {
         return $_ENV[$key] ?? getenv($key);
     }

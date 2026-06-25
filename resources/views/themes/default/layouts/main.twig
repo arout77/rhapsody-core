@@ -230,7 +230,7 @@
     </script>
 
     {# Dedicated Child Script Injection Vector #}
-    {% block scripts %}{% endblock %}
+    {% block scripts %}{{ vite_assets('resources/js/app.jsx') }}{% endblock %}
     {{ schema_markup|raw }}
 </body>
 </html>
