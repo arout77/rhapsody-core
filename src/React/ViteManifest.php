@@ -62,14 +62,27 @@ class ViteManifest
 
     private static function devTags(string $entry): string
     {
+        $host = (string) (self::env('VITE_HOST') ?: 'localhost');
         $port = (int) (self::env('VITE_PORT') ?: 5173);
-        $base = $_ENV['APP_URL'] . $_ENV['APP_BASE_URL'] . ":{$port}";
+        $base = 'http://' . $host . ':' . $port;
 
-        // @vite/client must come first — it sets up HMR and CSS injection.
+        // @vitejs/plugin-react normally injects this preamble via transformIndexHtml,
+        // but that hook only runs on Vite-served HTML. Since PHP generates our HTML,
+        // we inject it manually — exactly how Laravel's Vite integration handles this.
+        $preamble = <<<HTML
+    <script type="module">
+        import RefreshRuntime from "{$base}/@react-refresh"
+        RefreshRuntime.injectIntoGlobalHook(window)
+        window.\$RefreshReg$ = () => {}
+        window.\$RefreshSig$ = () => (type) => type
+        window.__vite_plugin_react_preamble_installed__ = true
+    </script>
+    HTML;
+
         $client = '<script type="module" src="' . $base . '/@vite/client"></script>';
         $app    = '<script type="module" src="' . $base . '/' . ltrim($entry, '/') . '"></script>';
 
-        return $client . "\n    " . $app;
+        return $preamble . "\n    " . $client . "\n    " . $app;
     }
 
     private static function productionTags(string $entry): string
