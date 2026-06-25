@@ -8,9 +8,21 @@
     <p>Make sure you have configured your database connection in <code>.env</code> and installed Doctrine.</p>
 
     <h2>Creating the Users Table</h2>
-    <p>Before you can use the authentication system, you must create the <code>users</code> table. Run the following command:</p>
-    <pre><code class="language-bash">php rhapsody auth:install</code></pre>
-    <p>This will create the table based on the <code>App\Entities\User</code> entity definition.</p>
+    <p>When the login page is visited, the authentication middleware ensures the <code>`users`</code> table exists. If it doesn't, the table and necessary columns will get automatically created:
+        <ul>
+            <li><var><strong>user_id</strong></var> varchar(255) NOT NULL</li>
+            <li><var><strong>name</strong></var> varchar(50) NOT NULL</li>
+            <li><var><strong>email</strong></var> varchar(100) NOT NULL</li>
+            <li><var><strong>password</strong></var> varchar(255) NOT NULL</li>
+            <li><var><strong>created_at</strong></var> datetime NOT NULL DEFAULT current_timestamp()</li>
+        </ul>
+        <em>Table data: ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci</em>
+    </p>
+
+    <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4">
+        <strong><span class="text-red-700">WARNING:</span></strong> If you already have an existing users table, the application will assume that the above columns exist. If you plan to use the built-in 
+        authentication system, you must make sure the columns exist <strong>as defined</strong> in the above.
+    </div>
 
     <h2>Using the Auth Controller</h2>
     <p>The framework includes a <code>AuthController</code> with routes for login, registration, and logout. Make sure the routes are registered in your <code>web.php</code>:</p>
