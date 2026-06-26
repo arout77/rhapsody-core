@@ -53,11 +53,11 @@ use Twig\Loader\FilesystemLoader;
 // 1. Establish the explicit runtime application path base directory context Safely
 $basePath = Path::root();
 
-if (file_exists(__DIR__ . '/.env')) {
-    $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+$envFile = $basePath . '/.env';
+if (file_exists($basePath . '/.env')) {
+    $dotenv = Dotenv\Dotenv::createImmutable($basePath);
     $dotenv->load();
 }
-
 // 2. Create a new Service Container instance and assign it to global scope
 global $container;
 $container  = new Container();
@@ -253,7 +253,7 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
         {
             return Session::hasFlash($name);
         }
-    };;;;;;;;;;;;;;;;;;;;;;
+    };;;;;;;;;;;;;;;;;;;;;;;;
 
     $twig->addGlobal('flash', $flash);
 
