@@ -3,6 +3,7 @@ namespace Rhapsody\Core\Routing;
 
 use Rhapsody\Core\Container;
 use Rhapsody\Core\Exceptions\HttpException;
+use Rhapsody\Core\Middleware\MiddlewareTracer;
 use Rhapsody\Core\Request;
 use Rhapsody\Core\Response;
 
@@ -93,6 +94,9 @@ class Router
         $uri    = $request->getPath(); // Use getPath() to handle base URL stripping
         $method = $request->getMethod();
 
+        // For debug toolbar
+        MiddlewareTracer::reset();
+
         foreach (self::$routes as $route) {
             // Route::matches() does both method and path matching
             if ($route->matches($method, $uri)) {
@@ -102,6 +106,10 @@ class Router
                 foreach (self::$globalMiddleware as $middlewareClass) {
                     $middlewareInstance = $container->resolve($middlewareClass);
                     $middlewareInstance->handle($request);
+                    $middlewareClass = get_class($middlewareInstance);
+                    MiddlewareTracer::start($middlewareClass, 'global');
+                    $response = $middlewareInstance->handle($request);
+                    MiddlewareTracer::stop();
                 }
 
                 // 2. RUN ROUTE-SPECIFIC MIDDLEWARE
@@ -110,6 +118,10 @@ class Router
                         $middlewareInstance = $container->resolve(self::$middlewareMap[$middlewareKey]);
                         // Pass the route as the second argument
                         $middlewareInstance->handle($request, $route);
+                        $middlewareClass = get_class($middlewareInstance);
+                        MiddlewareTracer::start($middlewareClass, 'route', $route->getPath());
+                        $middlewareInstance->handle($request, $route);
+                        MiddlewareTracer::stop();
                     }
                 }
 

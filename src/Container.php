@@ -13,6 +13,18 @@ class Container
     protected array $bindings = [];
 
     /**
+     * Tracks currently resolving classes to detect circular dependencies.
+     * @var array
+     */
+    protected array $resolving = [];
+
+    /**
+     * Static trace of all resolved services (for the debug toolbar).
+     * @var array
+     */
+    private static array $resolveTrace = [];
+
+    /**
      * Binds a class or interface to the container.
      *
      * @param string $abstract The class/interface name to bind.
@@ -26,6 +38,12 @@ class Container
         $this->bindings[$abstract] = $concrete;
     }
 
+    /**
+     * Stores a shared instance (singleton) in the container.
+     *
+     * @param string $abstract
+     * @param mixed $instance
+     */
     public function instance(string $abstract, $instance): void
     {
         $this->bindings[$abstract] = function () use ($instance) {
@@ -71,26 +89,59 @@ class Container
             return call_user_func($this->bindings[$abstract], $this);
         }
 
-        // Otherwise, try to autowire it using PHP's Reflection API.
-        $reflector = new ReflectionClass($abstract);
-
-        if (! $reflector->isInstantiable()) {
-            throw new \Exception("Class {$abstract} is not instantiable.");
+        // --- Circular dependency detection ---
+        if (isset($this->resolving[$abstract])) {
+            // Build the circular chain for the error message
+            $chain                = implode(' → ', array_keys($this->resolving)) . ' → ' . $abstract;
+            self::$resolveTrace[] = [
+                'class'    => $abstract,
+                'resolved' => false,
+                'circular' => true,
+                'stack'    => $this->resolving,
+            ];
+            throw new \Exception("Circular dependency detected: " . $chain);
         }
 
-        $constructor = $reflector->getConstructor();
+        // Mark this class as currently being resolved
+        $this->resolving[$abstract] = true;
+        $start                      = microtime(true);
 
-        if (is_null($constructor)) {
-            // If there's no constructor, we can just create a new instance.
-            return new $abstract();
+        try {
+            // Otherwise, try to autowire it using PHP's Reflection API.
+            $reflector = new ReflectionClass($abstract);
+
+            if (! $reflector->isInstantiable()) {
+                throw new \Exception("Class {$abstract} is not instantiable.");
+            }
+
+            $constructor = $reflector->getConstructor();
+
+            if (is_null($constructor)) {
+                // If there's no constructor, we can just create a new instance.
+                $instance = new $abstract();
+            } else {
+                // Get the constructor's parameters.
+                $parameters   = $constructor->getParameters();
+                $dependencies = $this->resolveDependencies($parameters);
+                $instance     = $reflector->newInstanceArgs($dependencies);
+            }
+
+            // Record successful resolution for debugging
+            $duration             = round((microtime(true) - $start) * 1000, 2);
+            $trace                = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+            $caller               = isset($trace[1]['class']) ? $trace[1]['class'] : 'unknown';
+            self::$resolveTrace[] = [
+                'class'     => $abstract,
+                'resolved'  => true,
+                'duration'  => $duration,
+                'called_by' => $caller,
+            ];
+
+            return $instance;
+        } finally {
+            // Always remove the resolution marker, even if an exception is thrown
+            unset($this->resolving[$abstract]);
         }
-
-        // Get the constructor's parameters.
-        $parameters   = $constructor->getParameters();
-        $dependencies = $this->resolveDependencies($parameters);
-
-        // Create a new instance of the class with the resolved dependencies.
-        return $reflector->newInstanceArgs($dependencies);
     }
 
     /**
@@ -123,5 +174,24 @@ class Container
             }
         }
         return $dependencies;
+    }
+
+    /**
+     * Returns the trace of all resolved services for the current request.
+     * Used by the debug toolbar.
+     *
+     * @return array
+     */
+    public static function getTrace(): array
+    {
+        return self::$resolveTrace;
+    }
+
+    /**
+     * Resets the resolution trace (called at the start of each request).
+     */
+    public static function resetTrace(): void
+    {
+        self::$resolveTrace = [];
     }
 }

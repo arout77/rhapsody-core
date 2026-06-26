@@ -396,4 +396,13 @@ class DocsController extends BaseController
             'canonical_url' => $request->getCanonicalUrl(),
         ]);
     }
+
+    public function toolbar(Request $request): Response
+    {
+        return $this->view('@core/docs/toolbar.twig', [], [
+            'title'         => 'Developer Debug Toolbar – Rhapsody Documentation',
+            'description'   => 'The dev toolbar contains a lot of information to help you diagnose issues in your application.',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
 }

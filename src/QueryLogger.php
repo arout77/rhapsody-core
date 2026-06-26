@@ -9,8 +9,9 @@ use Doctrine\DBAL\Logging\SQLLogger;
  */
 class QueryLogger implements SQLLogger
 {
-    public array $queries     = [];
-    private float $start_time = 0;
+    public array $queries      = [];
+    public array $fingerprints = []; // Track counts per SQL structure
+    private float $start_time  = 0;
 
     /**
      * @param $sql
@@ -19,13 +20,19 @@ class QueryLogger implements SQLLogger
      */
     public function startQuery($sql, ?array $params = null, ?array $types = null)
     {
-        $this->start_time = microtime(true);
-        $this->queries[]  = [
+        // Simple normalization: replace numeric/string literals with '?'
+        $fingerprint = preg_replace("/\b(\d+|'[^']+')\b/", '?', $sql);
+
+        $this->fingerprints[$fingerprint] = ($this->fingerprints[$fingerprint] ?? 0) + 1;
+        $this->start_time                 = microtime(true);
+        $this->queries[]                  = [
             'sql'         => $sql,
+            'fingerprint' => $fingerprint,
+            'is_n_plus_1' => $this->fingerprints[$fingerprint] > 3, // Flag if > 3 executions
             'params'      => $params,
             'types'       => $types,
-            'executionMS' => 0,                        // <-- RENAMED from execution_time
-            'caller'      => $this->findQueryCaller(), // <-- ADDED this line
+            'executionMS' => 0, // <-- RENAMED from execution_time
+            'caller'      => $this->findQueryCaller(),
         ];
     }
 

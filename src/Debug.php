@@ -2,7 +2,8 @@
 namespace Rhapsody\Core;
 
 use Doctrine\DBAL\Logging\DebugStack;
-use QueryLogger;
+use Rhapsody\Core\Middleware\MiddlewareTracer;
+use Rhapsody\Core\QueryLogger;
 use Rhapsody\Core\Routing\Route;
 
 /**
@@ -18,6 +19,7 @@ class Debug
 
     private function __construct()
     {}
+
     public static function getInstance(): self
     {
         if (self::$instance === null) {
@@ -58,6 +60,12 @@ class Debug
         $this->startTime           = microtime(true);
         $this->startMemory         = memory_get_usage();
         $this->data['php_version'] = phpversion();
+
+        // Reset cache hit/miss counters for this request
+        Cache::resetStats();
+
+        // Reset middleware tracer for this request
+        MiddlewareTracer::reset();
     }
 
     /**
@@ -70,36 +78,75 @@ class Debug
         $this->data['response_code']  = $response->getStatusCode();
         $this->data['app_version']    = $config['app_version'] ?? 'N/A';
         $this->data['session']        = $_SESSION ?? [];
+        // --- Enhanced HTTP Request data ---
+        $this->data['request'] = [
+            'method'     => $_SERVER['REQUEST_METHOD'] ?? 'GET',
+            'uri'        => $_SERVER['REQUEST_URI'] ?? '/',
+            'full_url'   => (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . ($_SERVER['REQUEST_URI'] ?? '/'),
+            'ip'         => $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1',
+            'timestamp'  => date('Y-m-d H:i:s', $_SERVER['REQUEST_TIME'] ?? time()),
+            'headers'    => getallheaders() ?: [],
+            'query'      => $_GET ?? [],
+            'body'       => file_get_contents('php://input') ?: null,
+            'middleware' => $route ? $route->getMiddleware() : [],
+        ];
 
-        $doctrineQueries = [];
-        if ($container->has(QueryLogger::class)) { // <-- Use QueryLogger
-            $doctrineQueries = $container->resolve(QueryLogger::class)->queries;
+        // Environment variables (collect for Environment tab)
+        $this->data['env'] = $_ENV ?? [];
+
+        // Get QueryLogger instance from container
+        $queryLogger = null;
+        if ($container->has(QueryLogger::class)) {
+            $queryLogger = $container->resolve(QueryLogger::class);
         }
 
+        $doctrineQueries       = $queryLogger ? $queryLogger->queries : [];
         $pdoQueries            = TraceablePDO::getQueryLog();
         $this->data['queries'] = array_merge($doctrineQueries, $pdoQueries);
 
-        // Get Doctrine Queries
+        // Also get Doctrine DebugStack if available (for backward compatibility)
         if ($container->has(DebugStack::class)) {
-            $this->data['queries'] = $container->resolve(DebugStack::class)->queries;
+            $stack = $container->resolve(DebugStack::class);
+            if (! empty($stack->queries)) {
+                $this->data['queries'] = array_merge($this->data['queries'], $stack->queries);
+            }
         }
 
-        // Use the new Logger class to read the logs
-        $phpLogger    = new Logger($config['logging']['php_error_log_path'] ?? '');
-        $apacheLogger = new Logger($config['logging']['apache_error_log_path'] ?? '');
+        // Cache stats
+        $this->data['cache_stats'] = Cache::getStats();
 
+        // N+1 queries detection (from QueryLogger fingerprints)
+        $nPlusOneAlerts = [];
+        if ($queryLogger) {
+            $nPlusOneAlerts = array_filter($queryLogger->queries, function ($q) {
+                return $q['is_n_plus_1'] ?? false;
+            });
+        }
+        $this->data['n_plus_one_alerts'] = array_values($nPlusOneAlerts);
+
+        // Middleware trace (collected by MiddlewareTracer)
+        $this->data['middleware_trace'] = MiddlewareTracer::getTrace();
+
+        // Container trace (collected by Container itself)
+        $this->data['container_trace'] = Container::getTrace();
+
+        // Logs
+        $phpLogger          = new Logger($config['logging']['php_error_log_path'] ?? '');
+        $apacheLogger       = new Logger($config['logging']['apache_error_log_path'] ?? '');
+        $this->data['logs'] = [
+            'php'    => $phpLogger->read(50),
+            'apache' => $apacheLogger->read(50),
+        ];
+
+        // Memory details
         $peakUsage  = memory_get_peak_usage();
         $limitBytes = $this->getMemoryLimitBytes();
-
-        $usedMb  = round($peakUsage / 1024 / 1024, 2);
-        $limitMb = $limitBytes === -1 ? 'Unlimited' : round($limitBytes / 1024 / 1024, 2);
-
+        $usedMb     = round($peakUsage / 1024 / 1024, 2);
+        $limitMb    = $limitBytes === -1 ? 'Unlimited' : round($limitBytes / 1024 / 1024, 2);
         $percentage = 0;
         if ($limitBytes > 0) {
             $percentage = round(($peakUsage / $limitBytes) * 100, 2);
         }
-
-        // Determine warning states dynamically
         $status = 'ok';
         if ($percentage > 80) {
             $status = 'warning';
@@ -109,7 +156,6 @@ class Debug
             $status = 'critical';
         }
 
-        // Export as a structured array for React
         $this->data['memory'] = [
             'used_mb'  => $usedMb,
             'limit_mb' => $limitMb,
@@ -117,11 +163,7 @@ class Debug
             'status'   => $status,
         ];
 
-        $this->data['logs'] = [
-            'php'    => $phpLogger->read(50),
-            'apache' => $apacheLogger->read(50),
-        ];
-
+        // Route data
         if ($route) {
             $callback = $route->getCallback();
             if (is_array($callback) && count($callback) === 2) {
@@ -132,12 +174,17 @@ class Debug
                     'controller' => end($controller),
                     'action'     => $callback[1],
                 ];
+                // Optionally, capture route parameters
+                $params = $route->getParams();
+                if (! empty($params)) {
+                    $this->data['route']['params'] = $params;
+                }
             }
         }
     }
 
     /**
-     * @return mixed
+     * @return array
      */
     public function getData(): array
     {
@@ -152,7 +199,6 @@ class Debug
         if (empty($path) || ! file_exists($path) || ! is_readable($path)) {
             return "Log file not found or not readable at: " . htmlspecialchars($path);
         }
-        // Use a memory-efficient way to read the end of a large file
         $file = new \SplFileObject($path, 'r');
         $file->seek(PHP_INT_MAX);
         $last_line = $file->key();
