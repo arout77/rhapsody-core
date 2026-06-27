@@ -28,16 +28,11 @@ class ViteManifest
      */
     public static function tags(string $entry): string
     {
-        try {
-            if (self::isDevMode()) {
-                return self::devTags($entry);
-            }
-            return self::productionTags($entry);
-        } catch (\RuntimeException $e) {
-            // Never let a missing Vite manifest break error page rendering.
-            error_log('[Rhapsody/React] ViteManifest::tags() failed: ' . $e->getMessage());
-            return '';
+        if (self::isDevMode()) {
+            return self::devTags($entry);
         }
+
+        return self::productionTags($entry);
     }
 
     /**
