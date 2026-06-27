@@ -1,5 +1,4 @@
 <?php
-
 namespace Rhapsody\Core\Commands;
 
 use Symfony\Component\Console\Command\Command;
@@ -15,13 +14,15 @@ use Symfony\Component\Console\Output\OutputInterface;
  *   php rhapsody react:install
  *
  * What it creates:
- *   vite.config.js              — Vite build configuration
- *   package.json                — npm manifest with React + Vite dependencies
- *   resources/js/app.jsx        — JS entry point (the Rhapsody bridge)
- *   resources/js/components/    — components directory (with a Welcome example)
+ *   vite.config.js                                 — Vite build configuration
+ *   package.json                                   — npm manifest with React + Vite dependencies
+ *   resources/js/app.jsx                           — JS entry point (the Rhapsody bridge)
+ *   resources/js/components/Welcome.jsx            — Example component
+ *   resources/js/components/Toolbar/MemoryProfiler.jsx   — Required by the debug toolbar
+ *   resources/js/components/Toolbar/PerformancePanel.jsx — Required by the debug toolbar
  *
  * What it patches:
- *   .env / .env.example         — Appends VITE_DEV_SERVER and VITE_PORT vars
+ *   .env / .env.example  — Appends VITE_DEV_SERVER and VITE_PORT vars
  */
 class ReactInstallCommand extends Command
 {
@@ -50,10 +51,15 @@ class ReactInstallCommand extends Command
 
         // Map: stub filename => destination in the developer's app
         $scaffolds = [
-            'vite-config.stub'    => 'vite.config.js',
-            'react-package.stub'  => 'package.json',
-            'react-entry.stub'    => 'resources/js/app.jsx',
-            'react-component.stub' => 'resources/js/components/Welcome.jsx',
+            'vite-config.stub'               => 'vite.config.js',
+            'react-package.stub'             => 'package.json',
+            'react-entry.stub'               => 'resources/js/app.jsx',
+            'react-component.stub'           => 'resources/js/components/Welcome.jsx',
+            // Toolbar islands — required for the debug toolbar's React features.
+            // Placed in a Toolbar/ subdirectory so they don't clutter the app's
+            // own component list and are clearly identifiable as framework-internal.
+            'toolbar-memory-profiler.stub'   => 'resources/js/components/Toolbar/MemoryProfiler.jsx',
+            'toolbar-performance-panel.stub' => 'resources/js/components/Toolbar/PerformancePanel.jsx',
         ];
 
         $hasErrors = false;
@@ -62,7 +68,7 @@ class ReactInstallCommand extends Command
             $stubPath = $stubsDir . '/' . $stub;
             $destPath = $this->basePath . '/' . $dest;
 
-            if (!file_exists($stubPath)) {
+            if (! file_exists($stubPath)) {
                 $output->writeln("  <error>✗ Stub not found:</error> {$stubPath}");
                 $hasErrors = true;
                 continue;
@@ -74,7 +80,7 @@ class ReactInstallCommand extends Command
             }
 
             $destDir = dirname($destPath);
-            if (!is_dir($destDir) && !mkdir($destDir, 0755, true)) {
+            if (! is_dir($destDir) && ! mkdir($destDir, 0755, true)) {
                 $output->writeln("  <error>✗ Could not create directory:</error> {$destDir}");
                 $hasErrors = true;
                 continue;
@@ -125,7 +131,7 @@ class ReactInstallCommand extends Command
         $output->writeln('     <info>php rhapsody make:react ComponentName</info>');
         $output->writeln('');
         $output->writeln('  4. Mount React from any controller:');
-        $output->writeln('     <info>return $this->react(\'Welcome\', [\'greeting\' => \'Hello!\']);</info>');
+        $output->writeln("     <info>return \$this->react('Welcome', ['greeting' => 'Hello!']);</info>");
         $output->writeln('');
 
         return Command::SUCCESS;
@@ -148,7 +154,7 @@ ENV;
         foreach (['.env', '.env.example'] as $file) {
             $path = $this->basePath . '/' . $file;
 
-            if (!file_exists($path)) {
+            if (! file_exists($path)) {
                 continue;
             }
 

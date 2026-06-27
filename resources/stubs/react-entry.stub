@@ -14,6 +14,9 @@
  * for XSS safety.  Both modes can coexist on the same page if needed (e.g. an
  * island embedded inside a full-SPA shell).
  *
+ * The bridge also exposes a global mount function so that dynamic islands
+ * (e.g. inside the debug toolbar) can be mounted after they are inserted.
+ *
  * You should rarely need to edit this file.
  * Generate new components with: php rhapsody make:react ComponentName
  */
@@ -76,55 +79,113 @@ function parseProps(scopeEl, selector) {
     }
 }
 
-// ─── Full SPA mode ──────────────────────────────────────────────────────────
-// Mounts a single component into #rhapsody-root.
-// Props come from #rhapsody-props (injected by BaseController::react()).
-// ─────────────────────────────────────────────────────────────────────────────
-const spaRoot = document.getElementById('rhapsody-root');
+/**
+ * Mount all React islands on the page.
+ * Also mounts the full-page SPA if #rhapsody-root exists.
+ * Exposed globally so dynamic islands (e.g. toolbar panels) can call it.
+ */
+function mountAll() {
+    console.log('[Rhapsody] Mounting React components...');
 
-if (spaRoot) {
-    const componentName = spaRoot.dataset.component ?? null;
+    // ─── 1. Full SPA mode ──────────────────────────────────────────
+    const spaRoot = document.getElementById('rhapsody-root');
 
-    if (!componentName) {
-        console.error('[Rhapsody] #rhapsody-root found but data-component is missing.');
-    } else {
-        const props     = parseProps(document, '#rhapsody-props');
+    if (spaRoot) {
+        const componentName = spaRoot.dataset.component ?? null;
+
+        if (!componentName) {
+            console.error('[Rhapsody] #rhapsody-root found but data-component is missing.');
+        } else {
+            // Check if already mounted (avoid duplicate roots)
+            if (spaRoot._reactRoot) {
+                console.log('[Rhapsody] SPA already mounted, skipping.');
+            } else {
+                const props = parseProps(document, '#rhapsody-props');
+                const Component = resolveComponent(componentName);
+
+                if (Component) {
+                    const root = createRoot(spaRoot);
+                    spaRoot._reactRoot = root;
+                    root.render(
+                        <React.StrictMode>
+                            <Component {...props} />
+                        </React.StrictMode>
+                    );
+                    console.log('[Rhapsody] SPA mounted:', componentName);
+                }
+            }
+        }
+    }
+
+    // ─── 2. Islands mode ────────────────────────────────────────────
+    const islands = document.querySelectorAll('.rhapsody-island');
+
+    islands.forEach((island) => {
+        // Skip if already mounted
+        if (island._reactRoot) {
+            return;
+        }
+
+        const componentName = island.dataset.component ?? null;
+
+        if (!componentName) {
+            console.warn('[Rhapsody] .rhapsody-island element found but data-component is missing.');
+            return;
+        }
+
+        const props = parseProps(island, '.rhapsody-island-props');
         const Component = resolveComponent(componentName);
 
         if (Component) {
-            createRoot(spaRoot).render(
+            const root = createRoot(island);
+            island._reactRoot = root;
+            root.render(
                 <React.StrictMode>
                     <Component {...props} />
                 </React.StrictMode>
             );
+            console.log('[Rhapsody] Island mounted:', componentName);
         }
-    }
+    });
 }
 
-// ─── Islands mode ───────────────────────────────────────────────────────────
-// Mounts one React root per .rhapsody-island element found on the page.
-// Each island is independent — they do not share state unless you wire them
-// up explicitly (e.g. via a shared Zustand/Jotai store or Context).
-// Props come from the .rhapsody-island-props block nested inside each island.
-// ─────────────────────────────────────────────────────────────────────────────
-const islands = document.querySelectorAll('.rhapsody-island');
-
-islands.forEach((island) => {
-    const componentName = island.dataset.component ?? null;
-
-    if (!componentName) {
-        console.warn('[Rhapsody] .rhapsody-island element found but data-component is missing.');
-        return;
+// ─── Expose globally for dynamic island mounting ─────────────────────
+// Required by the debug toolbar, which injects panel HTML dynamically
+// and then calls window.Rhapsody.mountIslands() to hydrate any islands
+// inside the newly-inserted content.
+if (typeof window !== 'undefined') {
+    if (!window.Rhapsody) {
+        window.Rhapsody = {};
     }
+    window.Rhapsody.mountAll = mountAll;
+    window.Rhapsody.mountIslands = function () {
+        const islands = document.querySelectorAll('.rhapsody-island');
+        islands.forEach((island) => {
+            if (island._reactRoot) return;
 
-    const props     = parseProps(island, '.rhapsody-island-props');
-    const Component = resolveComponent(componentName);
+            const componentName = island.dataset.component ?? null;
+            if (!componentName) return;
 
-    if (Component) {
-        createRoot(island).render(
-            <React.StrictMode>
-                <Component {...props} />
-            </React.StrictMode>
-        );
-    }
-});
+            const props = parseProps(island, '.rhapsody-island-props');
+            const Component = resolveComponent(componentName);
+            if (Component) {
+                const root = createRoot(island);
+                island._reactRoot = root;
+                root.render(
+                    <React.StrictMode>
+                        <Component {...props} />
+                    </React.StrictMode>
+                );
+                console.log('[Rhapsody] Island mounted dynamically:', componentName);
+            }
+        });
+    };
+}
+
+// ─── Auto-mount on DOM ready ─────────────────────────────────────────
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mountAll);
+} else {
+    // DOM already loaded (e.g. script injected after parse)
+    mountAll();
+}

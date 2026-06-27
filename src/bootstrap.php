@@ -216,15 +216,14 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
     $twig->addGlobal('app_url', $_ENV['APP_URL'] ?? '');
     $twig->addGlobal('app_env', $_ENV['APP_ENV'] ?? 'production');
 
+    // $twig->addExtension(new \Rhapsody\Core\React\ReactIslandExtension());
+
     // Register a smart vite_assets function
+    // the ['is_safe'] arg is crucial here; Twig will escape the output
+    // and just print the HTML to screen without it.
     $twig->addFunction(new \Twig\TwigFunction('vite_assets', function ($entry) {
-        // If React integration is available, use it
-        if (class_exists(\Rhapsody\Core\React\ViteManifest::class)) {
-            return \Rhapsody\Core\React\ViteManifest::tags($entry);
-        }
-        // Otherwise, return empty string (safe fallback)
-        return '';
-    }));
+        return \Rhapsody\Core\React\ViteManifest::tags($entry);
+    }, ['is_safe' => ['html']]));
 
     // Auth lazy object
     $auth = new class($c)
@@ -263,7 +262,7 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
         {
             return Session::hasFlash($name);
         }
-    };;;;;;
+    };;;;;;;;;;
 
     $twig->addGlobal('flash', $flash);
 
