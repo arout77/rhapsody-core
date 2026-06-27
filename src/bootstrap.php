@@ -216,6 +216,14 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
     $twig->addGlobal('app_url', $_ENV['APP_URL'] ?? '');
     $twig->addGlobal('app_env', $_ENV['APP_ENV'] ?? 'production');
 
+    // Register a default vite_assets function (does nothing)
+    $twig->addFunction(new \Twig\TwigFunction('vite_assets', function ($entry) {
+        // Return an empty string by default, preventing missing vite_assets helper on
+        // installs not using React.
+        // The React integration will override this with the real implementation.
+        return '';
+    }));
+
     // Auth lazy object
     $auth = new class($c)
     {
@@ -253,7 +261,7 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
         {
             return Session::hasFlash($name);
         }
-    };;;;;;;;;;;;;;;;;;;;;;;;
+    };;;;;;;;;;;;;;;;;;;;;;;;;;
 
     $twig->addGlobal('flash', $flash);
 

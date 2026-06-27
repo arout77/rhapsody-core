@@ -21,11 +21,11 @@ if (!defined('ROOT_DIR')) {
 }
 
 // 1. Load the Application's Bootstrap Environment safely
-$bootstrapPath = $basePath . '/bootstrap.php';
+$bootstrapPath = $basePath . '/vendor/arout/rhapsody-core/src/bootstrap.php';
 $container = null;
 
 if (file_exists($bootstrapPath)) {
-    $container = require_once $bootstrapPath;
+    $container = require $bootstrapPath;
 }
 
 if (!$container instanceof \Rhapsody\Core\Container) {
