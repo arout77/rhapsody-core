@@ -216,11 +216,13 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
     $twig->addGlobal('app_url', $_ENV['APP_URL'] ?? '');
     $twig->addGlobal('app_env', $_ENV['APP_ENV'] ?? 'production');
 
-    // Register a default vite_assets function (does nothing)
+    // Register a smart vite_assets function
     $twig->addFunction(new \Twig\TwigFunction('vite_assets', function ($entry) {
-        // Return an empty string by default, preventing missing vite_assets helper on
-        // installs not using React.
-        // The React integration will override this with the real implementation.
+        // If React integration is available, use it
+        if (class_exists(\Rhapsody\Core\React\ViteManifest::class)) {
+            return \Rhapsody\Core\React\ViteManifest::tags($entry);
+        }
+        // Otherwise, return empty string (safe fallback)
         return '';
     }));
 
@@ -261,7 +263,7 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
         {
             return Session::hasFlash($name);
         }
-    };;;;;;;;;;;;;;;;;;;;;;;;;;
+    };;;;;;
 
     $twig->addGlobal('flash', $flash);
 
