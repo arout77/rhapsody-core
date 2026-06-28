@@ -8,6 +8,7 @@ use Rhapsody\Core\React\ReactIslandExtension;
 use Rhapsody\Core\React\ViteManifest;
 use Rhapsody\Core\SEO\SchemaOrg;
 use Rhapsody\Core\Session;
+use Rhapsody\Core\Twig\RoutingExtension;
 use Twig\Environment;
 
 abstract class BaseController
@@ -30,6 +31,8 @@ abstract class BaseController
         // Register the React island Twig functions (react_component, vite_assets, csrf_token).
         // This makes them available in every Twig template rendered by any controller.
         $this->twig->addExtension(new ReactIslandExtension());
+
+        $this->twig->addExtension(new RoutingExtension());
 
         // Safely bridge session states into the view engine context
         $this->twig->addGlobal('session', $_SESSION ?? []);
@@ -148,9 +151,9 @@ abstract class BaseController
      */
     protected function react(string $component, array $props = [], array $meta = []): Response
     {
-        $title       = htmlspecialchars($meta['title']       ?? ($_ENV['APP_NAME'] ?? 'Rhapsody App'), ENT_QUOTES, 'UTF-8');
+        $title       = htmlspecialchars($meta['title'] ?? ($_ENV['APP_NAME'] ?? 'Rhapsody App'), ENT_QUOTES, 'UTF-8');
         $description = htmlspecialchars($meta['description'] ?? '', ENT_QUOTES, 'UTF-8');
-        $lang        = htmlspecialchars($meta['lang']        ?? 'en', ENT_QUOTES, 'UTF-8');
+        $lang        = htmlspecialchars($meta['lang'] ?? 'en', ENT_QUOTES, 'UTF-8');
 
         // JSON_HEX_TAG prevents </script> injection inside the JSON block.
         $propsJson = json_encode($props, JSON_HEX_TAG | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

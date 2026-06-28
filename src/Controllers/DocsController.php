@@ -361,6 +361,18 @@ class DocsController extends BaseController
         ]);
     }
 
+    /**
+     * Shows the social authentication (OAuth) documentation.
+     */
+    public function socialAuth(Request $request): Response
+    {
+        return $this->view('@core/docs/social-auth.twig', [], [
+            'title'         => 'Social Authentication (OAuth) – Rhapsody Documentation',
+            'description'   => 'Learn how to integrate Google and Facebook OAuth login using the built-in SocialAuthController.',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
+
     public function consoleCommands(Request $request): Response
     {
         return $this->view('@core/docs/console-commands.twig', [], [

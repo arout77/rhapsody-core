@@ -3,8 +3,9 @@ namespace Rhapsody\Core;
 
 use ReflectionClass;
 use ReflectionParameter;
+use Rhapsody\Core\Contracts\ContainerInterface;
 
-class Container
+class Container implements ContainerInterface
 {
     /**
      * Holds the registered bindings (recipes for how to build objects).

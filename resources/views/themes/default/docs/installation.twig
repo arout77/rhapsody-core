@@ -21,34 +21,54 @@
     <h2>2. Installation via Composer</h2>
     <p>Rhapsody is available as a Composer package. To create a new project, run:</p>
     
-<pre class="command-line"><code class="language-bash">composer create-project arout77/rhapsody-framework your-site-name</code></pre>
+    <pre class="command-line"><code class="language-bash">composer create-project arout77/rhapsody-framework your-site-name</code></pre>
 
-    <p>This command will download the framework, install all dependencies, and set up the basic structure for you.</p>
+    <p>This command downloads the framework, installs all PHP dependencies, and sets up the basic structure.</p>
 
     <p>Navigate into your new project directory:</p>
     <pre class="command-line"><code class="language-bash">cd your-site-name</code></pre>
-    <p>Then run Composer update to ensure all of the dependencies are up to date.
+
+    <p>It's a good practice to run a Composer update to ensure all dependencies are up‑to‑date and all new features are included:</p>
     <pre class="command-line"><code class="language-bash">composer update</code></pre>
 
+    <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4">
+        <p><span class="font-bold">⚠️ Important:</span> Before any page will load, you <span class="font-bold">must</span> set at least the following variables in your <code>.env</code>:</p>
+        <ul>
+            <li><code>APP_URL</code> – the full base URL of your site (e.g., <code>http://localhost/your-site-name</code>)</li>
+            <li><code>DB_HOST</code>, <code>DB_PORT</code>, <code>DB_NAME</code>, <code>DB_USER</code>, <code>DB_PASS</code> – your database connection details</li>
+        </ul>
+    </div>
+
+    <h3>2.1. Optional React Integration</h3>
+    <p>If you plan to use React for SPA's or React Islands (or want the debug toolbar’s <strong>Performance</strong> and <strong>Memory Usage</strong> panels to work), you need to set up the React bridge:</p>
+    <pre class="command-line"><code class="language-bash">php rhapsody react:install</code></pre>
+    <p>This command installs the necessary npm dependencies and creates the basic React entry point.</p>
+    <p>After running it, install the JavaScript dependencies and start the Vite development server:</p>
+    <pre class="command-line"><code class="language-bash">npm install
+npm run dev</code></pre>
+    <p><strong>Note:</strong> Even if you don’t use React anywhere else, the debug toolbar’s performance tabs rely on React islands. We recommend running this step to get the full debugging experience.</p>
+
     <h2>3. Environment Configuration</h2>
-    <p>Rhapsody uses a <code>.env</code> file to manage environment-specific variables like database credentials. This keeps your secrets out of version control.</p>
-    <p>First, if the .env file was not automatically generated, copy the example file:</p>
+    <p>Rhapsody uses a <code>.env</code> file to manage environment‑specific variables. This file is <strong>required</strong> for the application to run.</p>
+    <p>Copy the example file:</p>
     <pre class="command-line"><code class="language-bash">cp .env.example .env</code></pre>
-    <p>Next, open the newly created <code>.env</code> file and configure it for your local machine. The most important variables are for the database connection:</p>
-    
-<pre><code class="language-bash">APP_BASE_URL="/your-site-name"
+    <p>Example configuration:</p>
+    <pre><code class="language-bash">APP_URL="http://localhost/your-site-name"
+APP_BASE_URL="/your-site-name"
+
 DB_HOST="127.0.0.1"
 DB_PORT="3306"
 DB_NAME="database_name"
 DB_USER="username"
 DB_PASS="password"</code></pre>
 
+    <p>Without these values, the application will not be able to connect to the database or generate correct URLs.</p>
+
     <h2>4. Database Setup</h2>
-    <p>You will need to create a database with the name you specified in your <code>.env</code> file.</p>
-    <p>If you wish to receive email notifications regarding software updates and other relevant news, put your email address in the <code>MAIL_ADMIN_EMAIL</code> variable.</p>
-    
+    <p>Create a database with the name you specified in <code>DB_NAME</code>. If you want to receive email notifications about updates, set <code>MAIL_ADMIN_EMAIL</code> as well.</p>
+
     <h2>5. Web Server Configuration</h2>
-    <p>Your web server must be configured to direct all incoming requests to the front controller (<code>index.php</code>) in your document root. The repository includes a <code>.htaccess</code> file that handles this for Apache servers.</p> 
-    <p>You should now be able to visit your project in the browser and see the Rhapsody welcome page!</p>
+    <p>Your web server must be configured to direct all requests to the front controller (<code>index.php</code>). The repository includes a <code>.htaccess</code> file for Apache; for other servers (Nginx, etc.) please consult your server’s documentation.</p>
+    <p>Once everything is set up, visit your site in the browser – you should see the Rhapsody welcome page.</p>
 
 {% endblock %}

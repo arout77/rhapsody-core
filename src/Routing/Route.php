@@ -3,88 +3,81 @@ namespace Rhapsody\Core\Routing;
 
 class Route
 {
-    /**
-     * The captured parameters from a matched dynamic route.
-     * @var array
-     */
-    protected array $params = [];
-
+    protected string $method;
+    protected string $path;
+    protected $callback;
     protected array $middleware = [];
+    protected array $params     = [];
+    protected ?string $name     = null;
 
-    /**
-     * Middleware mapping (loaded from config).
-     * @var array
-     */
-    protected static array $middlewareMap = [];
-
-    /**
-     * Global middleware list (loaded from config).
-     * @var array
-     */
-    protected static array $globalMiddleware = [];
-
-    public function __construct(
-        protected string $method,
-        protected string $path,
-        protected mixed $callback
-    ) {
-        $this->method = strtolower($method);
-    }
-
-    /**
-     * A "magic" method used by var_export() for route caching.
-     * It allows PHP to reconstruct the Route object from the cache file.
-     *
-     * @param array $properties An array of properties to set on the new object.
-     * @return self A new instance of the Route class.
-     */
-    public static function __set_state(array $properties): self
+    public function __construct(string $method, string $path, $callback)
     {
-        $route             = new self($properties['method'], $properties['path'], $properties['callback']);
-        $route->middleware = $properties['middleware'] ?? null;
-        return $route;
+        $this->method   = $method;
+        $this->path     = $path;
+        $this->callback = $callback;
     }
 
-    /**
-     * Set middleware configuration from the application.
-     *
-     * @param array $map Associative array of key => class name.
-     * @param array $global List of global middleware class names.
-     */
-    public static function setMiddlewareConfig(array $map, array $global): void
+    public function getMethod(): string
     {
-        self::$middlewareMap    = $map;
-        self::$globalMiddleware = $global;
+        return $this->method;
+    }
+
+    public function getPath(): string
+    {
+        return $this->path;
+    }
+
+    public function getCallback()
+    {
+        return $this->callback;
+    }
+
+    public function getMiddleware(): array
+    {
+        return $this->middleware;
+    }
+
+    public function getParams(): array
+    {
+        return $this->params;
+    }
+
+    public function middleware(string $middleware): self
+    {
+        $this->middleware[] = $middleware;
+        return $this;
+    }
+
+    public function setParams(array $params): self
+    {
+        $this->params = $params;
+        return $this;
     }
 
     /**
-     * Checks if this route matches the given request method and path.
-     * It now supports dynamic segments like /posts/{id}.
+     * Check if this route matches the given HTTP method and URI.
+     * If it matches, extracts dynamic parameters and stores them in $this->params.
      *
-     * @param string $method The request's method.
-     * @param string $uri The request's URI.
-     *
-     * @return bool True if the route matches, false otherwise.
+     * @param string $method  The request method (e.g. GET, POST).
+     * @param string $uri     The request path (e.g. /user/123).
+     * @return bool           True if the route matches, false otherwise.
      */
     public function matches(string $method, string $uri): bool
     {
-        // First, check if the HTTP method matches.
-        if (strtolower($this->method) !== strtolower($method)) {
+        // 1. Method mismatch?
+        if ($this->method !== strtoupper($method)) {
             return false;
         }
 
-        // Convert the route path into a regular expression.
-        // 1. Replace dynamic segments {param} with a regex capture group.
-        $pattern = preg_replace('/\{([a-zA-Z0-9_]+)\}/', '([^/]+)', $this->path);
+        // 2. Convert route path to a regular expression.
+        //    Replace {parameter} with ([^/]+) and escape other characters.
+        $pattern = preg_replace('/\{[a-zA-Z0-9_]+\}/', '([^/]+)', $this->path);
+        $pattern = '#^' . $pattern . '$#';
 
-        // 2. Escape forward slashes and anchor the pattern.
-        $pattern = "~^" . $pattern . "$~";
-
-        // 3. Attempt to match the URI against the pattern.
+        // 3. Test the URI against the pattern.
         if (preg_match($pattern, $uri, $matches)) {
-            // Remove the full match from the beginning of the array.
+            // Remove the full match (index 0) – the rest are the parameter values.
             array_shift($matches);
-            // Store the captured parameter values.
             $this->params = $matches;
             return true;
         }
@@ -92,57 +85,18 @@ class Route
         return false;
     }
 
-    /**
-     * Gets the HTTP method for this route.
-     */
-    public function getMethod(): string
+    // --- Named route support ---
+    public function name(string $name): self
     {
-        return $this->method;
-    }
-
-    /**
-     * Gets the path for this route.
-     */
-    public function getPath(): string
-    {
-        return $this->path;
-    }
-
-    /**
-     * Gets the callback action for this route.
-     * @return mixed
-     */
-    public function getCallback(): mixed
-    {
-        return $this->callback;
-    }
-
-    /**
-     * Gets the captured URL parameters.
-     * @return array
-     */
-    public function getParams(): array
-    {
-        return $this->params;
-    }
-
-    /**
-     * Assigns a middleware key to this route.
-     *
-     * @param string $key The middleware key (e.g., 'auth', 'guest').
-     * @return self
-     */
-    public function middleware(string $key): self
-    {
-        $this->middleware[] = $key; // Append to the array; allows chaining middleware when defining routes
+        $this->name = $name;
+        // Register this route with the Router's static named route collection.
+        // (Make sure Router::addNamedRoute exists, or adjust accordingly.)
+        Router::addNamedRoute($name, $this);
         return $this;
     }
 
-    /**
-     * @return mixed
-     */
-    public function getMiddleware(): array
+    public function getName(): ?string
     {
-        return $this->middleware;
+        return $this->name;
     }
 }

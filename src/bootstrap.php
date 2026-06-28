@@ -3,6 +3,7 @@
 // bootstrap.php
 use App\Providers\EventServiceProvider;
 use App\Services\NotificationService;
+use Composer\InstalledVersions;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\ORMSetup;
@@ -72,6 +73,35 @@ $config = require $configPath;
 $container->bind('config', function () use ($config) {
     return $config;
 });
+
+/**
+ * Get the version of a Composer package from its own composer.json.
+ * Falls back to InstalledVersions if the file is missing.
+ */
+function getPackageVersion(string $packageName): string
+{
+    $vendorDir    = Path::root() . '/vendor/' . $packageName;
+    $composerJson = $vendorDir . '/composer.json';
+
+    if (file_exists($composerJson)) {
+        $data = json_decode(file_get_contents($composerJson), true);
+        if (isset($data['version']) && $data['version'] !== 'dev-main') {
+            return $data['version'];
+        }
+    }
+
+    // Fallback: use Composer's InstalledVersions
+    if (class_exists(\Composer\InstalledVersions::class)) {
+        $version = \Composer\InstalledVersions::getVersion($packageName);
+        if ($version !== null && $version !== 'dev-main') {
+            return $version;
+        }
+    }
+
+    return 'unknown';
+}
+
+$config['app_version'] = getPackageVersion('arout/rhapsody-core');
 
 // =========================================================================
 // STEP 2: SERVICE REGISTRATION (Register bindings into container memory)
@@ -262,7 +292,7 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
         {
             return Session::hasFlash($name);
         }
-    };;;;;;;;;;
+    };;;;;;;;;;;;;;;;;
 
     $twig->addGlobal('flash', $flash);
 
@@ -320,6 +350,11 @@ $container->bind(Validator::class, function (Container $c) {
 $container->bind(Request::class, fn() => new Request());
 $container->bind(NotificationService::class, function (Container $c) {
     return new NotificationService($c->resolve(Cache::class));
+});
+
+// --- Omnipay
+$container->bind(PaymentGatewayInterface::class, function () {
+    return new \App\Services\PaymentGateway();
 });
 
 // --- COMMAND BINDINGS (Refactored to inject context-aware path mappings) ---

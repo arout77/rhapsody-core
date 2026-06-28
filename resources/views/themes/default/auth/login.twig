@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="min-h-[75vh] flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8">
-    <div class="max-w-md w-full space-y-8 glass  p-8 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 transition-all duration-300">
+    <div class="max-w-md w-full space-y-8 bg-gray-50 dark:bg-gray-700  p-8 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 transition-all duration-300">
         
         {# Header Section #}
         <div class="text-center">
@@ -65,19 +65,21 @@
                     Sign In
                 </button>
             </div>
-            {#  
             {{ captcha_form|raw }}
-            #}
-
         </form>
 
         {# Footer Context Link #}
         <div class="text-center pt-2 border-t border-gray-100 dark:border-gray-700">
-            <p class="text-sm text-gray-500 dark:text-gray-400">
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
                 Don't have an account? 
                 <a href="{{ base_url }}/register" class="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-150">
                     Create an account
                 </a>
+            </p>
+            <p>
+                <a href="{{ route('auth.redirect', {provider: 'google'}) }}" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 dark:focus:ring-offset-gray-800 transition-colors duration-200 cursor-pointer mb-3">Login with Google</a>
+
+                <a href="{{ route('auth.redirect', {provider: 'facebook'}) }}" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 transition-colors duration-200 cursor-pointer">Login with Facebook</a>
             </p>
         </div>
     </div>

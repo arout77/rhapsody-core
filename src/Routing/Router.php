@@ -2,6 +2,7 @@
 namespace Rhapsody\Core\Routing;
 
 use Rhapsody\Core\Container;
+use Rhapsody\Core\Contracts\ContainerInterface;
 use Rhapsody\Core\Exceptions\HttpException;
 use Rhapsody\Core\Middleware\MiddlewareTracer;
 use Rhapsody\Core\Request;
@@ -14,7 +15,7 @@ use Rhapsody\Core\Response;
  * executing middleware, and using the service container to resolve controllers
  * and their dependencies.
  */
-class Router
+class Router implements \Rhapsody\Core\Contracts\RouterInterface
 {
     /**
      * The collection of registered routes.
@@ -40,6 +41,8 @@ class Router
      */
     protected static ?Route $matchedRoute = null;
 
+    protected static array $namedRoutes = []; // static, not instance
+
     /**
      * Set the middleware configuration from the application.
      *
@@ -59,6 +62,20 @@ class Router
         $route          = new Route($method, $path, $callback);
         self::$routes[] = $route;
         return $route;
+    }
+
+    public function addRoute(string $method, string $path, $callback): Route
+    {
+        $route                   = new Route($method, $path, $callback);
+        $this->routes[$method][] = $route;
+        return $route; // so you can chain ->name()
+    }
+
+    public function registerNamedRoute(Route $route): void
+    {
+        if ($name = $route->getName()) {
+            $this->namedRoutes[$name] = $route;
+        }
     }
 
     public static function get(string $path, mixed $callback): Route
@@ -89,7 +106,7 @@ class Router
      * @param Container $container
      * @return Response
      */
-    public static function dispatch(Request $request, Container $container): Response
+    public static function dispatch(Request $request, ContainerInterface $container): Response
     {
         $uri    = $request->getPath(); // Use getPath() to handle base URL stripping
         $method = $request->getMethod();
@@ -141,7 +158,7 @@ class Router
      * @param Container $container The application's service container.
      * @return Response
      */
-    protected static function execute(Route $route, Request $request, Container $container): Response
+    protected static function execute(Route $route, Request $request, ContainerInterface $container): Response
     {
         $callback = $route->getCallback();
         $params   = $route->getParams();
@@ -199,5 +216,47 @@ class Router
     public static function setRoutes(array $routes): void
     {
         self::$routes = $routes;
+    }
+
+    public static function addNamedRoute(string $name, Route $route): void
+    {
+        self::$namedRoutes[$name] = $route;
+    }
+
+    /**
+     * Generate a URL from a named route.
+     *
+     * @param string $name   The route name.
+     * @param array  $params Parameters to replace in the path (e.g., ['id' => 123]).
+     * @return string
+     * @throws \Exception If the route name is not found.
+     */
+    public static function generateUrl(string $name, array $params = []): string
+    {
+        if (! isset(self::$namedRoutes[$name])) {
+            $available = implode(', ', array_keys(self::$namedRoutes));
+            throw new \Exception("Route [{$name}] not found. Available routes: " . ($available ?: 'none'));
+        }
+
+        $route = self::$namedRoutes[$name];
+        $path  = $route->getPath();
+
+        // Replace {param} placeholders with values
+        foreach ($params as $key => $value) {
+            $path = str_replace('{' . $key . '}', $value, $path);
+        }
+
+        // If there are still un-replaced placeholders, throw an exception
+        if (preg_match('/\{[a-zA-Z0-9_]+\}/', $path)) {
+            throw new \Exception("Missing parameters for route [{$name}].");
+        }
+
+        // Prepend base path if defined and not already present
+        $basePath = $_ENV['APP_URL'] . $_ENV['APP_BASE_URL'];
+        if ($basePath && strpos($path, $basePath) !== 0) {
+            $path = rtrim($basePath, '/') . '/' . ltrim($path, '/');
+        }
+
+        return $path;
     }
 }

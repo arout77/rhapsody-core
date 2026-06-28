@@ -14,7 +14,7 @@
     </p>
     <pre><code class="language-php">// routes/web.php
 use App\Controllers\PageController;
-use Rhapsody\Core\Router;
+use Rhapsody\Core\Routing\Router;
 
 // A GET route that shows the about page
 Router::get('/about', [PageController::class, 'about']);
@@ -43,10 +43,32 @@ public function viewUser(Request $request, string $user_id)
 }</code></pre>
     <p><strong>Important:</strong> The router always passes the <code>Core\Request</code> object as the first argument to your controller method, followed by any dynamic route parameters in the order they appear in the URI.</p>
 
-    <h2>Route Naming and URL Generation</h2>
-    <p>Currently, Rhapsody does not have named routes. URLs should be generated in your views using the global <code>base_url</code> Twig variable to ensure they work correctly, especially in a subdirectory setup.</p>
-    <pre><code class="language-twig">&lt;!-- In a Twig template --&gt;
-&lt;a href="&lcub;&lcub; base_url }}/users"&gt;View All Users&lt;/a&gt;
-&lt;a href="&lcub;&lcub; base_url }}/users/{{ user.user_id }}"&gt;View Profile&lt;/a&gt;</code></pre>
+    <h2>Named Routes &amp; URL Generation</h2>
+    <p>
+        Rhapsody now supports <strong>named routes</strong>, allowing you to generate URLs dynamically without hardcoding paths.
+        This is especially useful when your application is installed in a subdirectory.
+    </p>
+    <p>
+        To assign a name to a route, chain the <code>name()</code> method after the route definition:
+    </p>
+    <pre><code class="language-php">Router::get('/profile/{id}', [ProfileController::class, 'show'])->name('profile.show');</code></pre>
+    <p>
+        You can then generate URLs using the <code>route()</code> Twig function in your views:
+    </p>
+    <pre><code class="language-twig">&lt;a href="&lcub;&lcub; route('profile.show', {id: user.id}) }}"&gt;View Profile&lt;/a&gt;</code></pre>
+    <p>
+        The <code>route()</code> function accepts the route name as the first argument and an optional associative array
+        of parameters to replace the placeholders in the route path.
+    </p>
+    <p>
+        If you need the base URL (including subdirectory) prepended, you can still use the <code>base_url</code> variable,
+        but <code>route()</code> automatically includes it when <code>$_ENV['APP_URL']</code> is set correctly.
+    </p>
+
+    <h2>Social Login (OAuth)</h2>
+    <p>
+        Rhapsody includes built‑in support for social authentication via Google and Facebook (more providers can be added).
+        See the <a href="{{ base_url }}/docs/social-auth">Social Authentication</a> documentation for setup instructions.
+    </p>
 
 {% endblock %}

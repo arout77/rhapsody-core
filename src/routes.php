@@ -2,6 +2,7 @@
 
 use Rhapsody\Core\Controllers\AuthController;
 use Rhapsody\Core\Controllers\DocsController;
+use Rhapsody\Core\Controllers\PaymentController;
 use Rhapsody\Core\Routing\Router;
 
 // Assumes your Router instance is injected or accessible
@@ -39,3 +40,8 @@ Router::get('/docs/react', [DocsController::class, 'reactjs']);
 Router::get('/docs/ddos-protection', [DocsController::class, 'ddosProtection']);
 Router::get('/docs/console-commands', [DocsController::class, 'consoleCommands']);
 Router::get('/docs/toolbar', [DocsController::class, 'toolbar']);
+
+// Omnipay
+Router::post('/payment/checkout', [PaymentController::class, 'checkout']);
+Router::get('/payment/return', [PaymentController::class, 'handleReturn']);
+Router::get('/payment/cancel', [PaymentController::class, 'cancel']);
