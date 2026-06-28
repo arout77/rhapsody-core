@@ -40,6 +40,7 @@ Router::get('/docs/react', [DocsController::class, 'reactjs']);
 Router::get('/docs/ddos-protection', [DocsController::class, 'ddosProtection']);
 Router::get('/docs/console-commands', [DocsController::class, 'consoleCommands']);
 Router::get('/docs/toolbar', [DocsController::class, 'toolbar']);
+Router::get('/docs/lazy-service-loading', [DocsController::class, 'lazyServiceLoading']);
 
 // Omnipay
 Router::post('/payment/checkout', [PaymentController::class, 'checkout']);

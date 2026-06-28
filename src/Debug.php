@@ -2,6 +2,7 @@
 namespace Rhapsody\Core;
 
 use Doctrine\DBAL\Logging\DebugStack;
+use Rhapsody\Core\Contracts\ContainerInterface;
 use Rhapsody\Core\Middleware\MiddlewareTracer;
 use Rhapsody\Core\QueryLogger;
 use Rhapsody\Core\Routing\Route;
@@ -70,8 +71,13 @@ class Debug
 
     /**
      * Gathers final data points at the end of the request.
+     *
+     * @param Response           $response
+     * @param array              $config
+     * @param ContainerInterface $container   <-- CHANGED from Container
+     * @param Route|null         $matchedRoute
      */
-    public function end(Response $response, array $config, Container $container, ?Route $route = null): void
+    public function end(Response $response, array $config, ContainerInterface $container, ?Route $matchedRoute = null): void
     {
         $this->data['execution_time'] = round((microtime(true) - $this->startTime) * 1000, 2);
         $this->data['memory_usage']   = round((memory_get_peak_usage() - $this->startMemory) / 1024 / 1024, 2);
@@ -88,7 +94,7 @@ class Debug
             'headers'    => getallheaders() ?: [],
             'query'      => $_GET ?? [],
             'body'       => file_get_contents('php://input') ?: null,
-            'middleware' => $route ? $route->getMiddleware() : [],
+            'middleware' => $matchedRoute ? $matchedRoute->getMiddleware() : [],
         ];
 
         // Environment variables (collect for Environment tab)
@@ -164,18 +170,18 @@ class Debug
         ];
 
         // Route data
-        if ($route) {
-            $callback = $route->getCallback();
+        if ($matchedRoute) {
+            $callback = $matchedRoute->getCallback();
             if (is_array($callback) && count($callback) === 2) {
                 $controller          = explode('\\', $callback[0]);
                 $this->data['route'] = [
-                    'method'     => $route->getMethod(),
-                    'path'       => $route->getPath(),
+                    'method'     => $matchedRoute->getMethod(),
+                    'path'       => $matchedRoute->getPath(),
                     'controller' => end($controller),
                     'action'     => $callback[1],
                 ];
                 // Optionally, capture route parameters
-                $params = $route->getParams();
+                $params = $matchedRoute->getParams();
                 if (! empty($params)) {
                     $this->data['route']['params'] = $params;
                 }

@@ -28,7 +28,6 @@ use Rhapsody\Core\Commands\MigrateCommand;
 use Rhapsody\Core\Commands\ReactInstallCommand;
 use Rhapsody\Core\Commands\RouteCacheCommand;
 use Rhapsody\Core\Commands\RouteClearCommand;
-use Rhapsody\Core\Commands\UpdateCommand;
 use Rhapsody\Core\Container;
 use Rhapsody\Core\Contracts\PaymentGatewayInterface;
 use Rhapsody\Core\Events\EventDispatcher;
@@ -36,6 +35,8 @@ use Rhapsody\Core\Helpers\OmnipayGateway;
 use Rhapsody\Core\Helpers\Path;
 use Rhapsody\Core\Mailer;
 use Rhapsody\Core\Middleware\DdosMiddleware;
+use Rhapsody\Core\Proxy\ContainerDecorator;
+use Rhapsody\Core\Proxy\LazyProxyFactory;
 use Rhapsody\Core\QueryLogger;
 use Rhapsody\Core\Request;
 use Rhapsody\Core\Routing\Router;
@@ -292,7 +293,7 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
         {
             return Session::hasFlash($name);
         }
-    };;;;;;;;;;;;;;;;;
+    };;;;;;;;;;;;;;;;;;;;;;;;;;;
 
     $twig->addGlobal('flash', $flash);
 
@@ -358,9 +359,6 @@ $container->bind(PaymentGatewayInterface::class, function () {
 });
 
 // --- COMMAND BINDINGS (Refactored to inject context-aware path mappings) ---
-$container->bind(UpdateCommand::class, function () use ($config) {
-    return new UpdateCommand($config);
-});
 
 $container->bind(CheckVersionCommand::class, function ($c) use ($config) {
     return new CheckVersionCommand(
@@ -427,6 +425,10 @@ $container->bind(MakeReactCommand::class, function () use ($basePath) {
     return new MakeReactCommand($basePath);
 });
 
+$container->bind(\Rhapsody\Core\Commands\BuildProxiesCommand::class, function ($c) use ($basePath) {
+    return new \Rhapsody\Core\Commands\BuildProxiesCommand;
+});
+
 // --------------------------------------------------------------
 // STEP 2.5: USER EXTENSION HOOK
 // --------------------------------------------------------------
@@ -434,6 +436,50 @@ $userBootstrap = $basePath . '/bootstrap.php';
 if (file_exists($userBootstrap)) {
     // The container is fully built; pass it to the user file.
     require $userBootstrap;
+}
+
+// =========================================================================
+// STEP 2.6: LAZY LOADING DECORATOR (web only)
+// =========================================================================
+
+// Only apply lazy loading for web requests (not CLI)
+if (PHP_SAPI !== 'cli') {
+    $lazyEnabled = filter_var(
+        $_ENV['LAZY_LOADING_ENABLED'] ?? $config['lazy']['enabled'] ?? true,
+        FILTER_VALIDATE_BOOLEAN
+    );
+
+    if ($lazyEnabled) {
+        $eagerServices = array_merge(
+            $config['lazy']['eager'] ?? [],
+            [
+                \Rhapsody\Core\Container::class,
+                \Rhapsody\Core\Routing\Router::class,
+                \Rhapsody\Core\Events\EventDispatcher::class,
+                \Rhapsody\Core\Request::class,
+                \Rhapsody\Core\Response::class,
+                \Rhapsody\Core\Cache::class,
+                \Rhapsody\Core\Database::class,
+                \Rhapsody\Core\Session::class,
+                \Twig\Environment::class,
+                \App\Services\NotificationService::class,
+            ]
+        );
+
+        $proxyCacheDir = $basePath . '/storage/cache/proxies';
+        $proxyFactory  = new \Rhapsody\Core\Proxy\LazyProxyFactory($container, $proxyCacheDir);
+
+        $container = new \Rhapsody\Core\Proxy\ContainerDecorator(
+            $container,
+            $proxyFactory,
+            $lazyEnabled,
+            $eagerServices
+        );
+
+        // Update the global reference.
+        global $container;
+        $container = $container;
+    }
 }
 
 // =========================================================================

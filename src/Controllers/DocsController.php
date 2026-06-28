@@ -417,4 +417,16 @@ class DocsController extends BaseController
             'canonical_url' => $request->getCanonicalUrl(),
         ]);
     }
+
+    /**
+     * Shows the service lazy loading documentation.
+     */
+    public function lazyServiceLoading(Request $request): Response
+    {
+        return $this->view('@core/docs/lazy-service-loading.twig', [], [
+            'title'         => 'Service Container Lazy Loading – Rhapsody Documentation',
+            'description'   => 'Learn how Rhapsody\'s lazy loading system defers service instantiation to improve performance.',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
 }
