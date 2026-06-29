@@ -37,7 +37,7 @@ class AuthController extends BaseController implements AuthenticatableInterface
     public function showLoginForm(): Response
     {
         // The "@core" namespace maps directly to vendor/arout/rhapsody-core/resources/views/
-        return $this->view('@core/auth/login.twig');
+        return $this->view('auth/login.twig');
     }
 
     /**
@@ -78,7 +78,7 @@ class AuthController extends BaseController implements AuthenticatableInterface
      */
     public function showRegisterForm(): Response
     {
-        return $this->view('@core/auth/register.twig');
+        return $this->view('auth/register.twig');
     }
 
     /**
@@ -116,7 +116,7 @@ class AuthController extends BaseController implements AuthenticatableInterface
             return redirect('/dashboard');
         }
 
-        return $this->view('@core/auth/register.twig', [
+        return $this->view('auth/register.twig', [
             'errors' => $this->validator->getErrors(),
             'old'    => $data,
         ]);

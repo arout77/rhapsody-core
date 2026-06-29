@@ -8,8 +8,14 @@ class Path
      */
     public static function root(string $path = ''): string
     {
-        // Fallback assumes this file is in vendor/arout77/rhapsody-core/src/Helpers/
-        $base = defined('ROOT_DIR') ? ROOT_DIR : dirname(__DIR__, 4);
+        // Use ROOT_DIR if defined (set in index.php)
+        if (defined('ROOT_DIR')) {
+            $base = ROOT_DIR;
+        } else {
+            // Fallback: assume this file is in vendor/arout77/rhapsody-core/src/Helpers/
+            // Go up 4 levels to reach the project root.
+            $base = dirname(__DIR__, 4);
+        }
 
         // Normalize any forward or backward slashes to the OS's native separator
         $normalizedPath = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path);

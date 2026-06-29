@@ -233,8 +233,11 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
     }
 
     if (is_dir($coreViewsPath)) {
+        // Add to the 'core' namespace for @core/... references
         $loader->addPath($coreViewsPath, 'core');
-    }
+        // Also add to the default namespace as a fallback for non-namespaced templates
+        $loader->addPath($coreViewsPath);
+    };
 
     // --- TWIG CACHING ENABLED ---
     $isDevelopment = ($config['app_env'] === 'development');
@@ -300,7 +303,7 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
         {
             return Session::hasFlash($name);
         }
-    };
+    };;;;
 
     $twig->addGlobal('flash', $flash);
 
