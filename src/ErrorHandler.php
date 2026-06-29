@@ -2,20 +2,14 @@
 namespace Rhapsody\Core;
 
 use Rhapsody\Core\Exceptions\HttpException;
+use Rhapsody\Core\Helpers\Path;
 use Rhapsody\Core\Logger;
 
-/**
- * Global exception and error handler for Rhapsody.
- * Logs all errors and displays appropriate error pages.
- */
 class ErrorHandler
 {
     private static bool $registered = false;
     private static array $config    = [];
 
-    /**
-     * Register all error handling functions.
-     */
     public static function register(array $config): void
     {
         if (self::$registered) {
@@ -31,25 +25,17 @@ class ErrorHandler
         self::$registered = true;
     }
 
-    /**
-     * Convert PHP errors into ErrorException and forward to exception handler.
-     */
     public static function handleError($level, $message, $file, $line)
     {
-        // Prevent Whoops/HTTP header warnings from causing a double-fault crash
         if (str_contains($message, 'http_response_code()')) {
-            return false; // Let PHP ignore it and continue execution
+            return false;
         }
 
-        // Your existing logic that converts errors to exceptions:
         if (error_reporting() & $level) {
             throw new \ErrorException($message, 0, $level, $file, $line);
         }
     }
 
-    /**
-     * Handle uncaught exceptions.
-     */
     public static function handleException(\Throwable $e): void
     {
         self::logError($e);
@@ -57,19 +43,14 @@ class ErrorHandler
         $isHttp404 = ($e instanceof HttpException && $e->getStatusCode() === 404);
 
         if (self::isDevelopment() && ! $isHttp404) {
-            // Show Whoops for non-404 errors in development
             self::renderWhoops($e);
         } else {
-            // For 404 or production errors, show friendly error page
             self::renderProductionError($e);
         }
 
         exit(1);
     }
 
-    /**
-     * Handle fatal shutdown errors (cannot be caught by set_exception_handler).
-     */
     public static function handleShutdown(): void
     {
         $error = error_get_last();
@@ -85,9 +66,6 @@ class ErrorHandler
         }
     }
 
-    /**
-     * Log the error using the framework's Logger.
-     */
     private static function logError(\Throwable $e): void
     {
         $logPath = self::$config['logging']['error_log_path'] ?? __DIR__ . '/../storage/logs/errors.log';
@@ -105,57 +83,26 @@ class ErrorHandler
         );
     }
 
-    /**
-     * Render detailed error page using Whoops (development mode).
-     */
     private static function renderWhoops(\Throwable $e): void
     {
-        // Avoid Whoops setting status code if headers already sent
         if (! headers_sent()) {
             $whoops = new \Whoops\Run();
             $whoops->pushHandler(new \Whoops\Handler\PrettyPageHandler());
             $whoops->handleException($e);
         } else {
-            // Fallback to production error page
             self::renderProductionError($e);
         }
     }
 
-    /**
-     * Render a user‑friendly error page in production mode.
-     * Respects the active theme and falls back to default theme.
-     *
-     * @param \Throwable $e
-     * @return void
-     */
     private static function renderProductionError(\Throwable $e): void
     {
-        // Determine HTTP status code from exception, default to 500
         $statusCode = ($e instanceof HttpException) ? $e->getStatusCode() : 500;
 
-        // Only set status code if headers not already sent
         if (! headers_sent()) {
             http_response_code($statusCode);
         }
 
-        // Get the active theme from config (set in .env)
-        $theme         = self::$config['theme'] ?? 'default';
-        $baseViewsPath = dirname(__DIR__) . '/views/themes/';
-
-        // Check for error template in active theme, then default theme
-        $templatePath = null;
-        $activePath   = $baseViewsPath . $theme . '/errors/' . $statusCode . '.twig';
-        $defaultPath  = $baseViewsPath . 'default/errors/' . $statusCode . '.twig';
-
-        if (file_exists($activePath)) {
-            $templatePath = $activePath;
-            $templateName = 'themes/' . $theme . '/errors/' . $statusCode . '.twig';
-        } elseif (file_exists($defaultPath)) {
-            $templatePath = $defaultPath;
-            $templateName = 'themes/default/errors/' . $statusCode . '.twig';
-        }
-
-        // Try to get Twig environment from the container (already configured with theme paths)
+        // 1. Try using the container's Twig instance (already configured)
         $twig = null;
         if (isset($GLOBALS['container']) && $GLOBALS['container']->has(\Twig\Environment::class)) {
             try {
@@ -165,20 +112,162 @@ class ErrorHandler
             }
         }
 
-        // If we have a template and Twig, render it
-        if ($twig && $templatePath) {
+        if ($twig) {
             try {
+                $theme        = self::$config['theme'] ?? 'default';
+                $templateName = $theme . '/errors/' . $statusCode . '.twig';
+                if ($twig->getLoader()->exists($templateName)) {
+                    echo $twig->render($templateName, [
+                        'message' => $statusCode === 404 ? 'Page not found.' : 'Server error.',
+                        'code'    => $statusCode,
+                    ]);
+                    return;
+                } else {
+                    $defaultTemplate = 'default/errors/' . $statusCode . '.twig';
+                    if ($twig->getLoader()->exists($defaultTemplate)) {
+                        echo $twig->render($defaultTemplate, [
+                            'message' => $statusCode === 404 ? 'Page not found.' : 'Server error.',
+                            'code'    => $statusCode,
+                        ]);
+                        return;
+                    }
+                }
+            } catch (\Exception $e) {
+                error_log('Twig error (container): ' . $e->getMessage());
+            }
+        }
+
+        // 2. Custom loader with fallback (including essential Twig functions)
+        self::renderWithCustomTwig($statusCode);
+    }
+
+    private static function renderWithCustomTwig(int $statusCode): void
+    {
+        $root = defined('ROOT_DIR') ? ROOT_DIR : Path::root();
+
+        // Candidate base directories for themes (project first, then core)
+        $themeBaseCandidates = [
+            $root . '/views/themes',
+            $root . '/resources/views/themes',
+            dirname(__DIR__) . '/resources/views/themes', // core fallback
+        ];
+
+        $theme       = self::$config['theme'] ?? 'default';
+        $loaderPaths = [];
+        $parentPaths = [];
+
+        foreach ($themeBaseCandidates as $base) {
+            if (! is_dir($base)) {
+                continue;
+            }
+
+            // Try to add the specific theme directory
+            $specificThemePath = $base . '/' . $theme;
+            if (is_dir($specificThemePath)) {
+                $loaderPaths[] = $specificThemePath;
+                $parentPaths[] = dirname($base);
+            }
+
+            // Try to add default theme (if different from current theme)
+            if ($theme !== 'default') {
+                $defaultPath = $base . '/default';
+                if (is_dir($defaultPath)) {
+                    $loaderPaths[] = $defaultPath;
+                    $parentPaths[] = dirname($base);
+                }
+            }
+
+            $parentPaths[] = $base;
+        }
+
+        // Combine and unique
+        $loaderPaths = array_unique(array_merge($loaderPaths, $parentPaths));
+        $loaderPaths = array_filter($loaderPaths, 'is_dir');
+
+        if (empty($loaderPaths)) {
+            self::renderPlainError($statusCode);
+            return;
+        }
+
+        try {
+            $loader = new \Twig\Loader\FilesystemLoader($loaderPaths);
+            $twig   = new \Twig\Environment($loader);
+            $twig->addGlobal('base_url', $_ENV['APP_BASE_URL'] ?? '');
+            $twig->addGlobal('app_env', $_ENV['APP_ENV'] ?? 'production');
+            $twig->addGlobal('config', self::$config);
+
+            // --- REGISTER ESSENTIAL TWIG FUNCTIONS ---
+            // 1. vite_assets (used in layouts/main.twig)
+            $twig->addFunction(new \Twig\TwigFunction('vite_assets', function ($entry) {
+                return \Rhapsody\Core\React\ViteManifest::tags($entry);
+            }, ['is_safe' => ['html']]));
+
+            // 2. route (for named routes)
+            $twig->addFunction(new \Twig\TwigFunction('route', function ($name, $params = []) {
+                return \Rhapsody\Core\Routing\Router::generateUrl($name, $params);
+            }));
+
+            // 3. csrf_token (if used)
+            $twig->addFunction(new \Twig\TwigFunction('csrf_token', function () {
+                return \Rhapsody\Core\Session::csrfToken();
+            }));
+
+            // 4. csrf_field (if used)
+            $twig->addFunction(new \Twig\TwigFunction('csrf_field', function () {
+                $token = \Rhapsody\Core\Session::csrfToken();
+                return new \Twig\Markup('<input type="hidden" name="_token" value="' . $token . '">', 'UTF-8');
+            }));
+
+            // 5. react_component (if used in error pages)
+            $twig->addFunction(new \Twig\TwigFunction('react_component', function ($component, $props = []) {
+                $propsJson     = json_encode($props, JSON_HEX_TAG | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $safeComponent = htmlspecialchars($component, ENT_QUOTES, 'UTF-8');
+                return new \Twig\Markup(
+                    '<div class="rhapsody-island" data-component="' . $safeComponent . '">
+                        <script type="application/json" class="rhapsody-island-props">' . $propsJson . '</script>
+                    </div>',
+                    'UTF-8'
+                );
+            }, ['is_safe' => ['html']]));
+
+            // Try theme-specific template
+            $templateName = $theme . '/errors/' . $statusCode . '.twig';
+            if ($loader->exists($templateName)) {
                 echo $twig->render($templateName, [
                     'message' => $statusCode === 404 ? 'Page not found.' : 'Server error.',
                     'code'    => $statusCode,
                 ]);
                 return;
-            } catch (\Exception $twigError) {
-                error_log('Twig error while rendering error page: ' . $twigError->getMessage());
             }
+
+            // Try default theme
+            $defaultTemplate = 'default/errors/' . $statusCode . '.twig';
+            if ($loader->exists($defaultTemplate)) {
+                echo $twig->render($defaultTemplate, [
+                    'message' => $statusCode === 404 ? 'Page not found.' : 'Server error.',
+                    'code'    => $statusCode,
+                ]);
+                return;
+            }
+
+            // Try without theme prefix
+            if ($loader->exists('errors/' . $statusCode . '.twig')) {
+                echo $twig->render('errors/' . $statusCode . '.twig', [
+                    'message' => $statusCode === 404 ? 'Page not found.' : 'Server error.',
+                    'code'    => $statusCode,
+                ]);
+                return;
+            }
+
+        } catch (\Exception $e) {
+            error_log('Custom Twig error: ' . $e->getMessage());
         }
 
-        // Ultimate fallback: plain HTML (should rarely be used)
+        self::renderPlainError($statusCode);
+    }
+
+    private static function renderPlainError(int $statusCode): void
+    {
         $title       = $statusCode === 404 ? '404 Not Found' : '500 Internal Server Error';
         $bodyMessage = $statusCode === 404
             ? 'The page you requested could not be found.'
@@ -190,37 +279,7 @@ class ErrorHandler
         echo "<a href='{$baseUrl}/'>Go Home</a></body></html>";
     }
 
-    private static function getTwigForErrorPage(): ?\Twig\Environment
-    {
-        $theme    = self::$config['theme'] ?? 'default';
-        $rootPath = dirname(__DIR__);
-        $paths    = [];
-
-        $activeThemePath = $rootPath . '/views/themes/' . $theme;
-        if (is_dir($activeThemePath)) {
-            $paths[] = $activeThemePath;
-        }
-        $defaultThemePath = $rootPath . '/views/themes/default';
-        if ($activeThemePath !== $defaultThemePath && is_dir($defaultThemePath)) {
-            $paths[] = $defaultThemePath;
-        }
-
-        if (empty($paths)) {
-            error_log('No valid theme directories found for error page');
-            return null;
-        }
-
-        $loader = new \Twig\Loader\FilesystemLoader($paths);
-        $twig   = new \Twig\Environment($loader);
-        $twig->addGlobal('base_url', $_ENV['APP_BASE_URL'] ?? '');
-        $twig->addGlobal('app_env', $_ENV['APP_ENV'] ?? 'production');
-        return $twig;
-    }
-
-    /**
-     * Check if the application is in development mode.
-     */
-    private static function isDevelopment() : bool
+    private static function isDevelopment(): bool
     {
         return (self::$config['app_env'] ?? 'production') === 'development';
     }
