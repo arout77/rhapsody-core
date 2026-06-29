@@ -42,6 +42,7 @@ use Rhapsody\Core\Request;
 use Rhapsody\Core\Routing\Router;
 use Rhapsody\Core\Services\RateLimiter;
 use Rhapsody\Core\Session;
+use Rhapsody\Core\Storage\Cookie;
 use Rhapsody\Core\Validator;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\Cache\Adapter\FilesystemAdapter;
@@ -244,6 +245,11 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
     ];
 
     $twig = new Environment($loader, $twigOptions);
+
+    if (isset($_ENV['APP_KEY'])) {
+        Cookie::setEncryptionKey($_ENV['APP_KEY']);
+    }
+
     $twig->addGlobal('app_url', $_ENV['APP_URL'] ?? '');
     $twig->addGlobal('app_env', $_ENV['APP_ENV'] ?? 'production');
 
@@ -282,6 +288,7 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
     $twig->addGlobal('base_url', $_ENV['APP_URL'] . $_ENV['APP_BASE_URL']);
     $twig->addGlobal('APP_THEME', $_ENV['APP_THEME']);
     $twig->addGlobal('app_theme', $_ENV['APP_THEME']);
+    $twig->addExtension(new \Rhapsody\Core\Twig\StorageExtension());
 
     // Lazy‑loaded flash messages
     $flash = new class {
@@ -293,7 +300,7 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
         {
             return Session::hasFlash($name);
         }
-    };;;;;;;;;;;;;;;;;;;;;;;;;;;
+    };
 
     $twig->addGlobal('flash', $flash);
 

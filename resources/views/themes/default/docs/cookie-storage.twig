@@ -1,0 +1,150 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>Cookie &amp; LocalStorage Management</h1>
+    <p>
+        Rhapsody provides a secure, modern API for managing browser cookies and <code>localStorage</code> directly from your PHP controllers and Twig templates. Both systems are designed with security and ease of use in mind, leveraging PHP 8.4 features like enums and typed properties.
+    </p>
+
+    <hr>
+
+    <h2>Cookie Management</h2>
+    <p>
+        The <code>Rhapsody\Core\Storage\Cookie</code> class offers a static API to set, get, and delete cookies with secure defaults. All cookie values are <strong>encrypted</strong> using AES-256-CBC and signed with your application's <code>APP_KEY</code>, preventing client-side tampering.
+    </p>
+
+    <h3>Configuration</h3>
+    <p>
+        Before using cookies, ensure your <code>.env</code> file contains a 32-character encryption key:
+    </p>
+    <pre><code class="language-bash">APP_KEY=your-32-character-secret-key</code></pre>
+    <p>
+        Generate one with: <code>php -r "echo bin2hex(random_bytes(16));"</code>
+    </p>
+
+    <h3>PHP Usage</h3>
+    <pre><code class="language-php">use Rhapsody\Core\Storage\Cookie;
+use Rhapsody\Core\Storage\SameSite;
+
+// Set a cookie (expires in 1 day)
+Cookie::set('theme', 'dark', 86400);
+
+// Set a cookie with custom SameSite
+Cookie::set('preferences', ['notifications' => true], 3600, '/', null, true, true, SameSite::Strict);
+
+// Get a cookie value
+$theme = Cookie::get('theme', 'light');
+
+// Check if a cookie exists
+if (Cookie::has('user_id')) {
+    // ...
+}
+
+// Delete a cookie
+Cookie::delete('theme');
+
+// Get all cookies (decrypted and decoded)
+$all = Cookie::all();</code></pre>
+
+    <p>
+        The <code>Cookie::set()</code> method accepts the following parameters (all with secure defaults):
+    </p>
+    <ul>
+        <li><code>name</code> – the cookie name</li>
+        <li><code>value</code> – can be a string, array, or any JSON-serializable value</li>
+        <li><code>expiry</code> – lifetime in seconds (0 = session cookie)</li>
+        <li><code>path</code> – cookie path (default: <code>/</code>)</li>
+        <li><code>domain</code> – optional domain</li>
+        <li><code>secure</code> – <code>true</code> (HTTPS only) by default</li>
+        <li><code>httpOnly</code> – <code>true</code> (no JavaScript access) by default</li>
+        <li><code>sameSite</code> – <code>SameSite::Lax</code>, <code>Strict</code>, or <code>None</code> (enum)</li>
+    </ul>
+
+    <h3>Twig Functions</h3>
+    <p>
+        The following Twig functions are available to work with cookies directly in your templates:
+    </p>
+    <table>
+        <thead><tr><th>Function</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr><td><code>cookie_get(name, default)</code></td><td>Returns the value of a cookie, or the default if not set.</td></tr>
+            <tr><td><code>cookie_set(name, value, expiry, path, domain, secure, httpOnly, sameSite)</code></td><td>Sets a cookie (returns nothing, outputs a <code>Set-Cookie</code> header).</td></tr>
+            <tr><td><code>cookie_has(name)</code></td><td>Returns <code>true</code> if the cookie exists.</td></tr>
+            <tr><td><code>cookie_delete(name, path, domain)</code></td><td>Deletes the cookie.</td></tr>
+        </tbody>
+    </table>
+
+    <h4>Example in Twig</h4>
+    <pre><code class="language-twig">{# Check if the user has a preference #}
+{% if cookie_has('theme') %}
+    {% set theme = cookie_get('theme') %}
+{% else %}
+    {% set theme = 'light' %}
+{% endif %}
+
+{# Set a cookie after a form submission (e.g., from a controller) #}
+{{ cookie_set('user_id', user.id, 86400) }}</code></pre>
+
+    <hr>
+
+    <h2>LocalStorage Management</h2>
+    <p>
+        The <code>Rhapsody\Core\Storage\LocalStorage</code> class generates JavaScript snippets that manipulate the browser's <code>localStorage</code>. This is useful for client-side preferences, temporary data, or caching.
+    </p>
+
+    <h3>PHP Usage</h3>
+    <p>
+        All methods return a <code>&lt;script&gt;</code> tag ready to be output in your views.
+    </p>
+    <pre><code class="language-php">use Rhapsody\Core\Storage\LocalStorage;
+
+// Generate a script that sets a localStorage item
+echo LocalStorage::set('user_preferences', ['theme' => 'dark']);
+
+// Generate a script that gets an item and calls a callback
+echo LocalStorage::get('user_id', 'handleUserId');
+
+// Remove an item
+echo LocalStorage::remove('temp_data');
+
+// Clear all localStorage
+echo LocalStorage::clear();</code></pre>
+
+    <h3>Twig Functions</h3>
+    <p>
+        The following Twig functions output <code>&lt;script&gt;</code> tags directly. Use them with the <code>{{ ... }}</code> syntax (not <code>|raw</code>, as they are already safe).
+    </p>
+    <table>
+        <thead><tr><th>Function</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr><td><code>localstorage_set(key, value, jsonEncode = true)</code></td><td>Sets a <code>localStorage</code> item. If <code>jsonEncode</code> is <code>true</code>, the value is JSON-encoded.</td></tr>
+            <tr><td><code>localstorage_remove(key)</code></td><td>Removes a <code>localStorage</code> item.</td></tr>
+            <tr><td><code>localstorage_clear()</code></td><td>Clears all <code>localStorage</code> data.</td></tr>
+        </tbody>
+    </table>
+
+    <h4>Example in Twig</h4>
+    <pre><code class="language-twig">{# Store the user's theme preference client-side #}
+{{ localstorage_set('theme', 'dark') }}
+
+{# Remove a temporary flag #}
+{{ localstorage_remove('onboarding_seen') }}</code></pre>
+
+    <hr>
+
+    <h2>Security Considerations</h2>
+    <ul>
+        <li><strong>Encryption:</strong> All cookies are encrypted with your <code>APP_KEY</code>.</li>
+        <li><strong>HttpOnly:</strong> By default, cookies are not accessible via JavaScript, preventing XSS attacks.</li>
+        <li><strong>SameSite:</strong> Defaults to <code>Lax</code>, protecting against CSRF.</li>
+        <li><strong>Secure:</strong> By default, cookies are only sent over HTTPS (set <code>secure=false</code> only for local development).</li>
+        <li><strong>LocalStorage:</strong> Data is stored in plain text in the browser – never store sensitive information (like passwords or tokens) in <code>localStorage</code>.</li>
+    </ul>
+
+    <hr>
+
+    <h2>Testing</h2>
+    <p>
+        In your PHPUnit tests, you can mock the cookie functions or use the <code>Cookie::get()</code> and <code>Cookie::set()</code> methods as usual. For <code>localStorage</code>, the generated JavaScript is not executed in unit tests, so you may want to test the generation logic separately.
+    </p>
+{% endblock %}
