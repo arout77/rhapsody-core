@@ -148,8 +148,7 @@ class ErrorHandler
         // Candidate base directories for themes (project first, then core)
         $themeBaseCandidates = [
             $root . '/views/themes',
-            $root . '/resources/views/themes',
-            dirname(__DIR__) . '/resources/views/themes', // core fallback
+            $root . '/vendor/arout/rhapsody-core/resources/views/themes', // core fallback
         ];
 
         $theme       = self::$config['theme'] ?? 'default';
