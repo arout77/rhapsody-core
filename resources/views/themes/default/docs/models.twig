@@ -5,13 +5,13 @@
     <p>
         The Model layer is responsible for all interaction with your database. It abstracts the data source so that your controllers
         don't need to know the specifics of your database schema or write raw SQL queries. In Rhapsody, all models are placed in the
-        <code>app/Models</code> directory and should extend the <code>Core\BaseModel</code>.
+        <code>app/Models</code> directory and should extend the <code>Rhapsody\Core\BaseModel</code>.
     </p>
     
     <h2>Database Connection</h2>
     <p>
         The framework uses PDO (PHP Data Objects) for database communication, which provides a secure and consistent interface.
-        The database connection is managed by the <code>Core\Database</code> class, which uses a Singleton pattern. This means
+        The database connection is managed by the <code>Rhapsody\Core\Database</code> class, which uses a Singleton pattern. This means
         the application only ever makes one single database connection per request, which is very efficient.
     </p>
     <p>

@@ -8,12 +8,29 @@
         This keeps your application logic separate from your presentation logic.
     </p>
     <p>
-        All controllers should be placed in the <code>app/Controllers</code> directory and should extend the <code>Core\BaseController</code>.
+        All controllers should be placed in the <code>app/Controllers</code> directory and should extend the <code>Rhapsody\Core\BaseController</code>.
     </p>
+
+    <hr>
+
+    <h2>BaseController Features</h2>
+    <p>
+        The <code>BaseController</code> provides a rich set of helper methods and automatically injects core services
+        so you can focus on your application logic. When you extend it, your controller automatically gains:
+    </p>
+    <ul>
+        <li>A configured <strong>Twig environment</strong> with theme support and custom extensions.</li>
+        <li>Access to the <strong>database</strong> via the <code>$this->db</code> property.</li>
+        <li>Access to the <strong>cache</strong> via <code>$this->cache</code>.</li>
+        <li>Built-in <strong>SEO helpers</strong> (Schema.org structured data).</li>
+        <li>Twig extensions for <strong>React islands</strong>, <strong>named routes</strong>, and <strong>CSRF protection</strong>.</li>
+    </ul>
+
+    <hr>
 
     <h2>Creating a Controller</h2>
     <p>Here is a basic example of a controller class.</p>
-    <pre><code class="language-php">&lt;?php
+    <pre><code class="language-php"><?php
 
 namespace App\Controllers;
 
@@ -26,49 +43,191 @@ class PageController extends BaseController
 {
     public function index(): Response
     {
-        // ... logic for the home page
+        // The view() helper renders a Twig template
+        return $this->view('home/index.twig', [
+            'title' => 'Welcome',
+        ]);
     }
 
     public function showUsers(Request $request): Response
     {
-        // ... logic to show a list of users
+        $users = (new User())->findAll();
+        
+        return $this->view('home/users.twig', [
+            'users' => $users,
+        ]);
     }
 }</code></pre>
-    <p>By extending <code>BaseController</code>, your controller automatically gets access to helper methods like <code>view()</code> and <code>json()</code>.</p>
 
-    <h2>Controller Methods & Responses</h2>
-    <p>Each public method in a controller is an "action" that can be mapped to a route. Controller actions should always return an instance of a <code>Core\Response</code> object.</p>
+    <hr>
+
+    <h2>Returning Responses</h2>
 
     <h3>Returning a View</h3>
-    <p>The most common action is to return a rendered Twig template. The <code>view()</code> helper method handles this.</p>
-    <pre><code class="language-php">public function index(): Response
+    <p>The <code>view()</code> helper renders a Twig template and returns a <code>Response</code> object with status 200.</p>
+    <pre><code class="language-php">public function dashboard(): Response
 {
-    $userModel = new User();
-    $users = $userModel->findAll();
-
-    // The first argument is the path to the template.
-    // The second argument is an array of data to pass to the view.
-    return $this->view('home/users.twig', [
-        'users' => $users
+    return $this->view('dashboard/index.twig', [
+        'stats' => $this->getStats(),
+    ], [
+        'title'       => 'Dashboard',
+        'description' => 'Your personal dashboard',
     ]);
 }</code></pre>
-
-    <h3>Accessing the Request</h3>
     <p>
-        The router automatically injects an instance of the <code>Core\Request</code> object as the first parameter to every controller action.
-        This object is a wrapper around superglobals like <code>$_GET</code>, <code>$_POST</code>, and <code>$_FILES</code> and provides helpful methods for inspecting the incoming request.
+        The third parameter allows you to pass SEO metadata (<code>title</code>, <code>description</code>) that will be
+        automatically merged into the view's <code>meta</code> variable.
+    </p>
+
+    <h3>Returning JSON</h3>
+    <p>The <code>json()</code> helper creates a JSON response with the correct <code>Content-Type</code> header.</p>
+    <pre><code class="language-php">public function getUser(string $id): Response
+{
+    $user = (new User())->findById($id);
+    
+    if (!$user) {
+        return $this->json(['error' => 'User not found'], 404);
+    }
+
+    return $this->json($user);
+}</code></pre>
+
+    <h3>Returning a React Component</h3>
+    <p>
+        Rhapsody includes a first‑class integration with <strong>React</strong> via the <code>react()</code> method.
+        This mounts a React component as a full‑page HTML response, with props serialised safely and Vite assets
+        injected automatically.
+    </p>
+    <pre><code class="language-php">public function dashboard(): Response
+{
+    return $this->react('Dashboard', [
+        'user'  => auth()->user()->toArray(),
+        'stats' => $this->getDashboardStats(),
+    ], [
+        'title' => 'Dashboard',
+    ]);
+}</code></pre>
+    <p>
+        The <code>react()</code> method handles:
+    </p>
+    <ul>
+        <li>Serialising props as JSON (XSS‑safe).</li>
+        <li>Injecting the CSRF token as a <code>&lt;meta&gt;</code> tag.</li>
+        <li>Resolving Vite assets (development HMR or production manifest).</li>
+        <li>Rendering a complete HTML document with the component mounted at <code>#rhapsody-root</code>.</li>
+    </ul>
+    <p>
+        For more details, see the <a href="{{ base_url }}/docs/react">React Integration</a> documentation.
+    </p>
+
+    <hr>
+
+    <h2>Accessing the Request</h2>
+    <p>
+        The router automatically injects an instance of the <code>Rhapsody\Core\Request</code> object as the first parameter
+        to every controller action. This object provides a clean API for accessing request data.
     </p>
     <pre><code class="language-php">public function handleContact(Request $request): Response
 {
     // Get the request method (e.g., 'post')
     $method = $request->getMethod();
 
-    // Get sanitized POST data
+    // Get all input (POST, JSON, PUT, etc.)
     $data = $request->getBody();
 
     // Get a specific query parameter from the URL
-    $page = $request->getQueryParam('page', 1); // 1 is the default value
+    $page = $request->getQueryParam('page', 1);
 
+    // Get a specific POST value
+    $email = $request->post('email');
+
+    // Access uploaded files
+    $files = $request->getFiles();
+    
     // ...
 }</code></pre>
+
+    <hr>
+
+    <h2>Generating URLs with Named Routes</h2>
+    <p>
+        The <code>BaseController</code> automatically registers the <code>RoutingExtension</code> with Twig,
+        making the <code>route()</code> function available in all templates.
+    </p>
+    <pre><code class="language-twig">&lt;a href="&lcub;&lcub; route('profile.show', {id: user.id}) }}"&gt;View Profile&lt;/a&gt;</code></pre>
+    <p>
+        In PHP (e.g., inside a controller), you can use <code>Router::generateUrl()</code>:
+    </p>
+    <pre><code class="language-php">use Rhapsody\Core\Routing\Router;
+
+public function redirectToProfile(Request $request): Response
+{
+    $url = Router::generateUrl('profile.show', ['id' => $request->get('id')]);
+    return redirect($url);
+}</code></pre>
+
+    <hr>
+
+    <h2>Dependency Injection &amp; Lazy Loading</h2>
+    <p>
+        The container resolves your controllers and their dependencies automatically.
+        If you type‑hint a service in your controller's constructor, it will be injected.
+    </p>
+    <pre><code class="language-php">namespace App\Controllers;
+
+use App\Services\PaymentService;
+use Rhapsody\Core\BaseController;
+
+class CheckoutController extends BaseController
+{
+    public function __construct(
+        private PaymentService $paymentService
+    ) {}
+
+    public function process(): Response
+    {
+        $this->paymentService->charge(...);
+        // ...
+    }
+}</code></pre>
+    <p>
+        For performance, controllers are <strong>not lazy‑loaded</strong> (they are resolved eagerly).
+        However, all other services injected into controllers <em>can</em> be lazy‑loaded if you enable
+        the <code>LAZY_LOADING_ENABLED</code> setting in your <code>.env</code> file. This means that
+        heavy services (like the ORM or mailer) are only instantiated when they are actually used.
+    </p>
+    <p>
+        The <strong>Services</strong> panel in the debug toolbar shows which services were resolved
+        and whether they were lazy‑loaded – perfect for performance tuning.
+    </p>
+
+    <hr>
+
+    <h2>Debugging Controllers</h2>
+    <p>
+        The debug toolbar includes a <strong>Services</strong> panel that shows:
+    </p>
+    <ul>
+        <li>Which services were resolved during the request.</li>
+        <li>How long each service took to instantiate.</li>
+        <li>Whether the service was lazy‑loaded (green "Yes") or eager (red "No").</li>
+    </ul>
+    <p>
+        This is invaluable for identifying bottlenecks in your controller's dependency graph.
+    </p>
+    <p>
+        The <strong>Middleware</strong> panel shows execution times for all middleware,
+        helping you pinpoint slow components.
+    </p>
+
+    <hr>
+
+    <h2>Next Steps</h2>
+    <ul>
+        <li>Learn about <a href="{{ base_url }}/docs/routing">Routing</a> to map URLs to controllers.</li>
+        <li>Explore the <a href="{{ base_url }}/docs/request">Request</a> and <a href="{{ base_url }}/docs/response">Response</a> objects.</li>
+        <li>Read about <a href="{{ base_url }}/docs/react">React Integration</a> for building modern SPAs.</li>
+        <li>Check the <a href="{{ base_url }}/docs/performance">Performance</a> guide for lazy loading and caching.</li>
+    </ul>
+
 {% endblock %}

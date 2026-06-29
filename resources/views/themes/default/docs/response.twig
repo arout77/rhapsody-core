@@ -3,7 +3,7 @@
 {% block doc_content %}
     <h1>The Response Object</h1>
     <p>
-        All controller methods in Rhapsody must return an instance of the <code>Core\Response</code> object (or a class that extends it, like <code>RedirectResponse</code>). This object represents the complete HTTP response that will be sent back to the browser, including the content, status code, and headers.
+        All controller methods in Rhapsody must return an instance of the <code>Rhapsody\Core\Response</code> object (or a class that extends it, like <code>RedirectResponse</code>). This object represents the complete HTTP response that will be sent back to the browser, including the content, status code, and headers.
     </p>
 
     <hr>
@@ -27,38 +27,63 @@ public function getUser(string $id): Response
     $user = $this->userModel->findById($id);
     
     if (!$user) {
-        return $this->json(['error' => 'User not found'], 404); // Set a 404 status code
+        return $this->json(['error' => 'User not found'], 404);
     }
 
-    return $this->json($user); // Defaults to a 200 status code
+    return $this->json($user);
 }</code></pre>
 
-    <hr>
-
-    <h2>Redirecting Users</h2>
+    <h3>Redirecting Users</h3>
     <p>
-        To redirect a user to another page, Rhapsody uses the <code>Core\RedirectResponse</code> class. The easiest way to create one is with the global <code>redirect()</code> helper function.
+        To redirect a user to another page, Rhapsody uses the <code>Rhapsody\Core\RedirectResponse</code> class. The easiest way to create one is with the global <code>redirect()</code> helper function.
     </p>
 
-    <h3>Basic Redirects</h3>
+    <h4>Basic Redirects</h4>
     <pre><code class="language-php">public function store(Request $request): Response
 {
-    // ... save data to the database ...
-    
+    // ... save data ...
     return redirect('/users');
 }</code></pre>
     
-    <h3>Redirects with Flash Messages</h3>
+    <h4>Redirects with Flash Messages</h4>
     <p>
-        Often, you'll want to send a "flash message" to display on the next page (e.g., "User created successfully!"). You can chain the <code>with()</code> method to your redirect to store a message in the session for one request.
+        Chain the <code>with()</code> method to send a flash message for the next request.
     </p>
-    <pre><code class="language-php">public function updateUser(Request $request, string $id): Response
-{
-    // ... update the user ...
+    <pre><code class="language-php">return redirect('/users/' . $id)
+    ->with('success', 'Profile updated!');</code></pre>
+    <p>This message can be displayed in Twig using the global <code>flash</code> variable.</p>
 
-    return redirect('/users/' . $id)
-        ->with('success', 'Profile updated successfully!');
+    <hr>
+
+    <h2>Manually Building a Response</h2>
+    <p>If you need full control, you can create a <code>Response</code> instance and set its properties directly:</p>
+    <pre><code class="language-php">public function custom(): Response
+{
+    $response = new Response();
+    $response->setStatusCode(201);
+    $response->setHeader('X-Custom', 'Hello');
+    $response->setContent('<h1>Created</h1>');
+    return $response;
 }</code></pre>
-    <p>This message can then be displayed in your Twig template using the global <code>flash</code> variable.</p>
+
+    <h3>Retrieving Response Data (for Testing or Debugging)</h3>
+    <p>The <code>Response</code> object provides getter methods to inspect the response:</p>
+    <ul>
+        <li><code>getContent()</code> – returns the response body as a string.</li>
+        <li><code>getStatusCode()</code> – returns the HTTP status code.</li>
+        <li><code>getHeaders()</code> – returns an associative array of headers.</li>
+    </ul>
+    <p>These are especially useful when writing unit tests with PHPUnit.</p>
+    <pre><code class="language-php">$response = $this->call('GET', '/about');
+$this->assertEquals(200, $response->getStatusCode());
+$this->assertStringContainsString('About Us', $response->getContent());</code></pre>
+
+    <hr>
+
+    <h2>Sending the Response</h2>
+    <p>
+        The <code>send()</code> method is called automatically by the framework to output the response. You rarely need to call it yourself, but it’s available if you need to manually flush the response.
+    </p>
+    <p>It sets the status code, sends all headers, and prints the content.</p>
 
 {% endblock %}

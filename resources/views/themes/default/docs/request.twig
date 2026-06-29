@@ -3,7 +3,7 @@
 {% block doc_content %}
     <h1>The Request Object</h1>
     <p>
-        The <code>Core\Request</code> class provides an object-oriented way to interact with the current HTTP request. It encapsulates all the information about the request, such as GET and POST data, server variables, and uploaded files, making your application more secure and easier to work with.
+        The <code>Rhapsody\Core\Request</code> class provides an object-oriented way to interact with the current HTTP request. It encapsulates all the information about the request, such as GET and POST data, server variables, and uploaded files, making your application more secure and easier to work with.
     </p>
     <p>
         An instance of the <code>Request</code> object is automatically created and passed as the first argument to every controller method by the router.
@@ -12,9 +12,8 @@
     <hr>
 
     <h2>Accessing Request Information</h2>
-    <p>Here are some of the most common methods available on the <code>Request</code> object.</p>
 
-    <h3>Get the Request Path & Method</h3>
+    <h3>Get the Request Path &amp; Method</h3>
     <pre><code class="language-php">// In a controller method
 public function updateUser(Request $request, string $id): Response
 {
@@ -39,13 +38,11 @@ public function updateUser(Request $request, string $id): Response
     <pre><code class="language-php">$allInput = $request->getBody();
 $email    = $allInput['email'] ?? null;</code></pre>
 
-    <h3>Retrieving Query Parameters</h3>
+    <h3>Retrieving Individual Query Parameters</h3>
     <p>To get a value from the URL's query string (e.g., <code>/users?page=2</code>), use the <code>getQueryParam()</code> method. It includes a second argument to specify a default value if the parameter is not present.</p>
     <pre><code class="language-php">public function showUsers(Request $request): Response
 {
-    // Get the 'page' parameter, or default to 1
     $currentPage = (int) $request->getQueryParam('page', 1);
-
     // ...
 }</code></pre>
 
@@ -85,4 +82,10 @@ $canonical = $request->getCanonicalUrl(['page', 'category']);</code></pre>
     
     // ...
 }</code></pre>
+
+    <h3>Direct Access to Raw Data</h3>
+    <p>If you need to access raw GET or POST values directly, you can use the <code>get()</code> and <code>post()</code> methods:</p>
+    <pre><code class="language-php">$userId = $request->get('user_id');   // from $_GET
+$email  = $request->post('email');    // from $_POST</code></pre>
+
 {% endblock %}

@@ -179,8 +179,12 @@ class Toolbar
         // --- Environment Panel ---
         $envHtml = $this->formatEnvPanel();
 
+        // --- NEW: Services and Middleware panels ---
+        $servicesHtml   = $this->renderServicesPanel();
+        $middlewareHtml = $this->renderMiddlewarePanel();
+
         // --- Build panels array ---
-        $panels_data = [
+        $panels_data  = [
             'panel-request'     => $requestHtml,
             'panel-logs'        => $logHtml,
             'panel-db'          => $dbHtml,
@@ -191,13 +195,15 @@ class Toolbar
                     <script type="application/json" class="rhapsody-island-props">{$performanceProps}</script>
                 </div>
             HTML,
-            'panel-env' => $envHtml,
+            'panel-env'        => $envHtml,
+            'panel-services'   => $servicesHtml,
+            'panel-middleware' => $middlewareHtml,
         ];
 
-        $panels_json  = json_encode($panels_data);
+        $panels_json = json_encode($panels_data);
 
         // --- CSS for the new tables ---
-        $extraCss = <<<CSS
+        $extraCss  = <<<CSS
     .toolbar-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .toolbar-table td { padding: 6px 10px; border-bottom: 1px solid #2d3748; }
     .toolbar-table tr:last-child td { border-bottom: none; }
@@ -238,6 +244,8 @@ CSS;
     <div id="rhapsody-debug-toolbar-header">
         <div class="toolbar-item toolbar-logo" id="toolbar-close-btn">Rhapsody {$appVersion}</div>
         <div class="toolbar-item" data-panel="panel-request"><span class="toolbar-label">Request</span> <span class="toolbar-value status-ok">{$responseCode}</span></div>
+        <div class="toolbar-item" data-panel="panel-services"><span class="toolbar-label">Services</span></div>
+        <div class="toolbar-item" data-panel="panel-middleware"><span class="toolbar-label">Middleware</span></div>
         <div class="toolbar-item" data-panel="panel-logs"><span class="toolbar-label">Logs</span></div>
         <div class="toolbar-item" data-panel="panel-db"><span class="toolbar-label">Database</span> <span class="toolbar-value">{$queryCount} Queries</span></div>
         <div class="toolbar-item" data-panel="panel-session"><span class="toolbar-label">Session</span></div>
@@ -603,5 +611,93 @@ HTML;
     {
         $parts = explode('\\', $class);
         return end($parts);
+    }
+
+    /**
+     * Render the Services panel.
+     */
+    /**
+     * Render the Services panel.
+     */
+    private function renderServicesPanel(): string
+    {
+        $services = $this->data['container_trace'] ?? [];
+        if (empty($services)) {
+            return '<div id="panel-services" class="toolbar-panel"><p class="text-gray-400">No services resolved.</p></div>';
+        }
+
+        // Sort by duration descending
+        usort($services, fn($a, $b) => ($b['duration'] ?? 0) <=> ($a['duration'] ?? 0));
+
+        $html  = '<div id="panel-services" class="toolbar-panel">';
+        $html .= '<h3 class="text-white text-lg font-bold mb-4">Resolved Services</h3>';
+        $html .= '<div class="bg-gray-800 rounded p-3 overflow-x-auto">';
+        $html .= '<table class="toolbar-table">';
+        $html .= '<thead style="text-align: left;"><tr><th class="label">Service</th><th class="label">Duration (ms)</th><th class="label">Called By</th><th class="label">Lazy?</th></tr></thead>';
+        $html .= '<tbody>';
+        foreach ($services as $svc) {
+            $class      = $svc['class'] ?? 'unknown';
+            $duration   = $svc['duration'] ?? 0;
+            $calledBy   = $svc['called_by'] ?? 'unknown';
+            $isLazy     = isset($svc['proxy']) && $svc['proxy'] === true;
+            $lazyText   = $isLazy ? 'Yes' : 'No';
+            $lazyColor  = $isLazy ? 'text-green-400' : 'text-red-400';
+            $html      .= sprintf(
+                '<tr><td class="font-mono text-xs text-cyan-300">%s</td><td>%.2f</td><td class="text-gray-400 text-xs">%s</td><td><span class="%s">%s</span></td></tr>',
+                htmlspecialchars($class),
+                $duration,
+                htmlspecialchars($calledBy),
+                $lazyColor,
+                $lazyText
+            );
+        }
+        $html .= '</tbody></table>';
+        $html .= '</div>';
+        $html .= '</div>';
+        return $html;
+    }
+
+    /**
+     * Render the Middleware panel.
+     */
+    private function renderMiddlewarePanel(): string
+    {
+        $trace = $this->data['middleware_trace'] ?? [];
+        if (empty($trace)) {
+            return '<div id="panel-middleware" class="toolbar-panel"><p class="text-gray-400">No middleware executed.</p></div>';
+        }
+
+        $html   = '<div id="panel-middleware" class="toolbar-panel">';
+        $html  .= '<h3 class="text-white text-lg font-bold mb-4">Middleware Execution Times</h3>';
+        $html  .= '<div class="bg-gray-800 rounded p-3 overflow-x-auto">';
+        $html  .= '<table class="toolbar-table">';
+        $html  .= '<thead><tr><th class="label">#</th><th class="label">Type</th><th class="label">Class</th><th class="label">Route</th><th class="label">Duration (ms)</th></tr></thead>';
+        $html  .= '<tbody>';
+        $total  = 0;
+        foreach ($trace as $index => $item) {
+            $class     = $item['class'] ?? 'unknown';
+            $type      = $item['type'] ?? 'global';
+            $route     = $item['route'] ?? '-';
+            $duration  = $item['duration'] ?? 0;
+            $total    += $duration;
+            $color     = $duration > 50 ? 'text-red-400' : ($duration > 20 ? 'text-yellow-400' : 'text-green-400');
+            $html     .= sprintf(
+                '<tr><td>%d</td><td>%s</td><td class="font-mono text-xs">%s</td><td class="text-gray-400">%s</td><td class="%s">%.2f</td></tr>',
+                $index + 1,
+                htmlspecialchars($type),
+                htmlspecialchars($class),
+                htmlspecialchars($route),
+                $color,
+                $duration
+            );
+        }
+        $html .= '<tr style="border-top: 2px solid #4B5563;">';
+        $html .= '<td colspan="4" class="text-right font-bold text-gray-400">Total Middleware Time:</td>';
+        $html .= '<td class="font-bold text-cyan-400">' . round($total, 2) . ' ms</td>';
+        $html .= '</tr>';
+        $html .= '</tbody></table>';
+        $html .= '</div>';
+        $html .= '</div>';
+        return $html;
     }
 }

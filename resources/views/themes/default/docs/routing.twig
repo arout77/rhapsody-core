@@ -3,14 +3,14 @@
 {% block doc_content %}
     <h1>Routing</h1>
     <p>
-        The router is the heart of the Rhapsody framework. It maps incoming browser requests to specific controller methods,
-        allowing you to create clean, human-readable URLs. All routes for your web application are defined in the <code>/routes/web.php</code> and <code>/routes/api.php</code> files.
+        The router is the heart of the Rhapsody framework. It maps incoming browser requests to specific controller methods, allowing you to create clean, human-readable URLs. All routes for your web application are defined in the <code>/routes/web.php</code> and <code>/routes/api.php</code> files.
     </p>
+
+    <hr>
 
     <h2>Basic Routing</h2>
     <p>
-        The most basic route accepts a URI and a callback. The callback is typically an array containing the controller class
-        and the method name to execute. You can define routes for different HTTP methods like GET and POST.
+        The most basic route accepts a URI and a callback. The callback is typically an array containing the controller class and the method name to execute. You can define routes for different HTTP methods like GET and POST.
     </p>
     <pre><code class="language-php">// routes/web.php
 use App\Controllers\PageController;
@@ -24,32 +24,28 @@ Router::post('/contact', [PageController::class, 'handleContact']);</code></pre>
 
     <h2>Dynamic Routes with Parameters</h2>
     <p>
-        Often, you'll need to capture segments of the URI, such as a user ID or a blog post slug. You can do this by defining
-        route parameters. Parameters are enclosed in curly braces <code>{}</code> and should consist of alphabetic characters.
+        Often, you'll need to capture segments of the URI, such as a user ID or a blog post slug. You can do this by defining route parameters enclosed in curly braces <code>{}</code>.
     </p>
     <p>
-        These captured parameters are automatically passed as arguments to your controller method.
+        These captured parameters are automatically passed as arguments to your controller method, in the order they appear.
     </p>
     <pre><code class="language-php">// Route definition
 Router::get('/users/{user_id}', [PageController::class, 'viewUser']);
 
-// Corresponding controller method
-// app/Controllers/PageController.php
+// Controller method
 public function viewUser(Request $request, string $user_id)
 {
-    // The framework automatically provides the $user_id from the URL
     $user = (new User())->getUserById($user_id);
     // ...
 }</code></pre>
-    <p><strong>Important:</strong> The router always passes the <code>Core\Request</code> object as the first argument to your controller method, followed by any dynamic route parameters in the order they appear in the URI.</p>
+    <p><strong>Important:</strong> The router always passes the <code>Rhapsody\Core\Request</code> object as the first argument to your controller method, followed by any dynamic route parameters.</p>
 
     <h2>Named Routes &amp; URL Generation</h2>
     <p>
-        Rhapsody now supports <strong>named routes</strong>, allowing you to generate URLs dynamically without hardcoding paths.
-        This is especially useful when your application is installed in a subdirectory.
+        Rhapsody supports <strong>named routes</strong>, allowing you to generate URLs dynamically without hardcoding paths. This is especially useful when your application is installed in a subdirectory.
     </p>
     <p>
-        To assign a name to a route, chain the <code>name()</code> method after the route definition:
+        To assign a name to a route, chain the <code>name()</code> method:
     </p>
     <pre><code class="language-php">Router::get('/profile/{id}', [ProfileController::class, 'show'])->name('profile.show');</code></pre>
     <p>
@@ -57,18 +53,41 @@ public function viewUser(Request $request, string $user_id)
     </p>
     <pre><code class="language-twig">&lt;a href="&lcub;&lcub; route('profile.show', {id: user.id}) }}"&gt;View Profile&lt;/a&gt;</code></pre>
     <p>
-        The <code>route()</code> function accepts the route name as the first argument and an optional associative array
-        of parameters to replace the placeholders in the route path.
+        The <code>route()</code> function accepts the route name as the first argument and an optional associative array of parameters to replace the placeholders.
     </p>
     <p>
-        If you need the base URL (including subdirectory) prepended, you can still use the <code>base_url</code> variable,
-        but <code>route()</code> automatically includes it when <code>$_ENV['APP_URL']</code> is set correctly.
+        If you need the base URL (including subdirectory) prepended, the <code>route()</code> function automatically uses <code>$_ENV['APP_URL'] . $_ENV['APP_BASE_URL']</code>.
+    </p>
+    <p>
+        You can also generate URLs from PHP using the static method <code>Router::generateUrl($name, $params)</code>.
+    </p>
+
+    <h2>Middleware</h2>
+    <p>
+        You can attach middleware to routes to filter requests (e.g., authentication, CSRF protection). Middleware are resolved from the container and executed before the controller.
+    </p>
+    <pre><code class="language-php">Router::get('/dashboard', [DashboardController::class, 'index'])
+    ->middleware('auth'); // only authenticated users</code></pre>
+    <p>
+        Middleware can be defined in the <code>config.php</code> file under the <code>middleware.map</code> key.
+    </p>
+
+    <h2>Container Integration</h2>
+    <p>
+        The router uses the service container to resolve controllers and their dependencies. Your controller classes can type‑hint any service, and the container will inject them automatically. The router also accepts a <code>ContainerInterface</code> instance, allowing you to swap the container implementation if needed.
+    </p>
+    <p>
+        For performance, the container can be configured to lazy‑load services (see the <a href="{{ base_url }}/docs/performance">Performance</a> documentation).
+    </p>
+
+    <h2>Debugging Routes</h2>
+    <p>
+        The debug toolbar includes a <strong>Services</strong> and <strong>Middleware</strong> panel that show which routes were matched, which middleware were executed, and which services were resolved during the request. This is invaluable for profiling and debugging.
     </p>
 
     <h2>Social Login (OAuth)</h2>
     <p>
-        Rhapsody includes built‑in support for social authentication via Google and Facebook (more providers can be added).
-        See the <a href="{{ base_url }}/docs/social-auth">Social Authentication</a> documentation for setup instructions.
+        Rhapsody includes built‑in support for social authentication via Google and Facebook. See the <a href="{{ base_url }}/docs/social-auth">Social Authentication</a> documentation for setup instructions and route examples.
     </p>
 
 {% endblock %}

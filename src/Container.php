@@ -26,6 +26,12 @@ class Container implements ContainerInterface
     private static array $resolveTrace = [];
 
     /**
+     * Internal flag to indicate that the current resolution is triggered
+     * by a lazy proxy initializer. When true, the trace will be marked as proxy.
+     */
+    private static bool $proxyMode = false;
+
+    /**
      * Binds a class or interface to the container.
      *
      * @param string $abstract The class/interface name to bind.
@@ -128,15 +134,22 @@ class Container implements ContainerInterface
             }
 
             // Record successful resolution for debugging
-            $duration             = round((microtime(true) - $start) * 1000, 2);
-            $trace                = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
-            $caller               = isset($trace[1]['class']) ? $trace[1]['class'] : 'unknown';
-            self::$resolveTrace[] = [
+            $duration = round((microtime(true) - $start) * 1000, 2);
+            $trace    = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+            $caller   = isset($trace[1]['class']) ? $trace[1]['class'] : 'unknown';
+            $entry    = [
                 'class'     => $abstract,
                 'resolved'  => true,
                 'duration'  => $duration,
                 'called_by' => $caller,
             ];
+
+            // If we are in proxy mode, mark as proxy
+            if (self::$proxyMode) {
+                $entry['proxy'] = true;
+            }
+
+            self::$resolveTrace[] = $entry;
 
             return $instance;
         } finally {
@@ -194,5 +207,14 @@ class Container implements ContainerInterface
     public static function resetTrace(): void
     {
         self::$resolveTrace = [];
+    }
+
+    /**
+     * Enable or disable proxy mode for the current resolution.
+     * This is used by the lazy proxy system to mark traced services as lazy.
+     */
+    public static function setProxyMode(bool $enabled): void
+    {
+        self::$proxyMode = $enabled;
     }
 }

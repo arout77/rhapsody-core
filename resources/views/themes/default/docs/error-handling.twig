@@ -8,7 +8,7 @@
 
     <h2>How It Works</h2>
     <p>
-        The <code>Core\ErrorHandler</code> class is registered early in <code>index.php</code>. It sets three PHP handlers:
+        The <code>Rhapsody\Core\ErrorHandler</code> class is registered early in <code>index.php</code>. It sets three PHP handlers:
     </p>
     <ul>
         <li><code>set_error_handler()</code> – converts warnings, notices, etc. into <code>ErrorException</code>.</li>
@@ -76,7 +76,7 @@
 
     <h2>Throwing HTTP Exceptions</h2>
     <p>
-        For more control, you can throw <code>Core\Exceptions\HttpException</code> (optional class – you need to create it). Example:
+        For more control, you can throw <code>Rhapsody\Core\Exceptions\HttpException</code> (optional class – you need to create it). Example:
     </p>
     <pre><code class="language-php">use Rhapsody\Core\Exceptions\HttpException;
 
@@ -94,7 +94,7 @@ public function show(string $id): Response
 
     <h2>Logging Format</h2>
     <p>
-        Each error is logged using the <code>Core\Logger</code> class. A typical log entry looks like:
+        Each error is logged using the <code>Rhapsody\Core\Logger</code> class. A typical log entry looks like:
     </p>
     <pre><code class="language-php">[2025-06-15 14:32:10] ERROR: [PDOException] SQLSTATE[42S02]: Base table or view not found in /var/www/app/Models/User.php:45
 Stack trace:

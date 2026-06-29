@@ -3,6 +3,10 @@ namespace Rhapsody\Core\Proxy;
 
 use Rhapsody\Core\Container;
 
+/**
+ * Factory for creating lazy-loading proxies for any service.
+ * Uses our built‑in ProxyGenerator (no external dependencies).
+ */
 class LazyProxyFactory
 {
     private Container $container;
@@ -16,6 +20,9 @@ class LazyProxyFactory
 
     /**
      * Create a lazy proxy for the given class/interface.
+     *
+     * @param string $abstract The class or interface name.
+     * @return object The generated proxy instance.
      */
     public function create(string $abstract): object
     {
@@ -24,8 +31,16 @@ class LazyProxyFactory
 
         // The proxy class expects an initializer closure.
         $initializer = function (&$wrappedObject, $proxy, string $method, array $params, &$initializer) use ($abstract) {
-            $initializer   = null; // prevent re-initialization
-            $wrappedObject = $this->container->resolve($abstract);
+            $initializer = null; // prevent re-initialization
+
+            // Enable proxy mode so the container marks the trace as lazy
+            Container::setProxyMode(true);
+            try {
+                $wrappedObject = $this->container->resolve($abstract);
+            } finally {
+                Container::setProxyMode(false);
+            }
+
             return true;
         };
 

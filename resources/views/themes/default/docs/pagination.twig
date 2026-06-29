@@ -3,16 +3,12 @@
 {% block doc_content %}
     <h1>Pagination</h1>
     <p>
-        Rhapsody includes a reusable <code>Core\Pagination</code> class to make breaking up large sets of data into simple, navigable pages easy.
-        The pagination system is designed to work seamlessly with your models and controllers.
+        Rhapsody includes a powerful <code>Rhapsody\Core\Pagination</code> class that makes breaking large datasets into navigable pages a breeze.
+        The enhanced version offers greater flexibility, customisation, and cleaner integration with your views.
     </p>
 
     <h2>1. Model Setup</h2>
-    <p>To use pagination, your model needs two methods:</p>
-    <ul>
-        <li>A method to count the total number of records (e.g., <code>countAll()</code>).</li>
-        <li>A method to fetch a specific "slice" of records using <code>LIMIT</code> and <code>OFFSET</code> (e.g., <code>findPaginated()</code>).</li>
-    </ul>
+    <p>Your model still needs two methods: one to count total records, and one to fetch a specific slice using <code>LIMIT</code> and <code>OFFSET</code>.</p>
     <pre><code class="language-php">// app/Models/User.php
 public function countAll(): int
 {
@@ -31,14 +27,7 @@ public function findPaginated(int $limit, int $offset): array
 }</code></pre>
 
     <h2>2. Controller Logic</h2>
-    <p>In your controller, you'll bring everything together:</p>
-    <ol>
-        <li>Get the current page number and desired limit from the request.</li>
-        <li>Get the total count of items from your model.</li>
-        <li>Create a new instance of the <code>Pagination</code> class.</li>
-        <li>Use the pagination object's <code>getLimit()</code> and <code>getOffset()</code> methods to fetch the correct data slice from your model.</li>
-        <li>Pass both the data and the pagination object to your view.</li>
-    </ol>
+    <p>In your controller, instantiate the <code>Pagination</code> class with the total number of items, the desired limit, and the current page. The class now supports additional configuration via setter methods.</p>
     <pre><code class="language-php">// app/Controllers/PageController.php
 use Rhapsody\Core\Pagination;
 use Rhapsody\Core\Request;
@@ -46,11 +35,27 @@ use Rhapsody\Core\Request;
 public function showUsers(Request $request): Response
 {
     $usersPerPage = (int) $request->getQueryParam('limit', 10);
-    $currentPage = (int) $request->getQueryParam('page', 1);
+    $currentPage  = (int) $request->getQueryParam('page', 1);
 
     $totalUsers = $this->userModel->countAll();
 
     $pagination = new Pagination($totalUsers, $usersPerPage, $currentPage);
+
+    // Customise the number of links shown around the current page (default: 5)
+    $pagination->setMaxLinks(7);
+
+    // Add custom CSS classes to the rendered navigation
+    $pagination->setCssClasses([
+        'container' => 'pagination-container',
+        'list'      => 'pagination-list',
+        'item'      => 'pagination-item',
+        'active'    => 'is-active',
+        'disabled'  => 'is-disabled',
+        'link'      => 'pagination-link',
+    ]);
+
+    // Use a custom Twig template for rendering (optional)
+    $pagination->setTemplate('partials/pagination.twig');
 
     $users = $this->userModel->findPaginated(
         $pagination->getLimit(),
@@ -58,7 +63,7 @@ public function showUsers(Request $request): Response
     );
 
     return $this->view('home/users.twig', [
-        'users' => $users,
+        'users'      => $users,
         'pagination' => $pagination,
         'currentLimit' => $usersPerPage,
         'allowedLimits' => [5, 10, 25, 50]
@@ -67,13 +72,201 @@ public function showUsers(Request $request): Response
 
     <h2>3. Rendering in the View</h2>
     <p>
-        In your Twig template, you can now call the <code>render()</code> method on the pagination object to generate the navigation links.
-        The <code>|raw</code> filter is required to output the HTML.
+        In your Twig template, call the <code>render()</code> method on the pagination object. The enhanced version accepts an optional array of options to override default settings on the fly.
     </p>
-    <pre><code class="language-php">&lt;!-- views/home/users.twig --&gt;
+    <pre><code class="language-twig">&lt;!-- views/home/users.twig --&gt;
 &lt;div class="flex justify-center mt-8"&gt;
-    {{ pagination.render()|raw }}
+    &#123;&#123; pagination.render({
+        'maxLinks': 9,
+        'cssClasses': {
+            'active': 'my-active-class'
+        }
+    })|raw &#125;&#125;
 &lt;/div&gt;</code></pre>
-    <p>The <code>render()</code> method is smart enough to preserve existing query string parameters (like your "results per page" limit) when generating page links.</p>
+    <p>
+        The <code>render()</code> method now preserves all existing query string parameters (including the "limit" value) and automatically builds correct URLs. It also includes <strong>First</strong> and <strong>Last</strong> links when appropriate, and gracefully handles edge cases (e.g., only one page).
+    </p>
 
+    <h2>4. Advanced Features</h2>
+
+    <h3>4.1. Custom Template Rendering</h3>
+    <p>
+        You can supply a custom Twig template to control the HTML output. The template receives a <code>pagination</code> variable with the following properties:
+        <ul>
+            <li><code>totalItems</code> – total number of records</li>
+            <li><code>itemsPerPage</code> – number of items per page</li>
+            <li><code>currentPage</code> – current page number</li>
+            <li><code>totalPages</code> – total number of pages</li>
+            <li><code>previousPage</code> – previous page number (or <code>null</code>)</li>
+            <li><code>nextPage</code> – next page number (or <code>null</code>)</li>
+            <li><code>pageRange</code> – an array of page numbers to display (respecting <code>maxLinks</code>)</li>
+            <li><code>url(page)</code> – a helper function to generate the URL for a given page</li>
+        </ul>
+    </p>
+    <pre><code class="language-twig">&lt;!-- views/partials/pagination.twig --&gt;
+&lt;nav class="pagination"&gt;
+    &lt;ul&gt;
+        &lt;li&gt;&lt;a href="&#123;&#123; pagination.url(1) &#125;&#125;"&gt;First&lt;/a&gt;&lt;/li&gt;
+        &lt;li&gt;&lt;a href="&#123;&#123; pagination.url(pagination.previousPage) &#125;&#125;"&gt;Previous&lt;/a&gt;&lt;/li&gt;
+        &#123;&#37; for page in pagination.pageRange &#37;&#125;
+            &lt;li class="&#123;&#123; page == pagination.currentPage ? 'active' : '' &#125;&#125;"&gt;
+                &lt;a href="&#123;&#123; pagination.url(page) &#125;&#125;"&gt;&#123;&#123; page &#125;&#125;&lt;/a&gt;
+            &lt;/li&gt;
+        &#123;&#37; endfor &#37;&#125;
+        &lt;li&gt;&lt;a href="&#123;&#123; pagination.url(pagination.nextPage) &#125;&#125;"&gt;Next&lt;/a&gt;&lt;/li&gt;
+        &lt;li&gt;&lt;a href="&#123;&#123; pagination.url(pagination.totalPages) &#125;&#125;"&gt;Last&lt;/a&gt;&lt;/li&gt;
+    &lt;/ul&gt;
+&lt;/nav&gt;</code></pre>
+
+    <h3>4.2. AJAX / Live Updates (Without Client-Side Templating)</h3>
+    <p>
+        The <code>Pagination</code> class includes a <code>getDataAttributes()</code> method that returns data attributes like <code>data-page</code>, <code>data-total-pages</code>, and <code>data-current-page</code>. These make it easy to write unobtrusive JavaScript that fetches new pages via AJAX and updates the DOM—all while keeping your HTML generation <strong>100% in Twig</strong>.
+    </p>
+
+    <h4>Step 1: Split your view into reusable partials</h4>
+    <p>Extract the dynamic parts of your listing into separate Twig files. This keeps your markup DRY and allows you to render them independently for AJAX responses.</p>
+
+    <p><strong><code>views/home/_user_rows.twig</code></strong></p>
+    <pre><code class="language-twig">&#123;&#37; for user in users &#37;&#125;
+    &lt;tr&gt;
+        &lt;td&gt;&#123;&#123; user.id &#125;&#125;&lt;/td&gt;
+        &lt;td&gt;&#123;&#123; user.name &#125;&#125;&lt;/td&gt;
+        &lt;td&gt;&#123;&#123; user.email &#125;&#125;&lt;/td&gt;
+    &lt;/tr&gt;
+&#123;&#37; endfor &#37;&#125;</code></pre>
+
+    <p><strong><code>views/home/_pagination.twig</code></strong></p>
+    <pre><code class="language-twig">&lt;div class="pagination-wrapper"&gt;
+    &#123;&#123; pagination.render()|raw &#125;&#125;
+&lt;/div&gt;</code></pre>
+
+    <h4>Step 2: Assemble the main view using these partials</h4>
+    <pre><code class="language-twig">&lt;!-- views/home/users.twig --&gt;
+&lt;div id="users-list"
+     &#123;&#123; pagination.getDataAttributes()|map((v, k) =&gt; "#{k}=\"#{v}\"")|join(' ')|raw &#125;&#125;&gt;
+
+    &lt;table&gt;
+        &lt;thead&gt;
+            &lt;tr&gt;&lt;th&gt;ID&lt;/th&gt;&lt;th&gt;Name&lt;/th&gt;&lt;th&gt;Email&lt;/th&gt;&lt;/tr&gt;
+        &lt;/thead&gt;
+        &lt;tbody id="users-table-body"&gt;
+            &#123;&#37; include 'home/_user_rows.twig' with { users: users } &#37;&#125;
+        &lt;/tbody&gt;
+    &lt;/table&gt;
+
+    &#123;&#37; include 'home/_pagination.twig' with { pagination: pagination } &#37;&#125;
+&lt;/div&gt;</code></pre>
+
+    <h4>Step 3: Update your controller to handle AJAX requests</h4>
+    <p>
+        In your controller, detect AJAX calls (e.g., via the <code>X-Requested-With</code> header or <code>Accept</code> header). For AJAX requests, render <strong>only the partials</strong> using Twig and return them as JSON. For normal requests, render the full page.
+    </p>
+    <pre><code class="language-php">// app/Controllers/PageController.php
+public function showUsers(Request $request): Response
+{
+    $usersPerPage = (int) $request->getQueryParam('limit', 10);
+    $currentPage  = (int) $request->getQueryParam('page', 1);
+
+    $totalUsers = $this->userModel->countAll();
+    $pagination = new Pagination($totalUsers, $usersPerPage, $currentPage);
+    $users = $this->userModel->findPaginated(
+        $pagination->getLimit(),
+        $pagination->getOffset()
+    );
+
+    // If the request is AJAX, return JSON containing only the rendered partials
+    if ($request->isAjax() || $request->getHeader('Accept') === 'application/json') {
+        return $this->json([
+            'rows'       => $this->twig->render('home/_user_rows.twig', ['users' => $users]),
+            'pagination' => $this->twig->render('home/_pagination.twig', ['pagination' => $pagination]),
+        ]);
+    }
+
+    // Otherwise, render the full HTML page
+    return $this->view('home/users.twig', [
+        'users'      => $users,
+        'pagination' => $pagination,
+        'currentLimit' => $usersPerPage,
+        'allowedLimits' => [5, 10, 25, 50]
+    ]);
+}</code></pre>
+    <p>
+        <strong>Note:</strong> Because <code>$this->twig</code> is a protected property of <code>BaseController</code>, you can call <code>$this->twig->render()</code> directly to render any Twig template and get its output as a string—perfect for embedding in JSON responses.
+    </p>
+
+    <h4>Step 4: Write the client-side JavaScript</h4>
+    <p>
+        The JavaScript intercepts pagination link clicks, fetches the new page via AJAX, and swaps the updated HTML partials into the DOM—all without a client-side templating engine.
+    </p>
+    <pre><code class="language-javascript">// public/js/pagination.js
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('users-list');
+    if (!container) return;
+
+    container.addEventListener('click', function(e) {
+        const link = e.target.closest('.pagination-link');
+        if (!link) return;
+
+        e.preventDefault();
+
+        const url = link.getAttribute('href');
+        if (!url) return;
+
+        // Optional: show a loading indicator
+        container.classList.add('loading');
+
+        fetch(url, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Update the table rows
+            const tbody = document.getElementById('users-table-body');
+            if (tbody && data.rows) {
+                tbody.innerHTML = data.rows;
+            }
+
+            // Update the pagination controls
+            const paginationWrapper = container.querySelector('.pagination-wrapper');
+            if (paginationWrapper && data.pagination) {
+                paginationWrapper.innerHTML = data.pagination;
+            }
+
+            // Update the container's data attributes
+            const newPage = new URL(url).searchParams.get('page');
+            if (newPage) {
+                container.dataset.page = newPage;
+            }
+
+            container.classList.remove('loading');
+        })
+        .catch(error => {
+            console.error('Pagination AJAX error:', error);
+            container.classList.remove('loading');
+        });
+    });
+});</code></pre>
+
+    <h4>Why this approach is better for your Twig-based application</h4>
+    <ul>
+        <li><strong>DRY:</strong> You write your table rows and pagination markup <em>once</em> in Twig. Both the initial page load and AJAX updates use the same files.</li>
+        <li><strong>No client-side templating:</strong> You don't need Mustache, Handlebars, or React just for pagination. All HTML generation stays on the server.</li>
+        <li><strong>Easier debugging:</strong> All HTML is generated in PHP/Twig, so you can debug it using familiar tools.</li>
+        <li><strong>Graceful fallback:</strong> If JavaScript fails, the standard links still trigger a full page reload and work perfectly.</li>
+        <li><strong>Framework‑agnostic:</strong> The same pattern works with Vue, Alpine, or React if you prefer—just replace the DOM manipulation with your framework's reactivity.</li>
+    </ul>
+
+    <h3>4.3. URL Customisation</h3>
+    <p>
+        If you need to modify the base URL or add additional query parameters, use the <code>setBaseUrl()</code> and <code>setExtraParams()</code> methods before rendering.
+    </p>
+    <pre><code class="language-php">$pagination->setBaseUrl('/users/list');
+$pagination->setExtraParams(['sort' => 'name']);</code></pre>
+
+    <p>
+        The enhanced <code>Pagination</code> class is fully backwards compatible – the basic usage shown in the original documentation still works, but we highly recommend leveraging the new features for a more polished user experience.
+    </p>
 {% endblock %}
