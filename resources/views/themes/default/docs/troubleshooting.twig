@@ -1,0 +1,212 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>Troubleshooting &amp; Common Errors</h1>
+    <p>
+        This page lists the most common issues users encounter when working with Rhapsody,
+        along with their solutions. If you run into a problem, check here first.
+    </p>
+
+    <hr>
+
+    <h2>1. Route Cache Not Updating</h2>
+    <p>
+        <strong>Symptom:</strong> After a major refactor (e.g., moving controllers, changing namespaces, or updating routes), the site works locally but fails on production with a 500 error – even though the code is the same.
+    </p>
+    <p>
+        <strong>Cause:</strong> The route cache file (<code>storage/cache/routes/routes.php</code>) was generated <strong>before</strong> the changes and still contains references to old class names or paths. Production loads the cache instead of the dynamic route files.
+    </p>
+    <p>
+        <strong>Fix:</strong> Clear the route cache:
+    </p>
+    <pre><code class="language-bash">php rhapsody route:clear
+# Or manually:
+rm -f storage/cache/routes/routes.php</code></pre>
+    <p>
+        After clearing, test the site. Once everything works, you can regenerate the cache:
+    </p>
+    <pre><code class="language-bash">php rhapsody route:cache</code></pre>
+    <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4">
+        <strong>Tip:</strong> Always clear the route cache after any change that affects class names, namespaces, or route definitions – especially when deploying to production.
+    </div>
+
+    <hr>
+
+    <h2>2. Storage Permissions</h2>
+    <p>
+        <strong>Symptom:</strong> Pages work in development but fail in production, often with a 500 error or a message about not being able to write to a directory.
+    </p>
+    <p>
+        <strong>Cause:</strong> The web server user does not have write permissions to the <code>storage/</code> directory (or subdirectories like <code>cache/</code>, <code>logs/</code>, or <code>uploads/</code>).
+    </p>
+    <p>
+        <strong>Fix:</strong> Ensure the web server user has write access. For example:
+    </p>
+    <pre><code class="language-bash">chmod -R 755 storage/
+chmod -R 755 storage/cache/
+chmod -R 755 storage/logs/
+# If using uploads:
+chmod -R 755 storage/uploads/</code></pre>
+    <p>
+        If the server uses a different user/group, you may need to adjust ownership:
+    </p>
+    <pre><code class="language-bash">chown -R www-data:www-data storage/   # (or the appropriate user)</code></pre>
+
+    <hr>
+
+    <h2>3. Missing Environment Variables</h2>
+    <p>
+        <strong>Symptom:</strong> The application works locally but fails on production with errors about missing database connections, mail settings, or other services.
+    </p>
+    <p>
+        <strong>Cause:</strong> The production <code>.env</code> file is missing required variables (e.g., <code>DB_HOST</code>, <code>APP_KEY</code>, etc.).
+    </p>
+    <p>
+        <strong>Fix:</strong> Copy your <code>.env.example</code> to <code>.env</code> and fill in all required values. Common variables to check:
+    </p>
+    <ul>
+        <li><code>APP_ENV=production</code></li>
+        <li><code>APP_URL=...</code></li>
+        <li><code>DB_HOST</code>, <code>DB_NAME</code>, <code>DB_USER</code>, <code>DB_PASS</code></li>
+        <li><code>APP_KEY</code> – must be a 32‑character string (generate with <code>php -r "echo bin2hex(random_bytes(16));"</code>)</li>
+    </ul>
+
+    <hr>
+
+    <h2>4. Twig Cache</h2>
+    <p>
+        <strong>Symptom:</strong> Changes to Twig templates are not reflected on the site, even after refreshing.
+    </p>
+    <p>
+        <strong>Cause:</strong> Twig caches compiled templates in <code>storage/cache/twig/</code>.
+    </p>
+    <p>
+        <strong>Fix:</strong> Clear the Twig cache:
+    </p>
+    <pre><code class="language-bash">rm -rf storage/cache/twig/*</code></pre>
+    <p>
+        Or, if you have the CLI command:
+    </p>
+    <pre><code class="language-bash">php rhapsody cache:clear</code></pre>
+
+    <hr>
+
+    <h2>5. Doctrine Proxy Generation</h2>
+    <p>
+        <strong>Symptom:</strong> The application fails with an error like <code>Failed opening required '/tmp/__CG__AppEntities...'</code>.
+    </p>
+    <p>
+        <strong>Cause:</strong> Doctrine generates proxy classes for entities, but the proxies are missing or the directory is not writable.
+    </p>
+    <p>
+        <strong>Fix:</strong> In production, set <code>APP_ENV=production</code> and ensure proxies are pre‑generated:
+    </p>
+    <pre><code class="language-bash">php vendor/bin/doctrine orm:generate-proxies</code></pre>
+    <p>
+        Ensure the proxy directory (<code>storage/cache/doctrine/proxies/</code>) is writable, or pre‑generate them and commit them.
+    </p>
+
+    <hr>
+
+    <h2>6. Vite Manifest Not Found</h2>
+    <p>
+        <strong>Symptom:</strong> When <code>VITE_DEV_SERVER=false</code>, the site loads but styles/scripts are missing, or you get a 500 error.
+    </p>
+    <p>
+        <strong>Cause:</strong> The Vite production build has not been run, so <code>public/build/.vite/manifest.json</code> is missing.
+    </p>
+    <p>
+        <strong>Fix:</strong> Run the production build on the server:
+    </p>
+    <pre><code class="language-bash">npm install    # if not already done
+npm run build</code></pre>
+    <p>
+        This creates the manifest and the fingerprinted assets. Ensure the paths in <code>ViteManifest.php</code> match your setup (default is <code>public/build/</code>).
+    </p>
+
+    <hr>
+
+    <h2>7. Class Not Found (Autoloading Issues)</h2>
+    <p>
+        <strong>Symptom:</strong> The application throws a fatal error like <code>Class "App\Controllers\SomeController" not found</code>.
+    </p>
+    <p>
+        <strong>Cause:</strong> The namespace does not match the directory structure, or Composer's autoloader has not been refreshed.
+    </p>
+    <p>
+        <strong>Fix:</strong>
+    </p>
+    <ul>
+        <li>Ensure your PSR‑4 mappings in <code>composer.json</code> are correct.</li>
+        <li>Run <code>composer dump-autoload -o</code> (production) or <code>composer dump-autoload</code> (development).</li>
+        <li>Check that your controller files are in the correct directory and have the correct namespace.</li>
+    </ul>
+
+    <hr>
+
+    <h2>8. HTTP 500 – Generic Error</h2>
+    <p>
+        <strong>Symptom:</strong> The site shows a plain 500 error page with no details, even in development.
+    </p>
+    <p>
+        <strong>Cause:</strong> The error handler might be failing, or error reporting is disabled.
+    </p>
+    <p>
+        <strong>Fix:</strong>
+    </p>
+    <ul>
+        <li>Check the PHP error log (<code>storage/logs/errors.log</code> or the server's PHP log).</li>
+        <li>Temporarily enable <code>display_errors</code> in <code>index.php</code> to see the actual exception.</li>
+        <li>Check the web server error log (Apache/nginx).</li>
+    </ul>
+
+    <hr>
+
+    <h2>9. Lazy Loading Issues</h2>
+    <p>
+        <strong>Symptom:</strong> Services that should be lazy‑loaded are being instantiated too early, or you get errors about missing proxy classes.
+    </p>
+    <p>
+        <strong>Cause:</strong> The lazy loading system uses proxies generated in <code>storage/cache/proxies/</code>. If this directory is missing, or if the proxies are outdated, issues may occur.
+    </p>
+    <p>
+        <strong>Fix:</strong>
+    </p>
+    <ul>
+        <li>Ensure <code>storage/cache/proxies/</code> exists and is writable.</li>
+        <li>Run <code>php rhapsody build:proxies</code> to pre‑generate proxies.</li>
+        <li>Check that <code>LAZY_LOADING_ENABLED</code> is set correctly in <code>.env</code>.</li>
+    </ul>
+
+    <hr>
+
+    <h2>10. .htaccess / Rewrite Issues</h2>
+    <p>
+        <strong>Symptom:</strong> The home page works, but all other routes return a 404 or 500 error.
+    </p>
+    <p>
+        <strong>Cause:</strong> <code>.htaccess</code> is missing the rewrite rules, or <code>RewriteBase</code> is not set correctly.
+    </p>
+    <p>
+        <strong>Fix:</strong>
+    </p>
+    <ul>
+        <li>Ensure <code>.htaccess</code> contains the standard rules:</li>
+    </ul>
+    <pre><code class="language-apache">RewriteEngine On
+RewriteBase /
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]</code></pre>
+    <ul>
+        <li>If the site is in a subdirectory, set <code>RewriteBase /subdir/</code>.</li>
+        <li>Also check <code>APP_BASE_URL</code> in <code>.env</code> – it must match the subdirectory (or be empty if in root).</li>
+    </ul>
+
+    <hr>
+
+    <h2>Still stuck?</h2>
+    <p>
+        If your issue isn't listed here, check the official Rhapsody documentation, or open an issue on GitHub with a detailed description of the problem, the steps to reproduce it, and the error logs.
+    </p>
+{% endblock %}

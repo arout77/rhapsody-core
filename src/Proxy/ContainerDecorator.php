@@ -46,24 +46,20 @@ class ContainerDecorator implements ContainerInterface
 
     public function resolve(string $abstract): mixed
     {
-        // --- NEW: Skip proxying for controllers ---
-        if (class_exists($abstract) && is_subclass_of($abstract, BaseController::class)) {
+        if (! class_exists($abstract) && ! interface_exists($abstract)) {
             return $this->container->resolve($abstract);
         }
 
-        // If lazy loading is disabled, or the service is marked as eager, or it's a primitive,
-        // resolve immediately.
         if (! $this->enabled || $this->isEager($abstract)) {
             return $this->container->resolve($abstract);
         }
 
-        // Check if the container has a binding for this abstract.
-        // If not, it might be a concrete class that can be autowired.
-        if (! $this->container->has($abstract) && ! class_exists($abstract) && ! interface_exists($abstract)) {
+        // Skip proxying if the abstract is not a class/interface
+        // (e.g., string bindings like 'config' or scalar values)
+        if (class_exists($abstract) && is_subclass_of($abstract, \Rhapsody\Core\BaseController::class)) {
             return $this->container->resolve($abstract);
         }
 
-        // Return a lazy proxy for this service.
         return $this->proxyFactory->create($abstract);
     }
 

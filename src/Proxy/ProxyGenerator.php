@@ -39,22 +39,27 @@ class ProxyGenerator
             $implements = 'implements \\Rhapsody\\Core\\Proxy\\LazyProxyInterface';
         }
 
-        $namespace      = $this->getProxyNamespace($targetClass);
-        $shortClassName = $this->getProxyShortName($targetClass);
+        // Determine namespace and short name
+        if (str_contains($targetClass, 'class@anonymous')) {
+            $baseNamespace  = 'Rhapsody\\Core\\Proxy\\Generated\\Anonymous';
+            $shortClassName = 'AnonymousProxy';
+        } else {
+            $baseNamespace  = 'Rhapsody\\Core\\Proxy\\Generated\\' . str_replace('\\', '_', trim($targetClass, '\\'));
+            $shortClassName = $this->getProxyShortName($targetClass);
+        }
 
+        $fullClassName = $baseNamespace . '\\' . $shortClassName;
+
+        // Build methods
         $methods = [];
         foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC | ReflectionMethod::IS_PROTECTED) as $method) {
             if ($method->isStatic() || $method->isFinal() || $method->isConstructor() || $method->isDestructor()) {
                 continue;
             }
 
-            // Skip if the method name is 'initialize' to avoid conflict with our own lazy initialize
-            if ($method->getName() === 'initialize') {
-                continue;
-            }
-
             $visibility = $method->isProtected() ? 'protected' : 'public';
 
+            // Build parameter list
             $params = [];
             foreach ($method->getParameters() as $param) {
                 $type     = $param->getType();
@@ -68,6 +73,7 @@ class ProxyGenerator
             }
             $paramsStr = implode(', ', $params);
 
+            // Return type
             $returnType  = $method->getReturnType();
             $returnStr   = $this->formatReturnType($returnType);
 
@@ -82,26 +88,17 @@ class ProxyGenerator
             $methodName = $method->getName();
             $argList    = $this->buildArgList($method);
 
-            $isAbstract = $method->isAbstract() || $isInterface;
-
-            if ($isAbstract) {
-                if ($isVoid) {
-                    $body = '$this->wrappedObject->' . $methodName . '(' . $argList . ');';
-                } else {
-                    $body = 'return $this->wrappedObject->' . $methodName . '(' . $argList . ');';
-                }
+            // Always delegate to wrapped object
+            if ($isVoid) {
+                $body = '$this->wrappedObject->' . $methodName . '(' . $argList . ');';
             } else {
-                if ($isVoid) {
-                    $body = 'parent::' . $methodName . '(' . $argList . ');';
-                } else {
-                    $body = 'return parent::' . $methodName . '(' . $argList . ');';
-                }
+                $body = 'return $this->wrappedObject->' . $methodName . '(' . $argList . ');';
             }
 
             $methods[] = <<<METHOD
     {$visibility} function {$methodName}({$paramsStr}){$returnStr}
     {
-        \$this->lazyInitialize();
+        \$this->initialize();
         {$body}
     }
 METHOD;
@@ -115,7 +112,7 @@ METHOD;
         $code = <<<PHP
 <?php
 
-namespace {$namespace};
+namespace {$baseNamespace};
 
 use Rhapsody\Core\Proxy\LazyProxyInterface;
 
@@ -129,18 +126,18 @@ class {$shortClassName} {$extends} {$implements}
         \$this->initializer = \$initializer;
     }
 
-    private function lazyInitialize(): void
+    private function initialize(): void
     {
         if (\$this->wrappedObject === null && \$this->initializer !== null) {
             \$initializer = \$this->initializer;
-            \$initializer(\$this->wrappedObject, \$this, 'lazyInitialize', [], \$this->initializer);
+            \$initializer(\$this->wrappedObject, \$this, 'initialize', [], \$this->initializer);
             \$this->initializer = null;
         }
     }
 
     public function getWrappedObject(): ?object
     {
-        \$this->lazyInitialize();
+        \$this->initialize();
         return \$this->wrappedObject;
     }
 
@@ -162,20 +159,20 @@ class {$shortClassName} {$extends} {$implements}
 }
 PHP;
 
-        $filePath = $this->cacheDir . '/' . str_replace('\\', '_', $targetClass) . '.php';
+        // Write to file (with hash-based filename to avoid invalid characters)
+        $hash         = md5($targetClass);
+        $safeFilename = $hash . '_' . $shortClassName . '.php';
+        $filePath     = $this->cacheDir . '/' . $safeFilename;
+
         file_put_contents($filePath, $code);
+        require_once $filePath;
 
-        try {
-            require_once $filePath;
-        } catch (\ParseError $e) {
-            $debugPath = $this->cacheDir . '/' . str_replace('\\', '_', $targetClass) . '.debug.php';
-            file_put_contents($debugPath, $code);
-            throw new \Exception("Parse error in generated proxy file: {$filePath}\n" . $e->getMessage() . "\nDebug code written to: {$debugPath}", 0, $e);
-        }
-
-        return $namespace . '\\' . $shortClassName;
+        return $fullClassName;
     }
 
+    /**
+     * Format a type for use in a parameter or return type declaration.
+     */
     private function formatType(?ReflectionType $type): string
     {
         if ($type === null) {
@@ -193,6 +190,9 @@ PHP;
         return $this->formatSingleType($type) . ' ';
     }
 
+    /**
+     * Format a single type (named, with proper nullability and pseudo‑type handling).
+     */
     private function formatSingleType(ReflectionType $type): string
     {
         if (! ($type instanceof ReflectionNamedType)) {
@@ -202,16 +202,20 @@ PHP;
         $name       = $type->getName();
         $isNullable = $type->allowsNull();
 
+        // Pseudo‑types: static, self, parent – must NOT be prefixed with backslash.
         if (in_array($name, ['static', 'self', 'parent'], true)) {
             return ($isNullable ? '?' : '') . $name;
         }
 
+        // mixed cannot be marked nullable
         if ($name === 'mixed') {
             return 'mixed';
         }
 
+        // For built‑ins, use the name as‑is; for classes, add backslash.
         $typeString = $type->isBuiltin() ? $name : '\\' . $name;
 
+        // Nullable only if allowed and type is not null (which is handled separately)
         if ($isNullable && $name !== 'null') {
             return '?' . $typeString;
         }
@@ -219,6 +223,9 @@ PHP;
         return $typeString;
     }
 
+    /**
+     * Format a return type declaration.
+     */
     private function formatReturnType(?ReflectionType $type): string
     {
         if ($type === null) {
@@ -229,6 +236,9 @@ PHP;
         return ': ' . $typeStr;
     }
 
+    /**
+     * Get the type name as a string for comparison (handles union/intersection).
+     */
     private function getTypeName(?ReflectionType $type): ?string
     {
         if ($type === null) {
@@ -243,17 +253,23 @@ PHP;
         return $type->__toString();
     }
 
-    private function getProxyNamespace(string $targetClass): string
-    {
-        return 'Rhapsody\\Core\\Proxy\\Generated\\' . str_replace('\\', '_', trim($targetClass, '\\'));
-    }
-
+    /**
+     * Get the short class name for the proxy.
+     */
     private function getProxyShortName(string $targetClass): string
     {
         $parts = explode('\\', $targetClass);
-        return end($parts) . 'Proxy';
+        $last  = end($parts);
+        // If it's an anonymous class, use a generic name
+        if (str_contains($last, 'class@anonymous')) {
+            return 'AnonymousProxy';
+        }
+        return $last . 'Proxy';
     }
 
+    /**
+     * Build an argument list for a method call.
+     */
     private function buildArgList(ReflectionMethod $method): string
     {
         $args = [];
