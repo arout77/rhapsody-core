@@ -134,9 +134,13 @@ $container->bind(EventDispatcher::class, function (Container $c) {
 });
 
 // --- QUERY LOGGER BINDING (SINGLETON) ---
-$container->bind(QueryLogger::class, function () {
-    return new QueryLogger();
-});
+// $container->bind(QueryLogger::class, function () {
+//     static $instance;
+//     if ($instance === null) {
+//         $instance = new QueryLogger();
+//     }
+//     return $instance;
+// });
 
 // --- DOCTRINE ENTITY MANAGER BINDING ---
 $container->bind(EntityManager::class, function ($container) use ($config, $basePath) {
@@ -147,8 +151,8 @@ $container->bind(EntityManager::class, function ($container) use ($config, $base
     $sqlLogger = $container->resolve(QueryLogger::class);
 
     $cache          = $isDevMode ? new ArrayAdapter() : new FilesystemAdapter('', 0, $basePath . '/storage/cache/doctrine');
+    $sqlLogger      = \Rhapsody\Core\QueryLogger::getInstance();
     $doctrineConfig = ORMSetup::createAttributeMetadataConfiguration($paths, $isDevMode, null, $cache);
-
     $doctrineConfig->setSQLLogger($sqlLogger);
 
     $dbParams = [
@@ -303,7 +307,7 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
         {
             return Session::hasFlash($name);
         }
-    };;;;
+    };;;;;;;;;
 
     $twig->addGlobal('flash', $flash);
 

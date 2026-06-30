@@ -74,7 +74,7 @@ class Debug
      *
      * @param Response           $response
      * @param array              $config
-     * @param ContainerInterface $container   <-- CHANGED from Container
+     * @param ContainerInterface $container
      * @param Route|null         $matchedRoute
      */
     public function end(Response $response, array $config, ContainerInterface $container, ?Route $matchedRoute = null): void
@@ -84,6 +84,7 @@ class Debug
         $this->data['response_code']  = $response->getStatusCode();
         $this->data['app_version']    = $config['app_version'] ?? 'N/A';
         $this->data['session']        = $_SESSION ?? [];
+
         // --- Enhanced HTTP Request data ---
         $this->data['request'] = [
             'method'     => $_SERVER['REQUEST_METHOD'] ?? 'GET',
@@ -100,11 +101,8 @@ class Debug
         // Environment variables (collect for Environment tab)
         $this->data['env'] = $_ENV ?? [];
 
-        // Get QueryLogger instance from container
-        $queryLogger = null;
-        if ($container->has(QueryLogger::class)) {
-            $queryLogger = $container->resolve(QueryLogger::class);
-        }
+        // Get QueryLogger singleton
+        $queryLogger = QueryLogger::getInstance();
 
         $doctrineQueries       = $queryLogger ? $queryLogger->queries : [];
         $pdoQueries            = TraceablePDO::getQueryLog();
@@ -118,17 +116,40 @@ class Debug
             }
         }
 
+        // --- FIX: Ensure queries is an array and set total count ---
+        if (! isset($this->data['queries']) || ! is_array($this->data['queries'])) {
+            $this->data['queries'] = [];
+        }
+        $this->data['total_queries'] = count($this->data['queries']);
+
+        // --- FIX: Detect N+1 queries (if not already flagged) ---
+        $sqlCounts = [];
+        foreach ($this->data['queries'] as &$q) {
+            $sql = $q['sql'] ?? '';
+            // Normalize: replace integers and quoted strings with '?'
+            $normalized               = preg_replace('/\b\d+\b/', '?', $sql);
+            $normalized               = preg_replace("/'[^']*'/", '?', $normalized);
+            $normalized               = preg_replace('/\s+/', ' ', $normalized);
+            $sqlCounts[$normalized][] = &$q;
+        }
+        unset($q);
+
+        $nPlusOneAlerts = [];
+        foreach ($sqlCounts as $normalized => $queries) {
+            if (count($queries) > 3) {
+                foreach ($queries as &$q) {
+                    $q['is_n_plus_1'] = true;
+                    $nPlusOneAlerts[] = $q;
+                }
+                unset($q);
+            }
+        }
+
+        $this->data['n_plus_one_alerts'] = $nPlusOneAlerts;
+        $this->data['n_plus_1_count']    = count($nPlusOneAlerts);
+
         // Cache stats
         $this->data['cache_stats'] = Cache::getStats();
-
-        // N+1 queries detection (from QueryLogger fingerprints)
-        $nPlusOneAlerts = [];
-        if ($queryLogger) {
-            $nPlusOneAlerts = array_filter($queryLogger->queries, function ($q) {
-                return $q['is_n_plus_1'] ?? false;
-            });
-        }
-        $this->data['n_plus_one_alerts'] = array_values($nPlusOneAlerts);
 
         // Middleware trace (collected by MiddlewareTracer)
         $this->data['middleware_trace'] = MiddlewareTracer::getTrace();
@@ -157,7 +178,6 @@ class Debug
         if ($percentage > 80) {
             $status = 'warning';
         }
-
         if ($percentage > 95) {
             $status = 'critical';
         }
