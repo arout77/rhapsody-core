@@ -3,6 +3,8 @@
 
 namespace Rhapsody\Core;
 
+use TraceablePDO;
+
 class Toolbar
 {
     /**
@@ -13,6 +15,28 @@ class Toolbar
 
     public function render(): string
     {
+        // --- FALLBACK: if no queries were provided, get them from TraceablePDO ---
+        if (empty($this->data['queries'])) {
+            $this->data['queries']       = TraceablePDO::getQueryLog();
+            $this->data['total_queries'] = count($this->data['queries']);
+
+            // Also compute N+1 count (optional, but helps the panel)
+            $sqlCounts = [];
+            $nPlusOne  = 0;
+            foreach ($this->data['queries'] as $q) {
+                $sql = $q['sql'];
+                // Simple fingerprint: strip numbers and quoted strings
+                $fingerprint             = preg_replace("/\b(\d+|'[^']+')\b/", '?', $sql);
+                $sqlCounts[$fingerprint] = ($sqlCounts[$fingerprint] ?? 0) + 1;
+            }
+            foreach ($sqlCounts as $count) {
+                if ($count > 3) {
+                    $nPlusOne++;
+                }
+
+            }
+            $this->data['n_plus_1_count'] = $nPlusOne;
+        }
         // --- Data Preparation for Toolbar Header ---
         $appVersion   = htmlspecialchars($this->data['app_version'] ?? 'N/A', ENT_QUOTES, 'UTF-8');
         $execTime     = $this->data['execution_time'] ?? '0';
@@ -53,7 +77,7 @@ class Toolbar
         $requestHtml .= '</table></div>';
 
         // Route info (with middleware list)
-        $routeData    = $this->data['route'] ?? null;
+        $routeData   = $this->data['route'] ?? null;
         $requestHtml .= '<h4 class="text-gray-300 font-bold mt-3 mb-2">Route Details</h4>';
         if ($routeData) {
             $requestHtml .= '<div class="bg-gray-800 rounded p-3 mb-3">';
@@ -82,7 +106,7 @@ class Toolbar
         }
 
         // Headers
-        $headers      = $req['headers'] ?? [];
+        $headers     = $req['headers'] ?? [];
         $requestHtml .= '<h4 class="text-gray-300 font-bold mt-3 mb-2">Request Headers</h4>';
         if (empty($headers)) {
             $requestHtml .= '<p class="text-gray-400">No headers available.</p>';
@@ -97,7 +121,7 @@ class Toolbar
         }
 
         // Query Parameters
-        $query  = $req['query'] ?? [];
+        $query = $req['query'] ?? [];
         if (! empty($query)) {
             $requestHtml .= '<h4 class="text-gray-300 font-bold mt-3 mb-2">Query Parameters</h4>';
             $requestHtml .= '<div class="bg-gray-800 rounded p-3 overflow-x-auto mb-3">';
@@ -110,7 +134,7 @@ class Toolbar
         }
 
         // Body (raw)
-        $body = $req['body'] ?? null;
+        $body  = $req['body'] ?? null;
         if ($body !== null && $body !== '') {
             $requestHtml .= '<h4 class="text-gray-300 font-bold mt-3 mb-2">Request Body</h4>';
             $decoded      = json_decode($body, true);
@@ -145,16 +169,16 @@ class Toolbar
         }
 
         // --- Cache Panel ---
-        $cacheStats = $this->data['cache'] ?? ['hits' => 0, 'misses' => 0, 'total' => 0, 'ratio' => 0];
-        $cacheHtml  = '<h3 class="text-white text-lg font-bold mb-4">Cache Performance</h3>';
+        $cacheStats  = $this->data['cache'] ?? ['hits' => 0, 'misses' => 0, 'total' => 0, 'ratio' => 0];
+        $cacheHtml   = '<h3 class="text-white text-lg font-bold mb-4">Cache Performance</h3>';
         $cacheHtml  .= '<div class="bg-gray-800 rounded p-3">';
         $cacheHtml  .= '<table class="toolbar-table">';
         $cacheHtml  .= '<tr><td class="label">Hits</td><td class="value"><span class="text-green-400">' . $cacheStats['hits'] . '</span></td></tr>';
         $cacheHtml  .= '<tr><td class="label">Misses</td><td class="value"><span class="text-red-400">' . $cacheStats['misses'] . '</span></td></tr>';
         $cacheHtml  .= '<tr><td class="label">Total Requests</td><td class="value">' . $cacheStats['total'] . '</td></tr>';
         $cacheHtml  .= '<tr><td class="label">Hit Ratio</td><td class="value">';
-        $ratio      = $cacheStats['ratio'];
-        $ratioColor = $ratio > 70 ? 'text-green-400' : ($ratio > 40 ? 'text-yellow-400' : 'text-red-400');
+        $ratio       = $cacheStats['ratio'];
+        $ratioColor  = $ratio > 70 ? 'text-green-400' : ($ratio > 40 ? 'text-yellow-400' : 'text-red-400');
         $cacheHtml  .= '<span class="' . $ratioColor . ' font-bold">' . $ratio . '%</span>';
         $cacheHtml  .= '<div class="w-full bg-gray-700 rounded-full h-2 mt-1">';
         $cacheHtml  .= '<div class="h-2 rounded-full ' . ($ratio > 70 ? 'bg-green-500' : ($ratio > 40 ? 'bg-yellow-500' : 'bg-red-500')) . '" style="width: ' . min(100, $ratio) . '%;"></div>';
@@ -163,7 +187,7 @@ class Toolbar
         $cacheHtml  .= '</table></div>';
 
         // --- Database panel with N+1 alerts ---
-        $dbHtml  = '<h3 class="text-white text-lg font-bold mb-4">Database Queries</h3>';
+        $dbHtml = '<h3 class="text-white text-lg font-bold mb-4">Database Queries</h3>';
         if ($nPlusOne > 0) {
             $dbHtml .= '<div class="bg-red-900/30 border border-red-700 rounded p-3 mb-3">';
             $dbHtml .= '<span class="text-red-400 font-bold">⚠️ N+1 Query Pattern Detected</span>';
@@ -174,14 +198,14 @@ class Toolbar
         $dbHtml .= '<div>' . $this->formatQueries() . '</div>';
 
         // --- Logs panel ---
-        $logHtml = '<h3 class="text-white text-lg font-bold">PHP Error Log</h3><pre>' . ($this->data['logs']['php'] ?? 'Log not available.') . '</pre><h3 class="text-white text-lg font-bold mt-4">Apache Error Log</h3><pre>' . ($this->data['logs']['apache'] ?? 'Log not available.') . '</pre>';
+        $logHtml  = '<h3 class="text-white text-lg font-bold">PHP Error Log</h3><pre>' . ($this->data['logs']['php'] ?? 'Log not available.') . '</pre><h3 class="text-white text-lg font-bold mt-4">Apache Error Log</h3><pre>' . ($this->data['logs']['apache'] ?? 'Log not available.') . '</pre>';
 
         // --- Environment Panel ---
         $envHtml = $this->formatEnvPanel();
 
         // --- NEW: Services and Middleware panels ---
-        $servicesHtml   = $this->renderServicesPanel();
-        $middlewareHtml = $this->renderMiddlewarePanel();
+        $servicesHtml    = $this->renderServicesPanel();
+        $middlewareHtml  = $this->renderMiddlewarePanel();
 
         // --- Build panels array ---
         $panels_data  = [
@@ -203,7 +227,7 @@ class Toolbar
         $panels_json = json_encode($panels_data);
 
         // --- CSS for the new tables ---
-        $extraCss  = <<<CSS
+        $extraCss = <<<CSS
     .toolbar-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .toolbar-table td { padding: 6px 10px; border-bottom: 1px solid #2d3748; }
     .toolbar-table tr:last-child td { border-bottom: none; }
