@@ -37,11 +37,13 @@
 ├── default/               ← fallback theme (always present)
 │   ├── layouts/
 │   │   └── main.twig
+│   │   └── navbar.twig
 │   ├── home/
 │   └── errors/
 ├── my_custom_theme/       ← your active theme
 │   ├── layouts/
 │   │   └── main.twig      ← custom layout (optional)
+│   │   └── navbar.twig
 │   ├── home/
 │   └── errors/
 └── ...</code></pre>
@@ -108,6 +110,20 @@
     </ol>
 
     <hr>
+
+    <h2>Navigation Menus</h2>
+
+        <p>
+            Naturally, you'll want to create your own navigation menu. To do so, you will need to create a <var>navbar.twig</var> view file inside <code>/layouts</code> in your template directory: <code>/views/themes/{theme-name}/layouts/</code>. If you plan on reusing the core styles, it would be a good idea to view the core navbar to see its structure / styles.
+        </p>
+        <p>
+            <var>/vendor/arout/rhapsody-core/resources/views/themes/default/layouts/navbar.twig</var>
+        </p>
+        <p>Or even better, simply copy it to your theme directory and modify it there.</p>
+
+        <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4">
+            <strong>Note:</strong> it may be necessary to copy over core's <code>main.twig</code> as well, and adjust the location of the navigation block, if you want your navbar on the bottom of the screen, or other conditions where the default location may interfere with your layout.
+        </div>
 
     <h2>Creating a Completely Custom Theme (From Scratch)</h2>
     <p>

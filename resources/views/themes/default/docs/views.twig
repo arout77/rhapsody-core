@@ -8,6 +8,240 @@
     </p>
     <p>All view files are located in the <code>views/</code> directory and use the <code>.twig</code> extension.</p>
 
+    <hr>
+
+    <h2>The <code>@core</code> Namespace and Styling</h2>
+    <p>
+        When you use the <code>@core</code> namespace in your templates (e.g., <code>&#123;&#123;% extends "@core/layouts/main.twig" %&#125;&#125;</code>), 
+        you inherit the framework's default design system.
+    </p>
+    <div class="bg-blue-50 dark:bg-blue-950/40 border-l-4 border-blue-500 dark:border-blue-400 p-4 rounded-r-lg">
+        <strong class="text-blue-800 dark:text-blue-300">Framework Styling:</strong>
+        <ul class="text-blue-800 dark:text-blue-300 mt-2 space-y-1">
+            <li><strong>Tailwind CSS v4.3.2</strong> – The default theme uses Tailwind for all styling.</li>
+            <li><strong>Dark mode support</strong> – Built-in light/dark/system theme switching.</li>
+            <li><strong>Responsive by default</strong> – Mobile-first design with Tailwind's utility classes.</li>
+            <li><strong>Google Fonts</strong> – Montserrat font family is pre-loaded.</li>
+        </ul>
+    </div>
+
+    <h3>Adding Custom CSS to the Core Theme</h3>
+    <p>
+        If you want to keep the framework's default styling but add your own custom CSS, you should:
+    </p>
+    <ol>
+        <li>
+            <strong>Copy the core <code>main.twig</code> to your theme:</strong>
+            <pre><code class="language-bash">cp vendor/arout/rhapsody-core/resources/views/themes/default/layouts/main.twig views/themes/your-theme/layouts/main.twig</code></pre>
+        </li>
+        <li>
+            <strong>Add your custom stylesheets in the <code>styles</code> block:</strong>
+            <pre><code class="language-twig">&#123;% block styles %&#125;
+    &#123;# 1. Keep the core Tailwind styles (or replace them) #&#125;
+    &lt;link rel="stylesheet" href="&#123;&#123; base_url &#125;&#125;/css/app.css"&gt;
+    
+    &#123;# 2. Your custom styles #&#125;
+    &lt;link rel="stylesheet" href="&#123;&#123; base_url &#125;&#125;/css/custom.css"&gt;
+    
+    &#123;# 3. Keep the Google Fonts #&#125;
+    &lt;link rel="preconnect" href="https://fonts.googleapis.com"&gt;
+    &lt;link rel="preconnect" href="https://fonts.gstatic.com" crossorigin&gt;
+    &lt;link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&amp;display=swap" rel="stylesheet"&gt;
+&#123;% endblock %&#125;</code></pre>
+        </li>
+        <li>
+            <strong>Create your CSS files in <code>/public/css/</code>:</strong>
+            <pre><code class="language-bash">public/css/app.css
+public/css/custom.css</code></pre>
+        </li>
+    </ol>
+
+    <div class="bg-yellow-50 dark:bg-yellow-950/40 border-l-4 border-yellow-500 dark:border-yellow-400 p-4 rounded-r-lg">
+        <strong class="text-yellow-800 dark:text-yellow-300">💡 Tip:</strong>
+        <p class="text-yellow-800 dark:text-yellow-300 mt-1">
+            If you're using a build tool (like Vite or Webpack), you can output your compiled CSS to 
+            <code>/public/css/</code> and reference it with <code>&#123;&#123; base_url &#125;&#125;/css/app.css</code>.
+        </p>
+    </div>
+
+    <h3>Replacing the Core Theme Entirely</h3>
+    <p>
+        If you want to completely replace the framework's styling (e.g., use Bootstrap instead of Tailwind):
+    </p>
+    <ol>
+        <li>Create a <strong>new theme</strong> in <code>views/themes/your-theme/</code></li>
+        <li>Create your own <code>layouts/main.twig</code> from scratch</li>
+        <li>Set <code>APP_THEME=your-theme</code> in your <code>.env</code> file</li>
+    </ol>
+    <p>
+        See the <a href="&#123;&#123; base_url &#125;&#125;/docs/themes">Theme Customization</a> guide for more details – new themes must include certain core Twig blocks (e.g. <code>&#123;% block head %&#125;</code>, <code>&#123;% block content %&#125;</code>, etc.)
+    </p>
+
+    <hr>
+
+    <h2>Global Twig Variables</h2>
+    <p>
+        The framework automatically makes the following variables available in <strong>every</strong> Twig template:
+    </p>
+
+    <div class="overflow-x-auto">
+        <table class="w-full border-collapse bg-gray-50 dark:bg-gray-800/50 rounded-lg overflow-hidden">
+            <thead>
+                <tr class="bg-gray-200 dark:bg-gray-700">
+                    <th class="text-left p-3 font-semibold text-gray-700 dark:text-gray-300">Variable</th>
+                    <th class="text-left p-3 font-semibold text-gray-700 dark:text-gray-300">Type</th>
+                    <th class="text-left p-3 font-semibold text-gray-700 dark:text-gray-300">Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>&#123;&#123; base_url &#125;&#125;</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">string</td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">The full base URL of your application. Use this for all links.</td>
+                </tr>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>&#123;&#123; app_url &#125;&#125;</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">string</td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">The APP_URL from your <code>.env</code> file.</td>
+                </tr>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>&#123;&#123; app_env &#125;&#125;</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">string</td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">The current environment (<code>development</code>, <code>production</code>, etc.)</td>
+                </tr>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>&#123;&#123; app_theme &#125;&#125;</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">string</td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">The active theme name from <code>APP_THEME</code> in <code>.env</code>.</td>
+                </tr>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>&#123;&#123; auth.check &#125;&#125;</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">bool</td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400"><code>true</code> if a user is logged in, <code>false</code> otherwise.</td>
+                </tr>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>&#123;&#123; auth.user &#125;&#125;</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">object|null</td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">The logged-in user object (with <code>name</code>, <code>email</code>, <code>user_id</code>, etc.) or <code>null</code> if not logged in.</td>
+                </tr>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>&#123;&#123; flash.success &#125;&#125;</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">string|null</td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">Success flash message (displayed once, then cleared).</td>
+                </tr>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>&#123;&#123; flash.error &#125;&#125;</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">string|null</td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">Error flash message (displayed once, then cleared).</td>
+                </tr>
+                <tr>
+                    <td class="p-3"><code>&#123;&#123; schema_markup &#125;&#125;</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">string</td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">JSON-LD structured data for SEO (rendered at the end of the page).</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="bg-blue-50 dark:bg-blue-950/40 border-l-4 border-blue-500 dark:border-blue-400 p-4 rounded-r-lg mt-4">
+        <strong class="text-blue-800 dark:text-blue-300">💡 Additional Variables:</strong>
+        <p class="text-blue-800 dark:text-blue-300 mt-1">
+            You can also access any data passed from your controller via the second argument to 
+            <code>view()</code> or <code>react()</code>. These are merged into the template's context.
+        </p>
+    </div>
+
+    <hr>
+
+    <h2>Twig Functions</h2>
+    <p>
+        The framework provides several useful Twig functions that you can use in your templates:
+    </p>
+
+    <div class="overflow-x-auto">
+        <table class="w-full border-collapse bg-gray-50 dark:bg-gray-800/50 rounded-lg overflow-hidden">
+            <thead>
+                <tr class="bg-gray-200 dark:bg-gray-700">
+                    <th class="text-left p-3 font-semibold text-gray-700 dark:text-gray-300">Function</th>
+                    <th class="text-left p-3 font-semibold text-gray-700 dark:text-gray-300">Description</th>
+                    <th class="text-left p-3 font-semibold text-gray-700 dark:text-gray-300">Example</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>route()</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">Generates a URL for a named route with optional parameters.</td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400 font-mono text-sm"><code>&#123;&#123; route('auth.redirect', {provider: 'facebook'}) &#125;&#125;</code></td>
+                </tr>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>csrf_field()</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">Outputs a hidden input field with a CSRF token.</td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400 font-mono text-sm"><code>&#123;&#123; csrf_field() &#125;&#125;</code></td>
+                </tr>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>vite_assets()</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">Loads Vite assets (dev server or production build).</td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400 font-mono text-sm"><code>&#123;&#123; vite_assets('resources/js/app.jsx') &#125;&#125;</code></td>
+                </tr>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>react_component()</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">Embeds a React component as an "island" in a Twig template.</td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400 font-mono text-sm"><code>&#123;&#123; react_component('UserStats', {userId: 1}) &#125;&#125;</code></td>
+                </tr>
+                <tr>
+                    <td class="p-3"><code>captcha_form</code> <small>(variable)</small></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">Raw HTML for a CAPTCHA form (rendered with <code>|raw</code> filter).</td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400 font-mono text-sm"><code>&#123;&#123; captcha_form|raw &#125;&#125;</code></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Using the <code>route()</code> Function</h3>
+    <p>
+        The <code>route()</code> function generates URLs based on named routes defined in your <code>routes/web.php</code> file.
+        This is the preferred way to create links because it keeps your URLs maintainable:
+    </p>
+    <pre><code class="language-twig">&#123;# Simple route without parameters #&#125;
+&lt;a href="&#123;&#123; route('home') &#125;&#125;"&gt;Home&lt;/a&gt;
+
+&#123;# Route with parameters #&#125;
+&lt;a href="&#123;&#123; route('profile.show', {id: user.id}) &#125;&#125;"&gt;View Profile&lt;/a&gt;
+
+&#123;# Route with query parameters #&#125;
+&lt;a href="&#123;&#123; route('users.index', {page: 2, sort: 'name'}) &#125;&#125;"&gt;Page 2&lt;/a&gt;</code></pre>
+
+    <div class="bg-yellow-50 dark:bg-yellow-950/40 border-l-4 border-yellow-500 dark:border-yellow-400 p-4 rounded-r-lg">
+        <strong class="text-yellow-800 dark:text-yellow-300">💡 Tip:</strong>
+        <p class="text-yellow-800 dark:text-yellow-300 mt-1">
+            Named routes are defined in your <code>routes/web.php</code> file using the <code>->name()</code> method:
+            <br>
+            <code class="font-mono text-sm">$router->get('/profile/{id}', [ProfileController::class, 'show'])->name('profile.show');</code>
+        </p>
+    </div>
+
+    <h3>Using the <code>captcha_form</code> Variable</h3>
+    <p>
+        If you have CAPTCHA functionality enabled, the <code>captcha_form</code> variable contains the raw HTML for the CAPTCHA widget.
+        Use the <code>|raw</code> filter to render it:
+    </p>
+    <pre><code class="language-twig">&lt;form method="POST" action="&#123;&#123; base_url &#125;&#125;/submit"&gt;
+    &#123;# Render the CAPTCHA widget #&#125;
+    &#123;&#123; captcha_form|raw &#125;&#125;
+    
+    &lt;button type="submit"&gt;Submit&lt;/button&gt;
+&lt;/form&gt;</code></pre>
+
+    <div class="bg-red-50 dark:bg-red-950/40 border-l-4 border-red-500 dark:border-red-400 p-4 rounded-r-lg">
+        <strong class="text-red-800 dark:text-red-300">⚠️ Security Note:</strong>
+        <p class="text-red-800 dark:text-red-300 mt-1">
+            Always use the <code>|raw</code> filter when outputting <code>captcha_form</code>, as it contains HTML markup that would otherwise be escaped by Twig. 
+            Only use <code>|raw</code> with trusted content – the framework ensures <code>captcha_form</code> is safe.
+        </p>
+    </div>
+
+    <hr>
+
     <h2>Layouts and Inheritance</h2>
     <p>
         One of Twig's most powerful features is template inheritance. Instead of repeating your site's header and footer in every file, you can create
@@ -21,52 +255,113 @@
         &lt;header&gt;...&lt;/header&gt;
         
         &lt;main&gt;
-            &lcub;% block content %}&lcub;% endblock %}
+            &#123;% block content %&#125;&#123;% endblock %&#125;
         &lt;/main&gt;
 
         &lt;footer&gt;...&lt;/footer&gt;
     &lt;/body&gt;
 &lt;/html&gt;</code></pre>
     <p>A specific page template then extends this layout and provides content only for the <code>content</code> block.</p>
-    <pre><code class="language-php">{# views/home/index.twig #}
-&lcub;% extends "layouts/main.twig" %&rcub;
+    <pre><code class="language-php">&#123;# views/home/index.twig #&#125;
+&#123;% extends "layouts/main.twig" %&#125;
 
-&lcub;% block content %}
+&#123;% block content %&#125;
     &lt;h1&gt;Welcome to the Home Page!&lt;/h1&gt;
     &lt;p&gt;This is the content for our home page.&lt;/p&gt;
-&lcub;% endblock %&rcub;</code></pre>
+&#123;% endblock %&#125;</code></pre>
+
+    <hr>
 
     <h2>Displaying Data</h2>
-    <p>You can print data passed from your controller using double curly braces: <code>&lcub;{ ... }&rcub;</code>. Twig automatically escapes this output to prevent XSS attacks, making it secure by default.</p>
+    <p>You can print data passed from your controller using double curly braces: <code>&#123;&#123; ... &#125;&#125;</code>. Twig automatically escapes this output to prevent XSS attacks, making it secure by default.</p>
     <pre><code class="language-php">// In your controller
 return $this->view('profile.twig', ['username' => 'Alice']);
 
-{# In profile.twig #}
-&lt;h1&gt;Welcome, &lcub;{ username }&rcub;!&lt;/h1&gt;</code></pre>
+&#123;# In profile.twig #&#125;
+&lt;h1&gt;Welcome, &#123;&#123; username &#125;&#125;!&lt;/h1&gt;</code></pre>
 
-    <h2>Global Variables</h2>
-    <p>The framework makes a few variables globally available in all Twig templates:</p>
-    <ul>
-        <li><code>&lcub;{ base_url }&rcub;</code>: The base path of your application. Always use this for creating links.</li>
-        <li><code>&lcub;{ auth.check }&rcub;</code>: A boolean that is <code>true</code> if a user is logged in, <code>false</code> otherwise.</li>
-        <li><code>&lcub;{ auth.user }&rcub;</code>: An object containing the logged-in user's data (e.g., <code>auth.user.name</code>). It is <code>null</code> if no user is logged in.</li>
-    </ul>
+    <hr>
 
-    <h2>Displaying Flash Messages</h2>
-        <p>After a redirect, you can display flash messages set in your controller. The main layout file is already set up to display <code>success</code> and <code>error</code> messages automatically.</p>
-        <pre><code class="language-twig">&lcub;% raw %}&lcub;% if flash.success %}
-        <div class="alert-success">&lcub;&lcub; flash.success }}</div>
-    &lcub;% endif %}&lcub;% endraw %}</code></pre>
+    <h2>Working with Flash Messages</h2>
 
-    <h2>Styling with Tailwind CSS</h2>
+    <h3>Creating Flash Messages in Controllers</h3>
     <p>
-        The main layout includes the Tailwind CSS CDN script, so you can use any of Tailwind's utility classes in your views for rapid and responsive styling.
-        The framework also includes a theme switcher with light/dark/system modes.
+        Flash messages are temporary messages that are stored in the session and displayed once, then automatically cleared.
+        You can create them using the <code>->with()</code> method when returning a redirect response:
+    </p>
+    <pre><code class="language-php">// In your controller
+public function submitForm(Request $request): Response
+{
+    // ... process form data ...
+    
+    if ($success) {
+        return redirect('/dashboard')->with('success', 'Your profile has been updated!');
+    } else {
+        return redirect('/profile')->with('error', 'There was a problem updating your profile.');
+    }
+}</code></pre>
+
+    <p>
+        The <code>redirect()</code> helper returns a <code>RedirectResponse</code> object, and <code>->with()</code> 
+        accepts two arguments: the flash message <strong>type</strong> and the message <strong>content</strong>.
     </p>
 
-    <h3>Warming the Twig Cache</h3>
+    <h3>Displaying Flash Messages in Templates</h3>
     <p>
-        Twig compiles templates the first time they are rendered. In production, you can pre‑compile all templates to eliminate the first‑visit delay, giving you significantly faster page load times. See the <a href="{{ base_url }}/docs/caching">caching documentation</a> for more details.
+        Flash messages are automatically available in all Twig templates via the <code>flash</code> global variable.
+        The main layout template already includes a section to display <code>success</code> and <code>error</code> messages.
     </p>
+
+    <p>You can display them manually in any template like this:</p>
+    <pre><code class="language-twig">&#123;% if flash.success %&#125;
+    &lt;div class="alert-success"&gt;&#123;&#123; flash.success &#125;&#125;&lt;/div&gt;
+&#123;% endif %&#125;
+
+&#123;% if flash.error %&#125;
+    &lt;div class="alert-error"&gt;&#123;&#123; flash.error &#125;&#125;&lt;/div&gt;
+&#123;% endif %&#125;</code></pre>
+
+    <p>
+        The main layout file <code>@core/layouts/main.twig</code> already includes this logic, so you don't need to add it to every template.
+        However, you can add additional flash types (like <code>warning</code> or <code>info</code>) by creating them in your controller
+        and displaying them in your templates accordingly.
+    </p>
+
+    <h3>Creating Custom Flash Messages</h3>
+    <p>
+        You're not limited to <code>success</code> and <code>error</code>. You can use any key you want:
+    </p>
+    <pre><code class="language-php">// In your controller
+return redirect('/dashboard')->with('warning', 'Your session is about to expire.');
+return redirect('/dashboard')->with('info', 'A new update is available.');</code></pre>
+
+    <p>
+        And in your template:
+    </p>
+    <pre><code class="language-twig">&#123;% if flash.warning %&#125;
+    &lt;div class="alert-warning"&gt;&#123;&#123; flash.warning &#125;&#125;&lt;/div&gt;
+&#123;% endif %&#125;
+
+&#123;% if flash.info %&#125;
+    &lt;div class="alert-info"&gt;&#123;&#123; flash.info &#125;&#125;&lt;/div&gt;
+&#123;% endif %&#125;</code></pre>
+
+    <div class="bg-yellow-50 dark:bg-yellow-950/40 border-l-4 border-yellow-500 dark:border-yellow-400 p-4 rounded-r-lg">
+        <strong class="text-yellow-800 dark:text-yellow-300">💡 Tip:</strong>
+        <p class="text-yellow-800 dark:text-yellow-300 mt-1">
+            Flash messages are <strong>one-time use</strong>. After they are displayed, they are automatically cleared from the session.
+            This makes them perfect for showing feedback after form submissions, logins, or other actions.
+        </p>
+    </div>
+
+    <hr>
+
+    <div class="bg-green-50 dark:bg-green-950/40 border-l-4 border-green-500 dark:border-green-400 p-4 rounded-r-lg">
+        <strong class="text-green-800 dark:text-green-300">Need Help?</strong>
+        <p class="text-green-800 dark:text-green-300 mt-1">
+            Check the <a href="&#123;&#123; base_url &#125;&#125;/docs/faq" class="text-green-800 dark:text-green-300 underline">FAQ</a> 
+            or open an issue on GitHub.
+        </p>
+    </div>
 
 {% endblock %}

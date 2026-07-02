@@ -74,17 +74,17 @@ POST /reset-password     → Handle password reset</code></pre>
     <p>
         In your templates, you can check if a user is logged in using the <code>auth</code> global:
     </p>
-    <pre><code class="language-twig">{% raw %}{% if auth.check %}
-    Welcome back, {{ auth.user.name }}!
-    &lt;a href="{{ base_url }}/logout"&gt;Logout&lt;/a&gt;
-{% else %}
-    &lt;a href="{{ base_url }}/login"&gt;Login&lt;/a&gt;
-    &lt;a href="{{ base_url }}/register"&gt;Register&lt;/a&gt;
-{% endif %}{% endraw %}</code></pre>
+    <pre><code class="language-twig">&#123;&#123;% if auth.check %&#125;&#125;
+    Welcome back, &#123;&#123; auth.user.name &#125;&#125;!
+    &lt;a href="&#123;&#123; base_url &#125;&#125;/logout"&gt;Logout&lt;/a&gt;
+&#123;&#123;% else %&#125;&#125;
+    &lt;a href="&#123;&#123; base_url &#125;&#125;/login"&gt;Login&lt;/a&gt;
+    &lt;a href="&#123;&#123; base_url &#125;&#125;/register"&gt;Register&lt;/a&gt;
+&#123;&#123;% endif %&#125;&#125;</code></pre>
     <p>
         Protect routes with the <code>auth</code> middleware:
     </p>
-    <pre><code class="language-php">$router->get('/dashboard', [DashboardController::class, 'index'])->middleware('auth');</code></pre>
+    <pre><code class="language-php">Router::get('/dashboard', [DashboardController::class, 'index'])->middleware('auth');</code></pre>
 
     <hr>
 
@@ -120,8 +120,8 @@ class AuthController extends BaseAuthController
     <p>
         Then update your <code>routes/web.php</code> to point to your custom controller:
     </p>
-    <pre><code class="language-php">$router->get('/register', [App\Controllers\AuthController::class, 'showRegisterForm']);
-$router->post('/register', [App\Controllers\AuthController::class, 'register']);</code></pre>
+    <pre><code class="language-php">Router::get('/register', [App\Controllers\AuthController::class, 'showRegisterForm']);
+Router::post('/register', [App\Controllers\AuthController::class, 'register']);</code></pre>
 
     <h3>Extending the User Entity</h3>
     <p>
@@ -214,9 +214,9 @@ class LoginController extends BaseController
     <p>
         Then register your routes in <code>routes/web.php</code>:
     </p>
-    <pre><code class="language-php">$router->get('/login', [LoginController::class, 'showForm']);
-$router->post('/login', [LoginController::class, 'login']);
-$router->post('/logout', [LoginController::class, 'logout']);</code></pre>
+    <pre><code class="language-php">Router::get('/login', [LoginController::class, 'showForm']);
+Router::post('/login', [LoginController::class, 'login']);
+Router::post('/logout', [LoginController::class, 'logout']);</code></pre>
 
     <hr>
 
@@ -230,7 +230,7 @@ views/themes/your-theme/auth/register.twig
 views/themes/your-theme/auth/forgot-password.twig
 views/themes/your-theme/auth/reset-password.twig</code></pre>
     <p>
-        The framework will automatically use your theme's templates instead of the core ones.
+        The framework will automatically use your theme's templates instead of the core ones if you have set up your own theme; otherwise make sure that your view files extend <code>@core/layouts/main.twig</code>. See the <a href="{{ base_url }}/docs/themes">themes documentation</a> for more details on using core and custom themes.
     </p>
 
     <hr>
@@ -252,7 +252,7 @@ views/themes/your-theme/auth/reset-password.twig</code></pre>
     <div class="bg-green-50 dark:bg-green-950/40 border-l-4 border-green-500 dark:border-green-400 p-4 rounded-r-lg">
         <strong class="text-green-800 dark:text-green-300">Need Help?</strong>
         <p class="text-green-800 dark:text-green-300 mt-1">
-            Check the <a href="{{ base_url }}/docs/faq" class="text-green-800 dark:text-green-300 underline">FAQ</a> 
+            Check the <a href="&#123;&#123; base_url &#125;&#125;/docs/faq" class="text-green-800 dark:text-green-300 underline">FAQ</a> 
             or open an issue on GitHub.
         </p>
     </div>
