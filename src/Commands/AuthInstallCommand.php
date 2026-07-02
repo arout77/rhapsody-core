@@ -1,30 +1,62 @@
 <?php
 namespace Rhapsody\Core\Commands;
 
-use Doctrine\ORM\EntityManager;
-use Rhapsody\Core\Console\Command;
-use Rhapsody\Core\Container;
+use Rhapsody\Core\Database;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 
 class AuthInstallCommand extends Command
 {
-    protected string $name        = 'auth:install';
-    protected string $description = 'Create the users table for authentication.';
+    protected static $defaultName = 'auth:install';
 
-    public function execute(Container $container, array $args = []): int
+    protected function configure(): void
     {
-        /** @var EntityManager $em */
-        $em = $container->resolve(EntityManager::class);
+        $this->setName('auth:install')
+            ->setDescription('Install authentication tables (users, password_resets, etc.)')
+            ->setHelp('This command creates the necessary database tables for the authentication system.');
+    }
 
-        $tool    = new \Doctrine\ORM\Tools\SchemaTool($em);
-        $classes = [$em->getClassMetadata(\App\Entities\User::class)];
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $output->writeln('<info>Installing authentication tables...</info>');
 
         try {
-            $tool->createSchema($classes);
-            $this->output->writeln('<info>Users table created successfully.</info>');
-            return 0;
-        } catch (\Exception $e) {
-            $this->output->writeln('<error>Failed to create users table: ' . $e->getMessage() . '</error>');
-            return 1;
+            $db = Database::getInstance()->getConnection();
+
+            // Create users table
+            $sql = "
+            CREATE TABLE IF NOT EXISTS `users` (
+              `user_id` varchar(255) NOT NULL,
+              `name` varchar(255) NOT NULL,
+              `email` varchar(255) NOT NULL,
+              `password` varchar(255) NOT NULL,
+              `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              PRIMARY KEY (`user_id`),
+              UNIQUE KEY `email` (`email`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            ";
+
+            $db->exec($sql);
+            $output->writeln('<info>✓ Users table created successfully.</info>');
+
+            // Optional: Create password_resets table
+            $sql2 = "
+            CREATE TABLE IF NOT EXISTS `password_resets` (
+              `email` varchar(255) NOT NULL,
+              `token` varchar(255) NOT NULL,
+              `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              KEY `email` (`email`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            ";
+
+            $db->exec($sql2);
+            $output->writeln('<info>✓ Password resets table created successfully.</info>');
+
+            return Command::SUCCESS;
+        } catch (\PDOException $e) {
+            $output->writeln('<error>✗ Failed to create tables: ' . $e->getMessage() . '</error>');
+            return Command::FAILURE;
         }
     }
 }

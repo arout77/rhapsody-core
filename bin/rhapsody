@@ -33,34 +33,145 @@ if (!$container instanceof \Rhapsody\Core\Container) {
     exit(1);
 }
 
-// 2. Read commands directly out of the application container configuration
-$config = $container->has('config') ? $container->resolve('config') : [];
-$possibleCommands = $config['commands'] ?? [];
-
-// Parse incoming CLI arguments
+// 2. Parse incoming CLI arguments
 $args = $argv;
 array_shift($args); // Remove the script name itself (rhapsody)
 $commandName = $args[0] ?? 'help';
 
 $commandRegistry = [];
 
-foreach ($possibleCommands as $commandClass) {
+// -------------------------------------------------------------------------
+// COMMAND DISCOVERY STRATEGY
+// -------------------------------------------------------------------------
+
+// Strategy 1: Auto-discover commands from the core Commands directory
+// This ensures new commands are automatically available when the core updates
+$coreCommandsPath = __DIR__ . '/../src/Commands';
+
+if (is_dir($coreCommandsPath)) {
+    foreach (glob($coreCommandsPath . '/*.php') as $file) {
+        $className = 'Rhapsody\\Core\\Commands\\' . basename($file, '.php');
+        
+        // Skip abstract classes or interfaces
+        if (!class_exists($className)) {
+            continue;
+        }
+        
+        try {
+            $reflection = new \ReflectionClass($className);
+            if ($reflection->isAbstract() || $reflection->isInterface()) {
+                continue;
+            }
+            
+            $commandInstance = $container->resolve($className);
+            
+            // Handle both Symfony Console commands and Rhapsody-style commands
+            if ($commandInstance instanceof \Symfony\Component\Console\Command\Command) {
+                $signature = $commandInstance->getName();
+                $description = $commandInstance->getDescription() ?: 'No description available';
+                
+                if ($signature) {
+                    $commandRegistry[$signature] = [
+                        'instance'    => $commandInstance,
+                        'description' => $description,
+                        'type'        => 'symfony'
+                    ];
+                }
+            } elseif (property_exists($commandInstance, 'signature')) {
+                $signature = $commandInstance->signature;
+                $description = property_exists($commandInstance, 'description') 
+                    ? $commandInstance->description 
+                    : 'No description available';
+                
+                $commandRegistry[$signature] = [
+                    'instance'    => $commandInstance,
+                    'description' => $description,
+                    'type'        => 'rhapsody'
+                ];
+            }
+        } catch (\Throwable $e) {
+            // Skip commands that fail to resolve (e.g., due to missing dependencies)
+            // Optionally log for debugging:
+            // if ($commandName === 'help' || $commandName === '--help') {
+            //     echo "[\033[33mWarning\033[0m] Could not load command '{$className}': " . $e->getMessage() . "\n";
+            // }
+            continue;
+        }
+    }
+}
+
+// Strategy 2: Also load user-defined commands from app/Commands (if they exist)
+$appCommandsPath = $basePath . '/app/Commands';
+if (is_dir($appCommandsPath)) {
+    foreach (glob($appCommandsPath . '/*.php') as $file) {
+        $className = 'App\\Commands\\' . basename($file, '.php');
+        
+        if (!class_exists($className)) {
+            continue;
+        }
+        
+        try {
+            $reflection = new \ReflectionClass($className);
+            if ($reflection->isAbstract() || $reflection->isInterface()) {
+                continue;
+            }
+            
+            $commandInstance = $container->resolve($className);
+            
+            if ($commandInstance instanceof \Symfony\Component\Console\Command\Command) {
+                $signature = $commandInstance->getName();
+                $description = $commandInstance->getDescription() ?: 'No description available';
+                
+                if ($signature) {
+                    $commandRegistry[$signature] = [
+                        'instance'    => $commandInstance,
+                        'description' => $description,
+                        'type'        => 'symfony'
+                    ];
+                }
+            } elseif (property_exists($commandInstance, 'signature')) {
+                $signature = $commandInstance->signature;
+                $description = property_exists($commandInstance, 'description') 
+                    ? $commandInstance->description 
+                    : 'No description available';
+                
+                $commandRegistry[$signature] = [
+                    'instance'    => $commandInstance,
+                    'description' => $description,
+                    'type'        => 'rhapsody'
+                ];
+            }
+        } catch (\Throwable $e) {
+            // Skip commands that fail to resolve
+            continue;
+        }
+    }
+}
+
+// Strategy 3: Fallback to config.php commands (backward compatibility)
+$config = $container->has('config') ? $container->resolve('config') : [];
+$configCommands = $config['commands'] ?? [];
+
+foreach ($configCommands as $commandClass) {
+    // Skip if already registered via auto-discovery
+    $className = is_string($commandClass) ? $commandClass : get_class($commandClass);
+    $alreadyRegistered = false;
+    
+    foreach ($commandRegistry as $registered) {
+        if (get_class($registered['instance']) === $className) {
+            $alreadyRegistered = true;
+            break;
+        }
+    }
+    
+    if ($alreadyRegistered) {
+        continue;
+    }
+    
     try {
         $commandInstance = $container->resolve($commandClass);
         
-        // Pattern A: Custom Rhapsody commands using standard property descriptors
-        if (property_exists($commandInstance, 'signature')) {
-            $signature = $commandInstance->signature;
-            $description = property_exists($commandInstance, 'description') ? $commandInstance->description : 'No description available';
-            
-            $commandRegistry[$signature] = [
-                'instance'    => $commandInstance,
-                'description' => $description,
-                'type'        => 'rhapsody'
-            ];
-        } 
-        // Pattern B: Symfony Console Command wrappers
-        elseif ($commandInstance instanceof \Symfony\Component\Console\Command\Command) {
+        if ($commandInstance instanceof \Symfony\Component\Console\Command\Command) {
             $signature = $commandInstance->getName();
             $description = $commandInstance->getDescription() ?: 'No description available';
             
@@ -71,9 +182,19 @@ foreach ($possibleCommands as $commandClass) {
                     'type'        => 'symfony'
                 ];
             }
+        } elseif (property_exists($commandInstance, 'signature')) {
+            $signature = $commandInstance->signature;
+            $description = property_exists($commandInstance, 'description') 
+                ? $commandInstance->description 
+                : 'No description available';
+            
+            $commandRegistry[$signature] = [
+                'instance'    => $commandInstance,
+                'description' => $description,
+                'type'        => 'rhapsody'
+            ];
         }
     } catch (\Throwable $e) {
-        // Log individual resolution failures to help map container dependencies
         if ($commandName === 'help' || $commandName === '--help') {
             echo "[\033[33mContainer Warning\033[0m] Failed to resolve '{$commandClass}': " . $e->getMessage() . "\n";
         }
@@ -88,11 +209,14 @@ if ($commandName === 'help' || $commandName === '--help' || !isset($commandRegis
     echo "Available Commands:\n";
     
     if (empty($commandRegistry)) {
-        echo "  \033[31mNo dynamic commands could be successfully resolved out of the container.\033[0m\n";
-    }
-
-    foreach ($commandRegistry as $signature => $meta) {
-        echo sprintf("  \033[32m%-25s\033[0m %s\n", $signature, $meta['description']);
+        echo "  \033[31mNo commands could be resolved.\033[0m\n";
+    } else {
+        // Sort commands alphabetically for better readability
+        ksort($commandRegistry);
+        
+        foreach ($commandRegistry as $signature => $meta) {
+            echo sprintf("  \033[32m%-25s\033[0m %s\n", $signature, $meta['description']);
+        }
     }
     echo "\n";
     exit(0);

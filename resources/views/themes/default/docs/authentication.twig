@@ -1,31 +1,260 @@
 {% extends "@core/docs/_layout.twig" %}
 
 {% block doc_content %}
-    <h1>Authentication Setup</h1>
-    <p>Rhapsody provides a simple authentication system using Doctrine ORM and the <code>User</code> entity.</p>
+    <h1>Authentication System</h1>
+    <p>
+        Rhapsody provides a complete, self-contained authentication system built with 
+        <strong>Doctrine ORM</strong> and the <code>User</code> entity. It handles 
+        registration, login, logout, and password reset flows out of the box.
+    </p>
 
-    <h2>Prerequisites</h2>
-    <p>Make sure you have configured your database connection in <code>.env</code> and installed Doctrine.</p>
+    <div class="bg-blue-50 dark:bg-blue-950/40 border-l-4 border-blue-500 dark:border-blue-400 p-4 rounded-r-lg">
+        <strong class="text-blue-800 dark:text-blue-300">Important:</strong>
+        <p class="text-blue-800 dark:text-blue-300 mt-1">
+            The authentication system is <strong>optional</strong>. You are not required to use it. 
+            You can build your own authentication system, or extend the built-in one.
+        </p>
+    </div>
 
-    <h2>Creating the Users Table</h2>
-    <p>Before you can use the authentication system, you must create the <code>users</code> table. Run the following command:</p>
-    <pre><code class="language-bash">php rhapsody auth:install</code></pre>
-    <p>This will create the table based on the <code>App\Entities\User</code> entity definition.</p>
+    <hr>
 
-    <h2>Using the Auth Controller</h2>
-    <p>The framework includes a <code>AuthController</code> with routes for login, registration, and logout. Make sure the routes are registered in your <code>web.php</code>:</p>
-    <pre><code>$router->get('/login', [AuthController::class, 'showLoginForm']);
-$router->post('/login', [AuthController::class, 'login']);
-$router->get('/register', [AuthController::class, 'showRegistrationForm']);
-$router->post('/register', [AuthController::class, 'register']);
-$router->post('/logout', [AuthController::class, 'logout']);</code></pre>
+    <h2>Installation</h2>
+    <p>
+        Before using the authentication system, you <strong>must</strong> create the required 
+        database tables. Run the following command from your project root:
+    </p>
+    <pre class="command-line"><code class="language-bash">php rhapsody auth:install</code></pre>
+    <p>
+        This command creates the <code>users</code> and <code>password_resets</code> tables 
+        based on the core <code>User</code> entity definition.
+    </p>
 
-    <h2>Middleware Protection</h2>
-    <p>To protect routes, use the <code>auth</code> middleware:</p>
-    <pre><code>$router->get('/dashboard', [DashboardController::class, 'index'])->middleware('auth');</code></pre>
+    <div class="bg-yellow-50 dark:bg-yellow-950/40 border-l-4 border-yellow-500 dark:border-yellow-400 p-4 rounded-r-lg">
+        <strong class="text-yellow-800 dark:text-yellow-300">⚠️ Important:</strong>
+        <p class="text-yellow-800 dark:text-yellow-300 mt-1">
+            Running <code>auth:install</code> is <strong>required</strong> before any authentication 
+            routes will work. The command will skip tables that already exist, so it's safe to run 
+            multiple times.
+        </p>
+    </div>
 
-    <h2>Customising the User Entity</h2>
-    <p>You can extend or modify the <code>App\Entities\User</code> class to add additional fields. After changes, update the table schema using the Doctrine schema tool:</p>
-    <pre><code class="language-bash">php rhapsody doctrine:schema:update --force</code></pre>
-    <p>Or create a migration for production.</p>
+    <hr>
+
+    <h2>How It Works</h2>
+    <p>
+        The authentication system is self-contained within the core framework:
+    </p>
+    <ul>
+        <li><strong>Controller:</strong> <code>Rhapsody\Core\Controllers\AuthController</code></li>
+        <li><strong>Entity:</strong> <code>Rhapsody\Core\Entities\User</code></li>
+        <li><strong>Views:</strong> <code>@core/auth/*.twig</code> (login, register, forgot-password, reset-password)</li>
+        <li><strong>Routes:</strong> Registered automatically from the core routes file</li>
+    </ul>
+    <p>
+        The following routes are available out of the box:
+    </p>
+    <pre><code class="language-text">GET  /login              → Show login form
+POST /login              → Handle login
+GET  /register           → Show registration form
+POST /register           → Handle registration
+POST /logout             → Log out
+GET  /forgot-password    → Show forgot password form
+POST /forgot-password    → Send reset link
+GET  /reset-password/{token} → Show reset password form
+POST /reset-password     → Handle password reset</code></pre>
+
+    <hr>
+
+    <h2>Using the Built-in Auth System</h2>
+    <p>
+        To use the default authentication system, simply ensure the routes are registered 
+        (they are automatically loaded from the core) and point your users to <code>/login</code> 
+        and <code>/register</code>.
+    </p>
+    <p>
+        In your templates, you can check if a user is logged in using the <code>auth</code> global:
+    </p>
+    <pre><code class="language-twig">{% raw %}{% if auth.check %}
+    Welcome back, {{ auth.user.name }}!
+    &lt;a href="{{ base_url }}/logout"&gt;Logout&lt;/a&gt;
+{% else %}
+    &lt;a href="{{ base_url }}/login"&gt;Login&lt;/a&gt;
+    &lt;a href="{{ base_url }}/register"&gt;Register&lt;/a&gt;
+{% endif %}{% endraw %}</code></pre>
+    <p>
+        Protect routes with the <code>auth</code> middleware:
+    </p>
+    <pre><code class="language-php">$router->get('/dashboard', [DashboardController::class, 'index'])->middleware('auth');</code></pre>
+
+    <hr>
+
+    <h2>Extending the Built-in Auth System</h2>
+    <p>
+        If you want to add custom functionality (e.g., additional fields, custom validation, 
+        or custom email templates), you can <strong>extend</strong> the core controller:
+    </p>
+    <pre><code class="language-php">// app/Controllers/AuthController.php
+namespace App\Controllers;
+
+use Rhapsody\Core\Controllers\AuthController as BaseAuthController;
+use Rhapsody\Core\Request;
+use Rhapsody\Core\Response;
+
+class AuthController extends BaseAuthController
+{
+    public function showRegisterForm(): Response
+    {
+        // Add custom data to the registration view
+        return $this->view('auth/register.twig', [
+            'terms_accepted' => false,
+        ]);
+    }
+
+    public function register(Request $request): Response
+    {
+        // Add custom validation before parent registration
+        // Or override the entire registration logic
+        // return parent::register($request);
+    }
+}</code></pre>
+    <p>
+        Then update your <code>routes/web.php</code> to point to your custom controller:
+    </p>
+    <pre><code class="language-php">$router->get('/register', [App\Controllers\AuthController::class, 'showRegisterForm']);
+$router->post('/register', [App\Controllers\AuthController::class, 'register']);</code></pre>
+
+    <h3>Extending the User Entity</h3>
+    <p>
+        To add custom fields to the user (e.g., <code>phone</code>, <code>avatar</code>), you can 
+        extend the core entity:
+    </p>
+    <pre><code class="language-php">// app/Entities/User.php
+namespace App\Entities;
+
+use Doctrine\ORM\Mapping as ORM;
+use Rhapsody\Core\Entities\User as BaseUser;
+
+#[ORM\Entity]
+#[ORM\Table(name: 'users')]
+class User extends BaseUser
+{
+    #[ORM\Column(type: 'string', nullable: true)]
+    private ?string $phone = null;
+
+    public function getPhone(): ?string
+    {
+        return $this->phone;
+    }
+
+    public function setPhone(?string $phone): void
+    {
+        $this->phone = $phone;
+    }
+}</code></pre>
+    <p>
+        <strong>Note:</strong> If you create your own <code>App\Entities\User</code> entity, it will 
+        <strong>override</strong> the core <code>User</code> entity. Make sure your entity contains 
+        all the fields the auth system expects, or extend the base entity as shown above.
+    </p>
+
+    <hr>
+
+    <h2>Building Your Own Auth System (Alternative)</h2>
+    <p>
+        If the built-in authentication system doesn't meet your needs, you can build your own 
+        from scratch. This is recommended if you need:
+    </p>
+    <ul>
+        <li>Integration with external authentication providers (LDAP, OAuth)</li>
+        <li>Non-email based login (e.g., username only)</li>
+        <li>Custom session management</li>
+        <li>Different user storage (e.g., Redis, external API)</li>
+    </ul>
+    <p>
+        To build your own system, you can either:
+    </p>
+    <ol>
+        <li>
+            <strong>Create a completely separate auth controller</strong> – 
+            Create your own <code>LoginController</code> and <code>RegisterController</code> 
+            in <code>app/Controllers/</code> and use your own routes.
+        </li>
+        <li>
+            <strong>Create independent login/register controllers</strong> – 
+            This is the recommended approach as it keeps responsibilities separated.
+        </li>
+    </ol>
+    <pre><code class="language-php">// app/Controllers/LoginController.php
+namespace App\Controllers;
+
+use Rhapsody\Core\BaseController;
+use Rhapsody\Core\Request;
+use Rhapsody\Core\Response;
+use Rhapsody\Core\Session;
+
+class LoginController extends BaseController
+{
+    public function showForm(): Response
+    {
+        return $this->view('auth/custom-login.twig');
+    }
+
+    public function login(Request $request): Response
+    {
+        // Your custom login logic here
+        // Validate credentials, set session, etc.
+    }
+
+    public function logout(): Response
+    {
+        Session::destroy();
+        return redirect('/login');
+    }
+}</code></pre>
+    <p>
+        Then register your routes in <code>routes/web.php</code>:
+    </p>
+    <pre><code class="language-php">$router->get('/login', [LoginController::class, 'showForm']);
+$router->post('/login', [LoginController::class, 'login']);
+$router->post('/logout', [LoginController::class, 'logout']);</code></pre>
+
+    <hr>
+
+    <h2>Customizing Views</h2>
+    <p>
+        To override the default authentication views, create matching templates in your 
+        active theme:
+    </p>
+    <pre><code class="language-bash">views/themes/your-theme/auth/login.twig
+views/themes/your-theme/auth/register.twig
+views/themes/your-theme/auth/forgot-password.twig
+views/themes/your-theme/auth/reset-password.twig</code></pre>
+    <p>
+        The framework will automatically use your theme's templates instead of the core ones.
+    </p>
+
+    <hr>
+
+    <h2>Security Features</h2>
+    <p>The built-in authentication system includes the following security measures:</p>
+    <ul>
+        <li><strong>Password hashing:</strong> Passwords are hashed using <code>password_hash()</code> with BCRYPT</li>
+        <li><strong>CSRF protection:</strong> All forms include a CSRF token field</li>
+        <li><strong>Session regeneration:</strong> Session ID is regenerated on login</li>
+        <li><strong>Password reset tokens:</strong> Tokens are hashed at rest (SHA-256) and time-limited (60 minutes)</li>
+        <li><strong>No user enumeration:</strong> Password reset responses are identical whether or not the email exists</li>
+        <li><strong>Single-use tokens:</strong> Reset tokens are deleted after successful use</li>
+        <li><strong>Old token invalidation:</strong> Requesting a new reset link invalidates all previous tokens</li>
+    </ul>
+
+    <hr>
+
+    <div class="bg-green-50 dark:bg-green-950/40 border-l-4 border-green-500 dark:border-green-400 p-4 rounded-r-lg">
+        <strong class="text-green-800 dark:text-green-300">Need Help?</strong>
+        <p class="text-green-800 dark:text-green-300 mt-1">
+            Check the <a href="{{ base_url }}/docs/faq" class="text-green-800 dark:text-green-300 underline">FAQ</a> 
+            or open an issue on GitHub.
+        </p>
+    </div>
+
 {% endblock %}

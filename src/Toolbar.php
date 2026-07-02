@@ -3,7 +3,7 @@
 
 namespace Rhapsody\Core;
 
-use TraceablePDO;
+use Rhapsody\Core\TraceablePDO;
 
 class Toolbar
 {

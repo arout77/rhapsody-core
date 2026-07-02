@@ -6,7 +6,9 @@ use Rhapsody\Core\Helpers\Recaptcha;
 
 class Validator
 {
-    /** @var array<string, array<int, string>> */
+    /**
+     * @var array<string, array<int, string>>
+     */
     protected array $errors = [];
     protected EntityManager $em;
 
@@ -20,9 +22,9 @@ class Validator
 
     /**
      * Check if a value is unique in a database table.
-     * @param string $field The field name (e.g., 'email')
-     * @param mixed $value The value to check (e.g., 'test@example.com')
-     * @param ?string $param The Entity name (e.g., 'User')
+     * @param string        $field The field name (e.g., 'email')
+     * @param mixed         $value The value to check (e.g., 'test@example.com')
+     * @param ?string       $param The Entity name (e.g., 'User')
      * @param array<string, mixed> $data
      */
     protected function validateUnique(string $field, mixed $value, ?string $param, array $data): void
@@ -31,16 +33,30 @@ class Validator
             return;
         }
 
-        // Assumes $param is the simple class name, e.g., "User"
-        // and all entities are in the App\Entities namespace.
-        $entityClass = "App\\Entities\\" . $param;
+        // Resolve $param against known entity namespaces, or allow a fully-qualified class name.
+        $entityClass = $param;
+
+        if (! class_exists($entityClass)) {
+            foreach (['Rhapsody\\Core\\Entities\\', 'App\\Entities\\'] as $namespace) {
+                if (class_exists($namespace . $param)) {
+                    $entityClass = $namespace . $param;
+                    break;
+                }
+            }
+        }
+
+        if (! class_exists($entityClass)) {
+            error_log("Validator Error: Unique check entity class not found for '{$param}'.");
+            $this->errors[$field][] = "There was an error checking if the {$field} is unique.";
+            return;
+        }
 
         try {
             $repository = $this->em->getRepository($entityClass);
             $result     = $repository->findOneBy([$field => $value]);
 
             if ($result) {
-                $this->errors[$field][] = "The {$field} is already associated with another account.";
+                $this->errors[$field][] = "The {$field} is already associated with another account. Click the 'Forgot Password?' link below if you need to reset your password.";
             }
         } catch (\Exception $e) {
             error_log("Validator Error: " . $e->getMessage());
@@ -89,7 +105,7 @@ class Validator
 
     /**
      * @param string $field
-     * @param mixed $value
+     * @param mixed  $value
      */
     protected function validateRequired(string $field, mixed $value): void
     {
@@ -99,7 +115,7 @@ class Validator
     }
 
     /**
-     * @param string $field
+     * @param string  $field
      * @param ?string $value
      */
     protected function validateEmail(string $field, ?string $value): void
@@ -111,8 +127,8 @@ class Validator
 
     /**
      * FIX: Changed `int $value` to `mixed $value` to prevent TypeErrors on string validation.
-     * @param string $field
-     * @param mixed $value
+     * @param string  $field
+     * @param mixed   $value
      * @param ?string $param
      */
     protected function validateMin(string $field, mixed $value, ?string $param): void
@@ -136,8 +152,8 @@ class Validator
 
     /**
      * FIX: Changed `int $value` to `mixed $value` to prevent TypeErrors on string validation.
-     * @param string $field
-     * @param mixed $value
+     * @param string  $field
+     * @param mixed   $value
      * @param ?string $param
      */
     protected function validateMax(string $field, mixed $value, ?string $param): void
@@ -160,7 +176,7 @@ class Validator
     }
 
     /**
-     * @param string $field
+     * @param string  $field
      * @param ?string $value
      */
     protected function validateUrl(string $field, ?string $value): void
@@ -171,7 +187,7 @@ class Validator
     }
 
     /**
-     * @param string $field
+     * @param string  $field
      * @param ?string $value
      * @param ?string $param
      */
@@ -189,7 +205,7 @@ class Validator
 
     /**
      * @param string $field
-     * @param mixed $value
+     * @param mixed  $value
      */
     protected function validateNumeric(string $field, mixed $value): void
     {
@@ -199,7 +215,7 @@ class Validator
     }
 
     /**
-     * @param string $field
+     * @param string  $field
      * @param ?string $value
      */
     protected function validateAlpha(string $field, ?string $value): void
@@ -210,7 +226,7 @@ class Validator
     }
 
     /**
-     * @param string $field
+     * @param string  $field
      * @param ?string $value
      */
     protected function validateAlphaNum(string $field, ?string $value): void
@@ -221,10 +237,10 @@ class Validator
     }
 
     /**
-     * @param string $field
+     * @param string  $field
      * @param ?string $value
      * @param ?string $param
-     * @param array $data
+     * @param array   $data
      */
     protected function validateConfirmed(string $field, ?string $value, ?string $param, array $data): void
     {
@@ -235,8 +251,8 @@ class Validator
     }
 
     /**
-     * @param string $field
-     * @param mixed $value
+     * @param string  $field
+     * @param mixed   $value
      * @param ?string $param
      */
     protected function validateIn(string $field, mixed $value, ?string $param): void
@@ -252,8 +268,8 @@ class Validator
     }
 
     /**
-     * @param string $field
-     * @param mixed $value
+     * @param string  $field
+     * @param mixed   $value
      * @param ?string $param
      */
     protected function validateNotIn(string $field, mixed $value, ?string $param): void
@@ -270,7 +286,7 @@ class Validator
 
     /**
      * @param string $field
-     * @param mixed $value
+     * @param mixed  $value
      */
     protected function validateImage(string $field, mixed $value): void
     {
@@ -282,8 +298,8 @@ class Validator
     }
 
     /**
-     * @param string $field
-     * @param mixed $value
+     * @param string  $field
+     * @param mixed   $value
      * @param ?string $param
      */
     protected function validateMimes(string $field, mixed $value, ?string $param): void
@@ -316,7 +332,7 @@ class Validator
 
     /**
      * @param string $field
-     * @param mixed $value
+     * @param mixed  $value
      */
     protected function validateRecaptcha(string $field, mixed $value): void
     {

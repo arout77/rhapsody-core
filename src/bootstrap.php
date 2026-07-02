@@ -307,7 +307,7 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
         {
             return Session::hasFlash($name);
         }
-    };;;;;;;;;
+    };;;;;;;;;;;;
 
     $twig->addGlobal('flash', $flash);
 
@@ -373,6 +373,9 @@ $container->bind(PaymentGatewayInterface::class, function () {
 });
 
 // --- COMMAND BINDINGS (Refactored to inject context-aware path mappings) ---
+$container->bind(\Rhapsody\Core\Commands\AuthInstallCommand::class, function ($c) {
+    return new \Rhapsody\Core\Commands\AuthInstallCommand();
+});
 
 $container->bind(CheckVersionCommand::class, function ($c) use ($config) {
     return new CheckVersionCommand(
