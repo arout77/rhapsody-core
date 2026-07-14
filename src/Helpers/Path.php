@@ -12,7 +12,7 @@ class Path
         if (defined('ROOT_DIR')) {
             $base = ROOT_DIR;
         } else {
-            // Fallback: assume this file is in vendor/arout77/rhapsody-core/src/Helpers/
+            // Fallback: assume this file is in vendor/arout/rhapsody-core/src/Helpers/
             // Go up 4 levels to reach the project root.
             $base = dirname(__DIR__, 4);
         }

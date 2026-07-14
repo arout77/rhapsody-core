@@ -19,9 +19,9 @@ class CheckVersionCommand extends Command
     private string $defaultRepository = 'arout77/Rhapsody-Framework';
 
     /**
-     * @param array $config
+     * @param array  $config
      * @param Mailer $mailer
-     * @param Cache $cache
+     * @param Cache  $cache
      */
     public function __construct(
         protected array $config,
@@ -40,7 +40,7 @@ class CheckVersionCommand extends Command
     }
 
     /**
-     * @param InputInterface $input
+     * @param InputInterface  $input
      * @param OutputInterface $output
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -95,7 +95,7 @@ class CheckVersionCommand extends Command
     }
 
     /**
-     * @param string $repository
+     * @param string          $repository
      * @param OutputInterface $output
      */
     private function fetchFromApi(string $repository, OutputInterface $output): ?array
@@ -137,8 +137,8 @@ class CheckVersionCommand extends Command
     }
 
     /**
-     * @param string $newVersion
-     * @param string $releaseUrl
+     * @param string          $newVersion
+     * @param string          $releaseUrl
      * @param OutputInterface $output
      */
     private function sendEmailNotification(string $newVersion, string $releaseUrl, OutputInterface $output): bool
