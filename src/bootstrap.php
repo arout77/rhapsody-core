@@ -307,7 +307,7 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
         {
             return Session::hasFlash($name);
         }
-    };;;;;;;;;;;;
+    };
 
     $twig->addGlobal('flash', $flash);
 
@@ -505,10 +505,7 @@ if (PHP_SAPI !== 'cli') {
 
 // Global Middleware Configuration Setup
 $middlewareConfig = $config['middleware'] ?? ['map' => [], 'global' => []];
-Router::setMiddlewareConfig(
-    $middlewareConfig['map'],
-    $middlewareConfig['global']
-);
+Router::setMiddlewareConfig($middlewareConfig);
 
 // Safely resolve the core router instance now that all configuration recipes are mapped
 $router = $container->resolve(\Rhapsody\Core\Routing\Router::class);

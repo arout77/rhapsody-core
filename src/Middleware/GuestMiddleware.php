@@ -1,21 +1,25 @@
 <?php
 namespace Rhapsody\Core\Middleware;
 
+use Rhapsody\Core\RedirectResponse;
 use Rhapsody\Core\Request;
+use Rhapsody\Core\Response;
+use Rhapsody\Core\Routing\Route;
 use Rhapsody\Core\Session;
 
 class GuestMiddleware extends Middleware
 {
     /**
-     * @param Request $request
+     * @param Request    $request
+     * @param Route|null $route
      */
-    public function handle(Request $request): void
+    public function handle(Request $request, ?Route $route = null): ?Response
     {
-        // If the user is already logged in...
+        // If the user is already logged in, redirect them to their dashboard.
         if (Session::has('user_id')) {
-            // ...redirect them to their dashboard and stop execution.
-            header('Location: ' . getenv('APP_BASE_URL') . '/dashboard');
-            exit();
+            return new RedirectResponse(getenv('APP_URL') . getenv('APP_BASE_URL') . '/dashboard');
         }
+
+        return null;
     }
 }

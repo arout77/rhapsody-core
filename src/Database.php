@@ -8,28 +8,40 @@ use Rhapsody\Core\TraceablePDO;
 class Database
 {
     private static ?Database $instance = null;
-    private PDO $connection;
+    private ?PDO $connection           = null;
+    private array $config;
 
     private function __construct(array $config)
     {
-        // 1. Maintain config validation to match your environment configuration structure
+        // Maintain config validation to match your environment configuration structure.
+        // Note: we validate eagerly (fail fast on obviously missing config) but we do
+        // NOT open the actual PDO connection here — that's deferred to getConnection()
+        // so that pages/requests which never touch the database don't require one.
         if (empty($config['database'])) {
             throw new Exception("Database configuration parameters are missing. Enter your credentials in <root directory> .env file");
         }
 
-        $dbConfig = $config['database'];
+        $this->config = $config;
+    }
 
-        // 2. Detect the target driver, defaulting to 'mysql' to ensure backward compatibility
+    /**
+     * Lazily opens (and caches) the underlying PDO connection on first use.
+     */
+    private function connect(): PDO
+    {
+        $dbConfig = $this->config['database'];
+
+        // Detect the target driver, defaulting to 'mysql' to ensure backward compatibility
         $driver = $dbConfig['driver'] ?? 'mysql';
 
-        // 3. Dynamically build the driver-specific connection string (DSN)
+        // Dynamically build the driver-specific connection string (DSN)
         $dsn = $this->buildDsn($dbConfig, $driver);
 
         $username = $dbConfig['user'] ?? null;
         $password = $dbConfig['password'] ?? null;
 
-        // 4. Instantiate the native PDO instance
-        $this->connection = new TraceablePDO($dsn, $username, $password, [
+        // Instantiate the native PDO instance
+        return new TraceablePDO($dsn, $username, $password, [
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);
@@ -83,10 +95,14 @@ class Database
     }
 
     /**
-     * Exposes the active PDO connection context.
+     * Exposes the active PDO connection context, connecting on first use.
      */
     public function getConnection(): PDO
     {
+        if ($this->connection === null) {
+            $this->connection = $this->connect();
+        }
+
         return $this->connection;
     }
 

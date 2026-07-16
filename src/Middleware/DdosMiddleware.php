@@ -3,9 +3,10 @@ namespace Rhapsody\Core\Middleware;
 
 use Rhapsody\Core\Request;
 use Rhapsody\Core\Response;
+use Rhapsody\Core\Routing\Route;
 use Rhapsody\Core\Services\RateLimiter;
 
-class DdosMiddleware
+class DdosMiddleware extends Middleware
 {
     protected RateLimiter $limiter;
     protected array $config;
@@ -16,7 +17,7 @@ class DdosMiddleware
         $this->config  = $config;
     }
 
-    public function handle(Request $request): ?Response
+    public function handle(Request $request, ?Route $route = null): ?Response
     {
         // Skip if protection is disabled
         if (empty($this->config['ddos_enabled'])) {

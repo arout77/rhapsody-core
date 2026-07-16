@@ -102,8 +102,8 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
      * Dispatches the incoming request, matching it against registered routes,
      * executing global and route-specific middleware, and returning a Response.
      *
-     * @param Request $request
-     * @param Container $container
+     * @param  Request    $request
+     * @param  Container  $container
      * @return Response
      */
     public static function dispatch(Request $request, ContainerInterface $container): Response
@@ -122,23 +122,32 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
                 // 1. RUN GLOBAL MIDDLEWARE
                 foreach (self::$globalMiddleware as $middlewareClass) {
                     $middlewareInstance = $container->resolve($middlewareClass);
-                    $middlewareInstance->handle($request);
-                    $middlewareClass = get_class($middlewareInstance);
-                    MiddlewareTracer::start($middlewareClass, 'global');
-                    $response = $middlewareInstance->handle($request);
+                    $resolvedClass      = get_class($middlewareInstance);
+
+                    MiddlewareTracer::start($resolvedClass, 'global');
+                    $response = $middlewareInstance->handle($request, $route);
                     MiddlewareTracer::stop();
+
+                    // A middleware that returns a Response wants to short-circuit
+                    // the request (e.g. rate-limited, blocked, forbidden).
+                    if ($response instanceof Response) {
+                        return $response;
+                    }
                 }
 
                 // 2. RUN ROUTE-SPECIFIC MIDDLEWARE
                 foreach ($route->getMiddleware() as $middlewareKey) {
                     if (isset(self::$middlewareMap[$middlewareKey])) {
                         $middlewareInstance = $container->resolve(self::$middlewareMap[$middlewareKey]);
-                        // Pass the route as the second argument
-                        $middlewareInstance->handle($request, $route);
-                        $middlewareClass = get_class($middlewareInstance);
-                        MiddlewareTracer::start($middlewareClass, 'route', $route->getPath());
-                        $middlewareInstance->handle($request, $route);
+                        $resolvedClass      = get_class($middlewareInstance);
+
+                        MiddlewareTracer::start($resolvedClass, 'route', $route->getPath());
+                        $response = $middlewareInstance->handle($request, $route);
                         MiddlewareTracer::stop();
+
+                        if ($response instanceof Response) {
+                            return $response;
+                        }
                     }
                 }
 
@@ -153,9 +162,9 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
     /**
      * Safely executes the resolved route callback.
      *
-     * @param Route $route
-     * @param Request $request
-     * @param Container $container The application's service container.
+     * @param  Route      $route
+     * @param  Request    $request
+     * @param  Container  $container The application's service container.
      * @return Response
      */
     protected static function execute(Route $route, Request $request, ContainerInterface $container): Response
@@ -226,10 +235,10 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
     /**
      * Generate a URL from a named route.
      *
-     * @param string $name   The route name.
-     * @param array  $params Parameters to replace in the path (e.g., ['id' => 123]).
-     * @return string
+     * @param  string     $name   The route name.
+     * @param  array      $params Parameters to replace in the path (e.g., ['id' => 123]).
      * @throws \Exception If the route name is not found.
+     * @return string
      */
     public static function generateUrl(string $name, array $params = []): string
     {

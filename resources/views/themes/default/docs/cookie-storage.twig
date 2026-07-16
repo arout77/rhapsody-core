@@ -64,26 +64,45 @@ $all = Cookie::all();</code></pre>
     <p>
         The following Twig functions are available to work with cookies directly in your templates:
     </p>
-    <table>
-        <thead><tr><th>Function</th><th>Description</th></tr></thead>
-        <tbody>
-            <tr><td><code>cookie_get(name, default)</code></td><td>Returns the value of a cookie, or the default if not set.</td></tr>
-            <tr><td><code>cookie_set(name, value, expiry, path, domain, secure, httpOnly, sameSite)</code></td><td>Sets a cookie (returns nothing, outputs a <code>Set-Cookie</code> header).</td></tr>
-            <tr><td><code>cookie_has(name)</code></td><td>Returns <code>true</code> if the cookie exists.</td></tr>
-            <tr><td><code>cookie_delete(name, path, domain)</code></td><td>Deletes the cookie.</td></tr>
-        </tbody>
-    </table>
+    <div class="overflow-x-auto">
+        <table class="w-full border-collapse bg-gray-50 dark:bg-gray-800/50 rounded-lg overflow-hidden">
+            <thead>
+                <tr class="bg-gray-200 dark:bg-gray-700">
+                    <th class="text-left p-3 font-semibold text-gray-700 dark:text-gray-300">Function</th>
+                    <th class="text-left p-3 font-semibold text-gray-700 dark:text-gray-300">Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>cookie_get(name, default)</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">Returns the value of a cookie, or the default if not set.</td>
+                </tr>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>cookie_set(name, value, expiry, path, domain, secure, httpOnly, sameSite)</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">Sets a cookie (returns nothing, outputs a <code>Set-Cookie</code> header).</td>
+                </tr>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>cookie_has(name)</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">Returns <code>true</code> if the cookie exists.</td>
+                </tr>
+                <tr>
+                    <td class="p-3"><code>cookie_delete(name, path, domain)</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">Deletes the cookie.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 
     <h4>Example in Twig</h4>
-    <pre><code class="language-twig">{# Check if the user has a preference #}
-{% if cookie_has('theme') %}
-    {% set theme = cookie_get('theme') %}
-{% else %}
-    {% set theme = 'light' %}
-{% endif %}
+    <pre><code class="language-twig">&#123;# Check if the user has a preference #&#125;
+&#123;% if cookie_has('theme') %&#125;
+    &#123;% set theme = cookie_get('theme') %&#125;
+&#123;% else %&#125;
+    &#123;% set theme = 'light' %&#125;
+&#123;% endif %&#125;
 
-{# Set a cookie after a form submission (e.g., from a controller) #}
-{{ cookie_set('user_id', user.id, 86400) }}</code></pre>
+&#123;# Set a cookie after a form submission (e.g., from a controller) #&#125;
+&#123;&#123; cookie_set('user_id', user.id, 86400) &#125;&#125;</code></pre>
 
     <hr>
 
@@ -112,23 +131,39 @@ echo LocalStorage::clear();</code></pre>
 
     <h3>Twig Functions</h3>
     <p>
-        The following Twig functions output <code>&lt;script&gt;</code> tags directly. Use them with the <code>{{ ... }}</code> syntax (not <code>|raw</code>, as they are already safe).
+        The following Twig functions output <code>&lt;script&gt;</code> tags directly. Use them with the <code>&#123;&#123; ... &#125;&#125;</code> syntax (not <code>|raw</code>, as they are already safe).
     </p>
-    <table>
-        <thead><tr><th>Function</th><th>Description</th></tr></thead>
-        <tbody>
-            <tr><td><code>localstorage_set(key, value, jsonEncode = true)</code></td><td>Sets a <code>localStorage</code> item. If <code>jsonEncode</code> is <code>true</code>, the value is JSON-encoded.</td></tr>
-            <tr><td><code>localstorage_remove(key)</code></td><td>Removes a <code>localStorage</code> item.</td></tr>
-            <tr><td><code>localstorage_clear()</code></td><td>Clears all <code>localStorage</code> data.</td></tr>
-        </tbody>
-    </table>
+    <div class="overflow-x-auto">
+        <table class="w-full border-collapse bg-gray-50 dark:bg-gray-800/50 rounded-lg overflow-hidden">
+            <thead>
+                <tr class="bg-gray-200 dark:bg-gray-700">
+                    <th class="text-left p-3 font-semibold text-gray-700 dark:text-gray-300">Function</th>
+                    <th class="text-left p-3 font-semibold text-gray-700 dark:text-gray-300">Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>localstorage_set(key, value, jsonEncode = true)</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">Sets a <code>localStorage</code> item. If <code>jsonEncode</code> is <code>true</code>, the value is JSON-encoded.</td>
+                </tr>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>localstorage_remove(key)</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">Removes a <code>localStorage</code> item.</td>
+                </tr>
+                <tr>
+                    <td class="p-3"><code>localstorage_clear()</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">Clears all <code>localStorage</code> data.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 
     <h4>Example in Twig</h4>
-    <pre><code class="language-twig">{# Store the user's theme preference client-side #}
-{{ localstorage_set('theme', 'dark') }}
+    <pre><code class="language-twig">&#123;# Store the user's theme preference client-side #&#125;
+&#123;&#123; localstorage_set('theme', 'dark') &#125;&#125;
 
-{# Remove a temporary flag #}
-{{ localstorage_remove('onboarding_seen') }}</code></pre>
+&#123;# Remove a temporary flag #&#125;
+&#123;&#123; localstorage_remove('onboarding_seen') &#125;&#125;</code></pre>
 
     <hr>
 

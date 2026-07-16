@@ -2,6 +2,8 @@
 namespace Rhapsody\Core\Middleware;
 
 use Rhapsody\Core\Request;
+use Rhapsody\Core\Response;
+use Rhapsody\Core\Routing\Route;
 use Rhapsody\Core\Session;
 
 class VerifyCsrfTokenMiddleware extends Middleware
@@ -19,39 +21,43 @@ class VerifyCsrfTokenMiddleware extends Middleware
     /**
      * Handle an incoming request.
      *
-     * @param Request $request
+     * @param  Request $request
      * @return void
      */
-    public function handle(Request $request): void
+    public function handle(Request $request, ?Route $route = null): ?Response
     {
         if ($this->isPostRequest($request) && ! $this->inExceptArray($request)) {
-            $token = $request->get('_token') ?? ($request->getBody()['_token'] ?? null);
+            $token = $request->get('_token') ?? ($request->getBody()['_token'] ?? '');
             if (! Session::verifyCsrfToken($token)) {
-                if (! headers_sent()) {
-                    http_response_code(419);
-                }
-
-                echo "CSRF token mismatch.";
-                exit;
+                $response = new Response();
+                $response->setStatusCode(419);
+                $response->setHeader('Content-Type', 'text/plain');
+                $response->setContent('CSRF token mismatch.');
+                return $response;
             }
         }
+
+        return null;
     }
 
     /**
      * Determine if the request is a POST request.
      *
-     * @param Request $request
+     * @param  Request $request
      * @return bool
      */
     protected function isPostRequest(Request $request): bool
     {
-        return $request->getMethod() === 'POST';
+        // Request::getMethod() returns a lowercase string (see Request.php) —
+        // comparing against uppercase 'POST' here meant this always returned
+        // false, so CSRF verification silently never ran on any request.
+        return strtolower($request->getMethod()) === 'post';
     }
 
     /**
      * Determine if the request URI is in the exception array.
      *
-     * @param Request $request
+     * @param  Request $request
      * @return bool
      */
     protected function inExceptArray(Request $request): bool
