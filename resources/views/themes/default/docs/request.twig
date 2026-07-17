@@ -13,6 +13,33 @@
 
     <h2>Accessing Request Information</h2>
 
+    <h3>Route Pattern Matching</h3>
+    <p>
+        The <code>is()</code> method allows you to check if the request's path matches a given pattern.
+        This is particularly useful for middleware to conditionally apply logic based on the route.
+    </p>
+    <p>
+        The method supports a trailing wildcard (<code>*</code>) to match any subpath:
+    </p>
+    <pre><code class="language-php">// Check if the current request is for the API
+    if ($request->is('api/*')) {
+        // API-specific handling
+    }
+
+    // Check for exact match
+    if ($request->is('users')) {
+        // Users page
+    }
+
+    // Check for admin routes
+    if ($request->is('admin/*')) {
+        // Admin routes
+    }</code></pre>
+    <p>
+        The <code>is()</code> method normalizes both the request path and the pattern by stripping
+        leading slashes, making it consistent for matching.
+    </p>
+
     <h3>Get the Request Path &amp; Method</h3>
     <pre><code class="language-php">// In a controller method
 public function updateUser(Request $request, string $id): Response

@@ -66,6 +66,30 @@ public function getUser(string $id): Response
     return $response;
 }</code></pre>
 
+    <h2>Redirect Responses</h2>
+    <p>
+        Rhapsody provides a <code>RedirectResponse</code> class for handling HTTP redirects.
+        The easiest way to create one is with the global <code>redirect()</code> helper function.
+    </p>
+
+    <h3>Basic Redirects</h3>
+    <pre><code class="language-php">public function store(Request $request): Response
+    {
+        // ... save data to the database ...
+        return redirect('/users');
+    }</code></pre>
+
+    <h3>Redirects with Flash Messages</h3>
+    <p>
+        Chain the <code>with()</code> method to send a flash message for the next request:
+    </p>
+    <pre><code class="language-php">return redirect('/users/' . $id)
+        ->with('success', 'Profile updated successfully!');</code></pre>
+    <p>
+        The <code>RedirectResponse::send()</code> method automatically saves the session
+        before redirecting, ensuring flash messages are preserved.
+    </p>
+
     <h3>Retrieving Response Data (for Testing or Debugging)</h3>
     <p>The <code>Response</code> object provides getter methods to inspect the response:</p>
     <ul>
