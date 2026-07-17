@@ -9,10 +9,10 @@ use Rhapsody\Core\Routing\Router;
 Router::get('/auth/{provider}', [SocialAuthController::class, 'redirectToProvider']);
 Router::get('/auth/{provider}/callback', [SocialAuthController::class, 'handleProviderCallback']);
 Router::get('/auth/redirect/{provider}', [SocialAuthController::class, 'redirectToProvider'])->name('auth.redirect');
-$router->get('/forgot-password', [AuthController::class, 'showForgotPasswordForm']);
-$router->post('/forgot-password', [AuthController::class, 'sendResetLink']);
-$router->get('/reset-password/{token}', [AuthController::class, 'showResetForm']);
-$router->post('/reset-password', [AuthController::class, 'resetPassword']);
+Router::get('/forgot-password', [AuthController::class, 'showForgotPasswordForm']);
+Router::post('/forgot-password', [AuthController::class, 'sendResetLink']);
+Router::get('/reset-password/{token}', [AuthController::class, 'showResetForm']);
+Router::post('/reset-password', [AuthController::class, 'resetPassword']);
 
 // Assumes your Router instance is injected or accessible
 Router::get('/login', [AuthController::class, 'showLoginForm']);

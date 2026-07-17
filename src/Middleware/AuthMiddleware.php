@@ -10,14 +10,14 @@ use Rhapsody\Core\Session;
 class AuthMiddleware extends Middleware
 {
     /**
-     * @param Request    $request
+     * @param Request $request
      * @param Route|null $route
      */
     public function handle(Request $request, ?Route $route = null): ?Response
     {
         // If the user is not logged in, redirect them to the login page.
         if (! Session::has('user_id')) {
-            return new RedirectResponse(getenv('APP_URL') . getenv('APP_BASE_URL') . '/login');
+            return new RedirectResponse(getenv('APP_BASE_URL') . '/login');
         }
 
         return null;

@@ -18,8 +18,8 @@ abstract class Middleware
      * a 403/429 block, etc). Return null to let the request continue
      * through the rest of the pipeline.
      *
-     * @param  Request         $request
-     * @param  Route|null      $route     The matched route, when running as route-specific middleware.
+     * @param Request $request
+     * @param Route|null $route The matched route, when running as route-specific middleware.
      * @return Response|null
      */
     abstract public function handle(Request $request, ?Route $route = null): ?Response;

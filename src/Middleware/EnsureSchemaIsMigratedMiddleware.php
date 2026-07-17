@@ -5,6 +5,7 @@ use App\Entities\User;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Tools\SchemaTool;
 use Rhapsody\Core\Request;
+use Rhapsody\Core\Response;
 use Rhapsody\Core\Routing\Route;
 
 class EnsureSchemaIsMigratedMiddleware extends Middleware
@@ -20,11 +21,11 @@ class EnsureSchemaIsMigratedMiddleware extends Middleware
      * * @param Request $request
      * @param Route|null $route Passed along by the routing pipeline context
      */
-    public function handle(Request $request, ?Route $route = null): void
+    public function handle(Request $request, ?Route $route = null): ?Response
     {
         // 1. Ensure we have a valid route to inspect
         if (! $route) {
-            return;
+            return null;
         }
 
         $callback = $route->getCallback();
@@ -39,7 +40,7 @@ class EnsureSchemaIsMigratedMiddleware extends Middleware
 
             // 3. Early return if it is any other controller (Zero database performance overhead elsewhere)
             if ($controllerName !== 'AuthController') {
-                return;
+                return null;
             }
 
             // 4. Execute creation only for AuthController actions if table does not exist
@@ -51,5 +52,7 @@ class EnsureSchemaIsMigratedMiddleware extends Middleware
                 $schemaTool->createSchema([$userMetadata]);
             }
         }
+
+        return null;
     }
 }

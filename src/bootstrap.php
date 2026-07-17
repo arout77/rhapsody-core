@@ -307,7 +307,7 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
         {
             return Session::hasFlash($name);
         }
-    };
+    };;;;;;;;;;;;
 
     $twig->addGlobal('flash', $flash);
 
@@ -500,24 +500,36 @@ if (PHP_SAPI !== 'cli') {
 }
 
 // =========================================================================
-// STEP 3: ROUTING & ENVIRONMENT RUNTIME EXECUTION (Happens Last!)
+// STEP 3: ROUTING & MIDDLEWARE CONFIGURATION (boot-time, once)
 // =========================================================================
 
 // Global Middleware Configuration Setup
 $middlewareConfig = $config['middleware'] ?? ['map' => [], 'global' => []];
 Router::setMiddlewareConfig($middlewareConfig);
 
-// Safely resolve the core router instance now that all configuration recipes are mapped
-$router = $container->resolve(\Rhapsody\Core\Routing\Router::class);
+// Load routes exactly once. In production, prefer the compiled route cache
+// if it exists; otherwise load the live route files. This used to be split
+// across bootstrap.php (which only ever loaded routes/web.php, unconditionally)
+// and index.php (which loaded routes/web.php + routes/api.php AGAIN whenever
+// not using the cache) — meaning every app route was registered twice on
+// every non-cached request.
+$routeCachePath = $basePath . '/storage/cache/routes/routes.php';
+if (file_exists($routeCachePath) && ($config['app_env'] ?? 'production') === 'production') {
+    $routes = require $routeCachePath;
+    Router::setRoutes($routes);
+} else {
+    // 1. Framework-defined routes (login, docs, password reset, social auth, etc.)
+    if (file_exists($basePath . '/vendor/arout/rhapsody-core/src/routes.php')) {
+        require $basePath . '/vendor/arout/rhapsody-core/src/routes.php';
+    }
 
-// 1. Load framework-defined routes first (using consistent context paths)
-if (file_exists($basePath . '/vendor/arout/rhapsody-core/src/routes.php')) {
-    require $basePath . '/vendor/arout/rhapsody-core/src/routes.php';
-}
-
-// 2. Load downstream application custom web workspace routes
-if (file_exists($basePath . '/routes/web.php')) {
-    require $basePath . '/routes/web.php';
+    // 2. Downstream application routes
+    if (file_exists($basePath . '/routes/web.php')) {
+        require $basePath . '/routes/web.php';
+    }
+    if (file_exists($basePath . '/routes/api.php')) {
+        require $basePath . '/routes/api.php';
+    }
 }
 
 // 3. Return the completely compiled and configured dependency injection container.

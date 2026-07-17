@@ -114,23 +114,16 @@ class ErrorHandler
 
         if ($twig) {
             try {
-                $theme        = self::$config['theme'] ?? 'default';
-                $templateName = $theme . '/errors/' . $statusCode . '.twig';
+                // The container's Twig loader root is already the active theme
+                // directory (see bootstrap.php's Environment binding), so the
+                // template name here must NOT repeat the theme name again.
+                $templateName = 'errors/' . $statusCode . '.twig';
                 if ($twig->getLoader()->exists($templateName)) {
                     echo $twig->render($templateName, [
                         'message' => $statusCode === 404 ? 'Page not found.' : 'Server error.',
                         'code'    => $statusCode,
                     ]);
                     return;
-                } else {
-                    $defaultTemplate = 'default/errors/' . $statusCode . '.twig';
-                    if ($twig->getLoader()->exists($defaultTemplate)) {
-                        echo $twig->render($defaultTemplate, [
-                            'message' => $statusCode === 404 ? 'Page not found.' : 'Server error.',
-                            'code'    => $statusCode,
-                        ]);
-                        return;
-                    }
                 }
             } catch (\Exception $e) {
                 error_log('Twig error (container): ' . $e->getMessage());

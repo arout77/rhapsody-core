@@ -21,7 +21,7 @@ class VerifyCsrfTokenMiddleware extends Middleware
     /**
      * Handle an incoming request.
      *
-     * @param  Request $request
+     * @param Request $request
      * @return void
      */
     public function handle(Request $request, ?Route $route = null): ?Response
@@ -43,7 +43,7 @@ class VerifyCsrfTokenMiddleware extends Middleware
     /**
      * Determine if the request is a POST request.
      *
-     * @param  Request $request
+     * @param Request $request
      * @return bool
      */
     protected function isPostRequest(Request $request): bool
@@ -57,7 +57,7 @@ class VerifyCsrfTokenMiddleware extends Middleware
     /**
      * Determine if the request URI is in the exception array.
      *
-     * @param  Request $request
+     * @param Request $request
      * @return bool
      */
     protected function inExceptArray(Request $request): bool

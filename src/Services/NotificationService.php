@@ -2,7 +2,7 @@
 namespace Rhapsody\Core\Services;
 
 use Rhapsody\Core\Cache\CacheInterface;
-use Rhapsody\Core\Kernel;
+use Rhapsody\Core\FrameworkInfo;
 
 class NotificationService
 {
@@ -48,7 +48,7 @@ class NotificationService
         $ctx = stream_context_create([
             'http' => [
                 'timeout' => 1.5, // Aggressive low timeout to preserve user load speeds
-                'header'  => "User-Agent: RhapsodyKernel/" . Kernel::getVersion() . "\r\n",
+                'header'  => "User-Agent: RhapsodyKernel/" . FrameworkInfo::getVersion() . "\r\n",
             ],
         ]);
 
@@ -62,7 +62,7 @@ class NotificationService
 
     protected function compareVersions(array $remoteData): ?array
     {
-        $current = Kernel::getVersion();
+        $current = FrameworkInfo::getVersion();
         $latest  = $remoteData['version'] ?? '1.0.0';
 
         // standard semantic version matching natively managed by PHP

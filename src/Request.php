@@ -155,4 +155,29 @@ class Request
     {
         return $this->files;
     }
+
+    /**
+     * Determine if the request's path matches a given pattern.
+     * Supports a trailing wildcard, e.g. 'api/*' matches 'api/users', 'api/foo/bar', etc.
+     *
+     * @param string $pattern
+     * @return bool
+     */
+    public function is(string $pattern): bool
+    {
+        // getPath() returns a leading-slash path (e.g. '/api/users'); patterns
+        // are written without the leading slash (e.g. 'api/*'), so normalize both.
+        $path    = ltrim($this->getPath(), '/');
+        $pattern = ltrim($pattern, '/');
+
+        if ($pattern === $path) {
+            return true;
+        }
+
+        // Turn the wildcard pattern into a regex: escape everything except '*',
+        // which becomes '.*'.
+        $regex = '#^' . str_replace('\*', '.*', preg_quote($pattern, '#')) . '$#';
+
+        return (bool) preg_match($regex, $path);
+    }
 }

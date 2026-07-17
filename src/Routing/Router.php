@@ -102,8 +102,8 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
      * Dispatches the incoming request, matching it against registered routes,
      * executing global and route-specific middleware, and returning a Response.
      *
-     * @param  Request    $request
-     * @param  Container  $container
+     * @param Request $request
+     * @param Container $container
      * @return Response
      */
     public static function dispatch(Request $request, ContainerInterface $container): Response
@@ -162,9 +162,9 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
     /**
      * Safely executes the resolved route callback.
      *
-     * @param  Route      $route
-     * @param  Request    $request
-     * @param  Container  $container The application's service container.
+     * @param Route $route
+     * @param Request $request
+     * @param Container $container The application's service container.
      * @return Response
      */
     protected static function execute(Route $route, Request $request, ContainerInterface $container): Response
@@ -235,10 +235,10 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
     /**
      * Generate a URL from a named route.
      *
-     * @param  string     $name   The route name.
-     * @param  array      $params Parameters to replace in the path (e.g., ['id' => 123]).
-     * @throws \Exception If the route name is not found.
+     * @param string $name   The route name.
+     * @param array  $params Parameters to replace in the path (e.g., ['id' => 123]).
      * @return string
+     * @throws \Exception If the route name is not found.
      */
     public static function generateUrl(string $name, array $params = []): string
     {
