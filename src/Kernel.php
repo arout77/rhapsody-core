@@ -1,7 +1,7 @@
 <?php
 namespace Rhapsody\Core;
 
-use App\Services\NotificationService;
+use Rhapsody\Core\Services\NotificationService;
 use Rhapsody\Core\Contracts\ContainerInterface;
 use Rhapsody\Core\Exceptions\HttpException;
 use Rhapsody\Core\Routing\Router;

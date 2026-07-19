@@ -15,7 +15,8 @@ class VerifyCsrfTokenMiddleware extends Middleware
      * @var array
      */
     protected array $except = [
-        'api/*', // Exclude all routes starting with 'api/'
+        'api/*',           // Exclude all routes starting with 'api/'
+        'payment/webhook', // Stripe/PayPal webhooks are authenticated by signature, not a session token
     ];
 
     /**

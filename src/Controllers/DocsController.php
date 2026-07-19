@@ -116,6 +116,18 @@ class DocsController extends BaseController
     }
 
     /**
+     * Shows the Database documentation.
+     */
+    public function database(Request $request): Response
+    {
+        return $this->view('@core/docs/database.twig', [], [
+            'title'         => 'Database connection – Rhapsody Documentation',
+            'description'   => 'Database connectivity – Rhapsody Documentation',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
+
+    /**
      * Shows the views and templating documentation.
      */
     public function views(Request $request): Response
@@ -426,6 +438,18 @@ class DocsController extends BaseController
         return $this->view('@core/docs/lazy-service-loading.twig', [], [
             'title'         => 'Service Container Lazy Loading – Rhapsody Documentation',
             'description'   => 'Learn how Rhapsody\'s lazy loading system defers service instantiation to improve performance.',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
+
+    /**
+     * Shows the cookies/localstorage documentation.
+     */
+    public function cookieStorage(Request $request): Response
+    {
+        return $this->view('@core/docs/cookie-storage.twig', [], [
+            'title'         => 'Cookies & LocalStorage – Rhapsody Documentation',
+            'description'   => 'Learn about Rhapsody\'s cookie and local LocalStorage helpers.',
             'canonical_url' => $request->getCanonicalUrl(),
         ]);
     }

@@ -1,0 +1,78 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+<h1>Database</h1>
+<p>
+    Rhapsody provides a lightweight PDO wrapper with support for multiple database drivers
+    and query logging for debugging.
+</p>
+
+<h2>Configuration</h2>
+<p>
+    Configure your database connection in the <code>.env</code> file:
+</p>
+<pre><code class="language-bash">DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=your_database
+DB_USER=your_username
+DB_PASS=your_password
+DB_DRIVER="mysql" # mysql, pgsql, sqlite, or sqlsrv</code></pre>
+
+<h2>Supported Drivers</h2>
+<ul>
+    <li><strong>MySQL</strong> – Default driver</li>
+    <li><strong>PostgreSQL</strong> (<code>pgsql</code>)</li>
+    <li><strong>SQLite</strong> – Use <code>:memory:</code> for in-memory testing</li>
+    <li><strong>SQL Server</strong> (<code>sqlsrv</code>)</li>
+</ul>
+
+<h2>Using the Database</h2>
+<p>
+    The <code>Database</code> class is a singleton that lazily connects to the database
+    on first use. This means pages that don't need the database won't open a connection.
+</p>
+<p></p>
+
+<div class="bg-red-200 border-l-4 border-red-700 text-red-700 p-4">
+    <strong>Pro tip:</strong> It is best practice to place database queries inside models, rather than 
+    in your controllers (separation of concerns). This will keep your controllers clutter-free and make 
+    testing / maintaining your code much simpler. See <a href="{{ base_url }}/docs/models">models documentation</a> 
+    for more information.
+</div>
+
+<h3>Getting a Connection</h3>
+<pre><code class="language-php">use Rhapsody\Core\Database;
+
+// Get the global instance
+$db = Database::getInstance($config);
+$pdo = $db->getConnection();
+
+// Execute a query
+$stmt = $pdo->query("SELECT * FROM users WHERE id = 1");
+$user = $stmt->fetch();</code></pre>
+
+<h3>Prepared Statements</h3>
+<pre><code class="language-php">$pdo = Database::getInstance($config)->getConnection();
+$stmt = $pdo->prepare("SELECT * FROM users WHERE email = :email");
+$stmt->execute([':email' => 'user@example.com']);
+$user = $stmt->fetch();</code></pre>
+
+<h2>Query Logging</h2>
+<p>
+    The <code>TraceablePDO</code> class extends the native PDO and logs all queries
+    for debugging purposes. The debug toolbar displays these logs in the <strong>Database</strong> panel.
+</p>
+<p>
+    To access the query log programmatically:
+</p>
+<pre><code class="language-php">$queries = TraceablePDO::getQueryLog();
+foreach ($queries as $query) {
+    echo $query['sql'] . ' (' . $query['executionMS'] . 'ms)';
+}</code></pre>
+
+<h2>N+1 Query Detection</h2>
+<p>
+    The debug toolbar automatically detects and warns about N+1 query patterns
+    when the same query is executed multiple times.
+</p>
+{% endblock %}

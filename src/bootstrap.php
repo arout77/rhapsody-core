@@ -2,7 +2,7 @@
 
 // bootstrap.php
 use App\Providers\EventServiceProvider;
-use App\Services\NotificationService;
+use Rhapsody\Core\Services\NotificationService;
 use Composer\InstalledVersions;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\ORM\EntityManager;
@@ -324,11 +324,14 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
 
 // --- OTHER CORE SERVICES ---
 $container->bind(\Rhapsody\Core\Contracts\AuthenticatableInterface::class, \App\Models\User::class);
-$container->bind(PaymentGatewayInterface::class, function () {
-    // Instantiate Omnipay dynamically based on an ENV variable (e.g., Stripe, PayPal_Rest)
-    $gatewayType = $_ENV['PAYMENT_GATEWAY'] ?? 'Stripe';
+$container->bind(PaymentGatewayInterface::class, function () use ($config) {
+    $gatewayType = $config['payment']['gateway'] ?? 'Stripe';
+    $currency    = $config['payment']['currency'] ?? 'USD';
 
     $gateway = Omnipay::create($gatewayType);
+    if (! $gateway) {
+        throw new \RuntimeException("Unsupported payment gateway: \"{$gatewayType}\". Check the PAYMENT_GATEWAY env variable.");
+    }
 
     // Configure API keys based on the driver
     if ($gatewayType === 'Stripe') {
@@ -336,24 +339,10 @@ $container->bind(PaymentGatewayInterface::class, function () {
     } elseif ($gatewayType === 'PayPal_Rest') {
         $gateway->setClientId($_ENV['PAYPAL_CLIENT_ID'] ?? '');
         $gateway->setSecret($_ENV['PAYPAL_SECRET'] ?? '');
-        $gateway->setTestMode(true);
+        $gateway->setTestMode(filter_var($_ENV['PAYPAL_TEST_MODE'] ?? true, FILTER_VALIDATE_BOOLEAN));
     }
 
-    return new OmnipayGateway($gateway);
-});
-
-// bind the EventDispatcher with its listener map
-$container->bind(\Rhapsody\Core\Events\EventDispatcher::class, function () use ($container) {
-    $listeners = [
-        \App\Events\PaymentSucceededEvent::class => [
-            \App\Listeners\SendPaymentConfirmationEmail::class,
-            \App\Listeners\UpdateOrderStatus::class,
-        ],
-        \App\Events\PaymentFailedEvent::class    => [
-            \App\Listeners\LogPaymentFailure::class,
-        ],
-    ];
-    return new \Rhapsody\Core\Events\EventDispatcher($container, $listeners);
+    return new OmnipayGateway($gateway, $currency);
 });
 
 $container->bind(Rhapsody\Core\Mailer::class, function ($c) use ($config) {
@@ -365,11 +354,6 @@ $container->bind(Validator::class, function (Container $c) {
 $container->bind(Request::class, fn() => new Request());
 $container->bind(NotificationService::class, function (Container $c) {
     return new NotificationService($c->resolve(Cache::class));
-});
-
-// --- Omnipay
-$container->bind(PaymentGatewayInterface::class, function () {
-    return new \App\Services\PaymentGateway();
 });
 
 // --- COMMAND BINDINGS (Refactored to inject context-aware path mappings) ---
@@ -479,7 +463,7 @@ if (PHP_SAPI !== 'cli') {
                 \Rhapsody\Core\Database::class,
                 \Rhapsody\Core\Session::class,
                 \Twig\Environment::class,
-                \App\Services\NotificationService::class,
+                NotificationService::class,
             ]
         );
 

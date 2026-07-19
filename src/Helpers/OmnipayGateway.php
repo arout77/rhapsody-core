@@ -7,18 +7,22 @@ use Rhapsody\Core\Contracts\PaymentGatewayInterface;
 class OmnipayGateway implements PaymentGatewayInterface
 {
     protected GatewayInterface $gateway;
+    protected string $defaultCurrency;
 
-    public function __construct(GatewayInterface $gateway)
+    public function __construct(GatewayInterface $gateway, string $defaultCurrency = 'USD')
     {
-        $this->gateway = $gateway;
+        $this->gateway         = $gateway;
+        $this->defaultCurrency = $defaultCurrency;
     }
 
     public function charge($amount, $paymentMethod, array $options = []): array
     {
+        $currency = $options['currency'] ?? $this->defaultCurrency;
+
         // Leverage Omnipay's unified purchase/authorize API
         $response = $this->gateway->purchase(array_merge([
             'amount'   => $amount,
-            'currency' => 'USD', // Could be pulled from global config
+            'currency' => $currency,
             'token'    => $paymentMethod,
         ], $options))->send();
 
@@ -27,6 +31,7 @@ class OmnipayGateway implements PaymentGatewayInterface
                 'success'        => true,
                 'transaction_id' => $response->getTransactionReference(),
                 'message'        => 'Payment approved.',
+                'currency'       => $currency,
             ];
         }
 

@@ -2,7 +2,7 @@
 namespace Rhapsody\Core\Controllers;
 
 use Rhapsody\Core\BaseController;
-use Rhapsody\Core\Http\Request;
+use Rhapsody\Core\Request;
 use Rhapsody\Core\Response;
 
 abstract class BaseWebhookController extends BaseController

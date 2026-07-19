@@ -10,30 +10,30 @@
         <h1 class="text-4xl md:text-5xl font-black tracking-tight dark:text-white bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
             <img src="{{ base_url }}/public/images/logo.png"> Framework
         </h1>
-        <p class="text-lg text-slate-400 max-w-2xl mx-auto">
+        <p class="text-lg text-gray-700 dark:text-gray-200 max-w-2xl mx-auto">
             A custom, high-performance PHP MVC framework built with autowired dependency injection, decoupled architecture, and flexible Twig templating.
         </p>
     </header>
 
-    <hr class="border-slate-800">
+    <hr class="border-gray-800">
 
     <section class="space-y-6">
         <h2 class="text-2xl font-bold tracking-tight dark:text-white flex items-center gap-3">
             <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-600 text-sm font-bold">1</span>
             Overriding this Default Landing Page
         </h2>
-        <p class="text-slate-300 leading-relaxed">
+        <p class="text-gray-600 dark:text-gray-300 leading-relaxed">
             The core engine displays this default landing page if it cannot find a matching template in your downstream application workspace. To design your own homepage, simply mirror the layout inside your application's <code>views</code> folder:
         </p>
         
         <div class="space-y-2">
-            <span class="text-xs font-semibold tracking-wider text-slate-400 uppercase block">Create file location:</span>
-            <div class="bg-slate-950 px-4 py-2 rounded-lg text-xs font-mono text-emerald-400 border border-slate-800">
+            <span class="text-xs font-semibold tracking-wider text-gray-700 dark:text-gray-200 uppercase block">Create file location:</span>
+            <div class="bg-gray-950 px-4 py-2 rounded-lg text-xs font-mono text-emerald-400 border border-gray-800">
                 my-awesome-app/views/themes/default/home/landing.twig
             </div>
         </div>
 
-        <p class="text-slate-300">
+        <p class="text-gray-600 dark:text-gray-300">
             Open your new application-level file and extend your custom master wrapper layout like this:
         </p>
 
@@ -42,7 +42,7 @@
 {{ '{%' }} block content {{ '%}' }}
 <div class="text-center py-20">
     <h1 class="text-5xl font-bold dark:text-white">My Custom Homepage</h1>
-    <p class="text-slate-400 mt-4">Welcome to my custom application space built on Rhapsody!</p>
+    <p class="text-gray-700 dark:text-gray-200 mt-4">Welcome to my custom application space built on Rhapsody!</p>
 </div>
 {{ '{%' }} endblock {{ '%}' }}</code></pre>
     </section>
@@ -52,43 +52,48 @@
             <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-600 text-sm font-bold">2</span>
             Understanding UI Styling Strategies
         </h2>
-        <p class="text-slate-300 leading-relaxed">
+        <p class="text-gray-600 dark:text-gray-300 leading-relaxed">
             Rhapsody provides two flexible approaches for rendering styles, depending on whether you want to maintain the system's baseline ecosystem or construct an isolated layout from scratch.
         </p>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+            <div class="p-5 rounded-xl bg-gray-900 border border-gray-800 space-y-3">
                 <div class="text-emerald-400 font-bold text-sm tracking-wider uppercase flex items-center gap-2">
                     <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Strategy A
                 </div>
                 <h3 class="text-lg font-bold text-white">Extending Core Layouts</h3>
-                <p class="text-sm text-slate-400 leading-relaxed">
-                    By implementing <code>{{ '{%' }}' extends "@core/layouts/main.twig" {{ '%}' }}</code>, your view automatically inherits the framework's compiled compilation stack, containing a fully provisioned preloaded <strong>Tailwind CSS</strong> stylesheet context.
+                <p class="text-sm text-gray-200 leading-relaxed">
+                    By implementing <br>
+                    <code class="language-twig">{{ '{%' }}' extends "@core/layouts/main.twig" {{ '%}' }}</code>, <br>
+                    your view automatically inherits the framework's compiled compilation stack, containing a fully provisioned preloaded <strong>Tailwind CSS</strong> stylesheet context.
                 </p>
-                <div class="text-xs bg-slate-950 p-3 rounded-lg font-mono text-slate-400 border border-slate-800/50">
-                    <span class="text-indigo-400">&lt;div</span> <span class="text-purple-400">class=</span><span class="text-emerald-300">"bg-slate-900 flex p-4 text-center rounded-xl"</span><span class="text-indigo-400">&gt;</span>
+                <div class="text-xs bg-gray-950 p-3 rounded-lg font-mono text-gray-200 border border-gray-800/50">
+                    <span class="text-indigo-400">&lt;div</span> <span class="text-purple-400">class=</span><span class="text-emerald-300">"bg-gray-900 flex p-4 text-center rounded-xl"</span><span class="text-indigo-400">&gt;</span>
                 </div>
-                <p class="text-xs text-slate-500">
+                <p class="text-xs text-gray-300">
                     <strong>Best for:</strong> Core application dashboards, administration panel features, utility templates, and views where rapid prototyping with clean utility utilities is ideal.
                 </p>
             </div>
 
-            <div class="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+            <div class="p-5 rounded-xl bg-gray-900 border border-gray-800 space-y-3">
                 <div class="text-amber-400 font-bold text-sm tracking-wider uppercase flex items-center gap-2">
                     <span class="w-2 h-2 rounded-full bg-amber-400"></span> Strategy B
                 </div>
                 <h3 class="text-lg font-bold text-white">Custom Views with Raw CSS</h3>
-                <p class="text-sm text-slate-400 leading-relaxed">
+                <p class="text-sm text-gray-200 leading-relaxed">
                     If you bypass the core master template wrapper completely and craft a standalone view document, you possess a blank canvas. This frees you from the core utility utility overrides, allowing the attachment of precise, bespoke style documents.
                 </p>
-                <div class="text-xs bg-slate-950 p-3 rounded-lg font-mono text-slate-400 border border-slate-800/50">
+                <div class="text-xs bg-gray-950 p-3 rounded-lg font-mono text-gray-200 border border-gray-800/50">
                     <span class="text-indigo-400">&lt;link</span> <span class="text-purple-400">rel=</span><span class="text-emerald-300">"stylesheet"</span> <span class="text-purple-400">href=</span><span class="text-emerald-300">"{{ app_url }}/css/custom.css"</span><span class="text-indigo-400">&gt;</span>
                 </div>
-                <p class="text-xs text-slate-500">
+                <p class="text-xs text-gray-300">
                     <strong>Best for:</strong> Distinct public-facing marketing portals, specialized landing interfaces, legacy application style parity, or complex third-party presentation frameworks.
                 </p>
             </div>
         </div>
+        <p>
+            Please see the <a href="{{ base_url }}/docs/views" target="_blank">views</a> and <a href="{{ base_url }}/docs/themes" target="_blank">custom themes</a> documentation for more detailed instructions on creating your own custom views and themes.
+        </p>
     </section>
 
     <section class="space-y-6">
@@ -96,13 +101,13 @@
             <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-600 text-sm font-bold">3</span>
             Creating Custom Pages &amp; Endpoints
         </h2>
-        <p class="text-slate-300 leading-relaxed">
+        <p class="text-gray-600 dark:text-gray-300 leading-relaxed">
             Adding fresh application routes and controller endpoints follows a clean, highly structured execution sequence.
         </p>
 
         <div class="space-y-3">
             <h3 class="text-lg font-semibold text-indigo-400">A. Register your endpoint route URL</h3>
-            <p class="text-slate-300">
+            <p class="text-gray-600 dark:text-gray-300">
                 Open your application's web routing file (<code>routes/web.php</code>) and explicitly map your custom path to a Controller target action string:
             </p>
             <pre><code class="language-php">&lt;?php
@@ -115,7 +120,7 @@ Router::get('/dashboard', 'App\Controllers\DashboardController@index');</code></
 
         <div class="space-y-3 pt-4">
             <h3 class="text-lg font-semibold text-indigo-400">B. Build your Application Controller</h3>
-            <p class="text-slate-300">
+            <p class="text-gray-600 dark:text-gray-300">
                 Create your controller inside <code>app/Controllers/DashboardController.php</code>. By extending the framework's <code>BaseController</code>, you gain immediate, safe, autowired access to both the global container dependency injector and the Twig rendering engine:
             </p>
             <pre><code class="language-php">&lt;?php
@@ -142,26 +147,6 @@ class DashboardController extends BaseController
 }</code></pre>
         </div>
     </section>
-
-    <footer class="bg-slate-950 border border-slate-800 rounded-xl p-6 space-y-4">
-        <h4 class="text-sm font-bold tracking-wider text-slate-400 uppercase">
-            Framework System Context Diagnostics
-        </h4>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono text-slate-400">
-            <div class="p-3 bg-slate-900 rounded border border-slate-800">
-                <span class="text-slate-500 block">Active Theme Context</span>
-                <span class="text-indigo-400 font-semibold text-sm">{{ theme }}</span>
-            </div>
-            <div class="p-3 bg-slate-900 rounded border border-slate-800">
-                <span class="text-slate-500 block">Environment Profile</span>
-                <span class="text-purple-400 font-semibold text-sm">{{ app_env }}</span>
-            </div>
-            <div class="p-3 bg-slate-900 rounded border border-slate-800">
-                <span class="text-slate-500 block">Engine Core Version</span>
-                <span class="text-pink-400 font-semibold text-sm">v1.4.6</span>
-            </div>
-        </div>
-    </footer>
     
 </div>
 {% endblock %}

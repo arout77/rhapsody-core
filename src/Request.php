@@ -149,11 +149,71 @@ class Request
     }
 
     /**
+     * Get a request header by name (case-insensitive).
+     *
+     * @param string $name
+     * @param mixed $default
+     * @return mixed
+     */
+    public function header(string $name, $default = null)
+    {
+        // PHP exposes headers as HTTP_X_FOO_BAR in $_SERVER, except
+        // Content-Type/Content-Length which have no HTTP_ prefix.
+        $key = 'HTTP_' . strtoupper(str_replace('-', '_', $name));
+        if (isset($this->server[$key])) {
+            return $this->server[$key];
+        }
+
+        $key = strtoupper(str_replace('-', '_', $name));
+        return $this->server[$key] ?? $default;
+    }
+
+    /**
+     * Get the raw request body (e.g. for webhook signature verification,
+     * where the exact bytes matter and can't go through getBody()'s parsing).
+     *
+     * @return string
+     */
+    public function getContent(): string
+    {
+        return file_get_contents('php://input') ?: '';
+    }
+
+    /**
      * @return mixed
      */
     public function getFiles(): array
     {
         return $this->files;
+    }
+
+    /**
+     * Get a single value from the request body (POST fields or JSON payload —
+     * see getBody()), falling back to the query string if not present there.
+     *
+     * @param string $key
+     * @param mixed $default
+     * @return mixed
+     */
+    public function input(string $key, $default = null)
+    {
+        $body = $this->getBody();
+        if (array_key_exists($key, $body)) {
+            return $body[$key];
+        }
+
+        return $this->getParams[$key] ?? $default;
+    }
+
+    /**
+     * Get all input: the request body merged with the query string
+     * (body values take precedence).
+     *
+     * @return array
+     */
+    public function all(): array
+    {
+        return array_merge($this->getParams, $this->getBody());
     }
 
     /**
