@@ -50,7 +50,7 @@ abstract class BaseController
             throw new \Exception("Database service has not been properly initialized inside the Service Container.");
         }
 
-        $appVersion = $this->cache->get('update_available') ?? '1.0.0';
+        $appVersion = FrameworkInfo::getVersion();
         $appUrl     = $_ENV['APP_URL'] ?? 'http://localhost';
 
         $this->schema->add('SoftwareApplication', [

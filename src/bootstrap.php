@@ -13,6 +13,7 @@ use Rhapsody\Core\Cache;
 use Rhapsody\Core\Cache\CacheInterface;
 use Rhapsody\Core\Cache\FileCacheDriver;
 use Rhapsody\Core\Cache\RedisCacheDriver;
+use Rhapsody\Core\FrameworkInfo;
 use Rhapsody\Core\Commands\CacheClearCommand;
 use Rhapsody\Core\Commands\CacheWarmCommand;
 use Rhapsody\Core\Commands\CheckVersionCommand;
@@ -76,34 +77,10 @@ $container->bind('config', function () use ($config) {
     return $config;
 });
 
-/**
- * Get the version of a Composer package from its own composer.json.
- * Falls back to InstalledVersions if the file is missing.
- */
-function getPackageVersion(string $packageName): string
-{
-    $vendorDir    = Path::root() . '/vendor/' . $packageName;
-    $composerJson = $vendorDir . '/composer.json';
-
-    if (file_exists($composerJson)) {
-        $data = json_decode(file_get_contents($composerJson), true);
-        if (isset($data['version']) && $data['version'] !== 'dev-main') {
-            return $data['version'];
-        }
-    }
-
-    // Fallback: use Composer's InstalledVersions
-    if (class_exists(\Composer\InstalledVersions::class)) {
-        $version = \Composer\InstalledVersions::getVersion($packageName);
-        if ($version !== null && $version !== 'dev-main') {
-            return $version;
-        }
-    }
-
-    return 'unknown';
-}
-
-$config['app_version'] = getPackageVersion('arout/rhapsody-core');
+// The framework version shown in the debug toolbar and available to CLI
+// commands via $config['app_version'] — same source as the update-check
+// banner (see NotificationService), so both stay in sync automatically.
+$config['app_version'] = FrameworkInfo::getVersion();
 
 // =========================================================================
 // STEP 2: SERVICE REGISTRATION (Register bindings into container memory)
@@ -311,9 +288,6 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
 
     $twig->addGlobal('flash', $flash);
 
-    $cache = $c->resolve(Cache::class);
-    $twig->addGlobal('update_available', $cache->get('update_available'));
-
     $twig->addFunction(new \Twig\TwigFunction('csrf_field', function () {
         $token = Session::csrfToken();
         return new \Twig\Markup('<input type="hidden" name="_token" value="' . $token . '">', 'UTF-8');
@@ -365,7 +339,8 @@ $container->bind(CheckVersionCommand::class, function ($c) use ($config) {
     return new CheckVersionCommand(
         $config,
         $c->resolve(Mailer::class),
-        $c->resolve(Cache::class)
+        $c->resolve(Cache::class),
+        $c->resolve(NotificationService::class)
     );
 });
 
