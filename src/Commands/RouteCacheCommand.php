@@ -1,7 +1,7 @@
 <?php
 namespace Rhapsody\Core\Commands;
 
-use Rhapsody\Core\Router;
+use Rhapsody\Core\Routing\Router;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;

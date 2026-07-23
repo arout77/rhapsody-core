@@ -70,8 +70,15 @@ class Route
         }
 
         // 2. Convert route path to a regular expression.
-        //    Replace {parameter} with ([^/]+) and escape other characters.
-        $pattern = preg_replace('/\{[a-zA-Z0-9_]+\}/', '([^/]+)', $this->path);
+        //    Replace {parameter} with ([^/]+) and escape all literal
+        //    characters so regex metacharacters in the path (e.g. a literal
+        //    '.') are matched literally rather than as regex syntax.
+        $pattern = preg_replace_callback('/\{[a-zA-Z0-9_]+\}|[^{}]+/', function (array $m) {
+            if (preg_match('/^\{[a-zA-Z0-9_]+\}$/', $m[0])) {
+                return '([^/]+)';
+            }
+            return preg_quote($m[0], '#');
+        }, $this->path);
         $pattern = '#^' . $pattern . '$#';
 
         // 3. Test the URI against the pattern.

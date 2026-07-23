@@ -22,20 +22,28 @@ class Toolbar
 
             // Also compute N+1 count (optional, but helps the panel)
             $sqlCounts = [];
-            $nPlusOne  = 0;
-            foreach ($this->data['queries'] as $q) {
-                $sql = $q['sql'];
-                // Simple fingerprint: strip numbers and quoted strings
-                $fingerprint             = preg_replace("/\b(\d+|'[^']+')\b/", '?', $sql);
-                $sqlCounts[$fingerprint] = ($sqlCounts[$fingerprint] ?? 0) + 1;
+            foreach ($this->data['queries'] as &$q) {
+                $sql = $q['sql'] ?? '';
+                // Same normalization as Debug::end(), so both panels agree.
+                $normalized               = preg_replace('/\b\d+\b/', '?', $sql);
+                $normalized               = preg_replace("/'[^']*'/", '?', $normalized);
+                $normalized               = preg_replace('/\s+/', ' ', $normalized);
+                $sqlCounts[$normalized][] = &$q;
             }
-            foreach ($sqlCounts as $count) {
-                if ($count > 3) {
-                    $nPlusOne++;
-                }
+            unset($q);
 
+            $nPlusOneAlerts = [];
+            foreach ($sqlCounts as $queries) {
+                if (count($queries) > 3) {
+                    foreach ($queries as &$q) {
+                        $q['is_n_plus_1'] = true;
+                        $nPlusOneAlerts[] = $q;
+                    }
+                    unset($q);
+                }
             }
-            $this->data['n_plus_1_count'] = $nPlusOne;
+            $this->data['n_plus_one_alerts'] = $nPlusOneAlerts;
+            $this->data['n_plus_1_count']    = count($nPlusOneAlerts);
         }
         // --- Data Preparation for Toolbar Header ---
         $appVersion   = htmlspecialchars($this->data['app_version'] ?? 'N/A', ENT_QUOTES, 'UTF-8');
@@ -47,10 +55,12 @@ class Toolbar
 
         // --- Prepare performance data for React component ---
         $performanceProps = json_encode([
-            'time'    => (float) $execTime,
-            'memory'  => (float) $memUsage,
-            'queries' => $queryCount,
-            'route'   => $this->data['route'] ?? null,
+            'time'     => (float) $execTime,
+            'memory'   => (float) $memUsage,
+            'queries'  => $queryCount,
+            'route'    => $this->data['route'] ?? null,
+            'nPlusOne' => $this->data['n_plus_one_alerts'] ?? [],
+            'cache'    => $this->data['cache_stats'] ?? ['hits' => 0, 'misses' => 0, 'ratio' => 0],
         ], JSON_HEX_TAG | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
         // --- Data Preparation for React Island (Memory Profiler) ---

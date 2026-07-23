@@ -21,6 +21,14 @@ class Request
     }
 
     /**
+     * Returns the server/environment data captured when this Request was constructed.
+     */
+    public function getServerParams(): array
+    {
+        return $this->server;
+    }
+
+    /**
      * Automatically generates a clean, standardized canonical URL tag.
      * Filters out non-structural parameters to prevent duplicate content penalties.
      *

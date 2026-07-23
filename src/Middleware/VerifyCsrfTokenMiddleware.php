@@ -27,7 +27,7 @@ class VerifyCsrfTokenMiddleware extends Middleware
      */
     public function handle(Request $request, ?Route $route = null): ?Response
     {
-        if ($this->isPostRequest($request) && ! $this->inExceptArray($request)) {
+        if ($this->isMutatingRequest($request) && ! $this->inExceptArray($request)) {
             $token = $request->get('_token') ?? ($request->getBody()['_token'] ?? '');
             if (! Session::verifyCsrfToken($token)) {
                 $response = new Response();
@@ -42,17 +42,15 @@ class VerifyCsrfTokenMiddleware extends Middleware
     }
 
     /**
-     * Determine if the request is a POST request.
+     * Determine if the request uses a state-mutating HTTP method that
+     * requires CSRF verification (POST, PUT, PATCH, DELETE).
      *
      * @param Request $request
      * @return bool
      */
-    protected function isPostRequest(Request $request): bool
+    protected function isMutatingRequest(Request $request): bool
     {
-        // Request::getMethod() returns a lowercase string (see Request.php) —
-        // comparing against uppercase 'POST' here meant this always returned
-        // false, so CSRF verification silently never ran on any request.
-        return strtolower($request->getMethod()) === 'post';
+        return in_array(strtolower($request->getMethod()), ['post', 'put', 'patch', 'delete'], true);
     }
 
     /**

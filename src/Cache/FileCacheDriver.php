@@ -30,7 +30,7 @@ class FileCacheDriver implements CacheInterface
             return $default;
         }
 
-        $data = unserialize($content);
+        $data = json_decode($content, true);
         if (! is_array($data) || ! isset($data['expires'])) {
             return $default;
         }
@@ -59,7 +59,7 @@ class FileCacheDriver implements CacheInterface
             'expires' => time() + ($minutes * 60),
         ];
 
-        file_put_contents($this->cachePath . md5($key), serialize($data));
+        file_put_contents($this->cachePath . md5($key), json_encode($data));
     }
 
     /**
@@ -80,7 +80,7 @@ class FileCacheDriver implements CacheInterface
             return false;
         }
 
-        $data = unserialize($content);
+        $data = json_decode($content, true);
         if (! is_array($data) || ! isset($data['expires'])) {
             return false;
         }

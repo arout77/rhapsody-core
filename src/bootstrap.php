@@ -230,8 +230,14 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
 
     $twig = new Environment($loader, $twigOptions);
 
-    if (isset($_ENV['APP_KEY'])) {
+    if (! empty($_ENV['APP_KEY'])) {
         Cookie::setEncryptionKey($_ENV['APP_KEY']);
+    } elseif (($_ENV['APP_ENV'] ?? 'production') === 'production') {
+        throw new \RuntimeException(
+            'APP_KEY is not set. Generate one with: php -r "echo bin2hex(random_bytes(16));" ' .
+            'and add it to your .env file. The application cannot run in production without it, ' .
+            'since it is used to encrypt cookies.'
+        );
     }
 
     $twig->addGlobal('app_url', $_ENV['APP_URL'] ?? '');

@@ -18,7 +18,11 @@ class RedisCacheDriver implements CacheInterface
     public function get(string $key, $default = null)
     {
         $value = $this->redis->get($key);
-        return $value ? unserialize($value) : $default;
+        if ($value === null || $value === false) {
+            return $default;
+        }
+        $decoded = json_decode($value, true);
+        return $decoded === null && json_last_error() !== JSON_ERROR_NONE ? $default : $decoded;
     }
 
     /**
@@ -28,7 +32,7 @@ class RedisCacheDriver implements CacheInterface
      */
     public function put(string $key, $value, int $minutes): void
     {
-        $this->redis->setex($key, $minutes * 60, serialize($value));
+        $this->redis->setex($key, $minutes * 60, json_encode($value));
     }
 
     /**

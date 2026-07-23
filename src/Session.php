@@ -15,6 +15,18 @@ class Session
     public static function start(): void
     {
         if (session_status() === PHP_SESSION_NONE) {
+            $isHttps = (! empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+
+            session_set_cookie_params([
+                'lifetime' => 0,
+                'path'     => '/',
+                'domain'   => '',
+                'secure'   => $isHttps,
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]);
+
             session_start();
         }
 
@@ -119,8 +131,8 @@ class Session
      */
     public static function getFlash(string $key, $default = null): ?string
     {
-        $message = self::get('flash_' . $key, $default);
-        self::remove('flash_' . $key);
+        $message = self::get($key, $default);
+        self::remove($key);
         return $message;
     }
 
@@ -129,7 +141,7 @@ class Session
      */
     public static function hasFlash(string $key): bool
     {
-        return self::has('flash_' . $key);
+        return self::has($key);
     }
 
     /**

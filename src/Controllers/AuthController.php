@@ -59,16 +59,7 @@ class AuthController extends BaseController implements AuthenticatableInterface
 
         $user = $this->em->getRepository(User::class)->findOneBy(['email' => $data['email']]);
 
-        // DEBUG: Log the user and password verification
-        error_log("User found: " . ($user ? 'yes' : 'no'));
-        if ($user) {
-            error_log("Password verify result: " . (password_verify($data['password'], $user->getPassword()) ? 'true' : 'false'));
-            error_log("Input password: " . $data['password']);
-            error_log("Stored hash: " . $user->getPassword());
-        }
-
         if ($user && password_verify($data['password'], $user->getPassword())) {
-            error_log("Login successful, redirecting to /dashboard");
             Session::regenerate();
             Session::set('user_id', $user->getUserId());
             Session::set('user_name', $user->getName());
@@ -76,7 +67,6 @@ class AuthController extends BaseController implements AuthenticatableInterface
             return redirect('/dashboard');
         }
 
-        error_log("Login failed, redirecting to /login with error");
         return redirect('/login')->with('error', 'Invalid email or password.');
     }
 

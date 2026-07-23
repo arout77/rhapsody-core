@@ -58,7 +58,7 @@ class DdosMiddleware extends Middleware
 
     protected function getClientIp(Request $request): string
     {
-        $server = $request->server ?? $_SERVER; // fallback
+        $server = $request->getServerParams();
         $ip     = $server['HTTP_CLIENT_IP'] ?? $server['HTTP_X_FORWARDED_FOR'] ?? $server['REMOTE_ADDR'] ?? '0.0.0.0';
         if (strpos($ip, ',') !== false) {
             $ips = explode(',', $ip);

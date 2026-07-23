@@ -21,6 +21,9 @@ final class Cookie
      */
     public static function setEncryptionKey(string $key): void
     {
+        if ($key === '') {
+            return; // Ignore empty keys so getKey()'s fallback logic still runs.
+        }
         self::$encryptionKey = $key;
     }
 
@@ -146,8 +149,11 @@ final class Cookie
 
     private static function getKey(): string
     {
-        if (! isset(self::$encryptionKey)) {
-            $key = $_ENV['APP_KEY'] ?? 'default-secret-key-change-me';
+        if (! isset(self::$encryptionKey) || self::$encryptionKey === '') {
+            $key = $_ENV['APP_KEY'] ?? '';
+            if ($key === '') {
+                $key = 'default-secret-key-change-me';
+            }
             if (strlen($key) < 32) {
                 $key = str_pad($key, 32, '0');
             }
