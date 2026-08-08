@@ -1,0 +1,15 @@
+{
+    "name": "acme/welcome-bonus",
+    "type": "rhapsody-module",
+    "description": "Example Rhapsody module — grants new users a configurable welcome bonus.",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.3",
+        "arout/rhapsody-core": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Acme\\WelcomeBonus\\": "src/"
+        }
+    }
+}

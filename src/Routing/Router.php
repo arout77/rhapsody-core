@@ -66,8 +66,10 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
 
     public function addRoute(string $method, string $path, $callback): Route
     {
-        $route                   = new Route($method, $path, $callback);
-        $this->routes[$method][] = $route;
+        $route          = new Route($method, $path, $callback);
+        self::$routes[] = $route; // must land in the same collection dispatch()/getRoutes() read —
+                                   // previously this wrote to a non-existent $this->routes property,
+                                   // so routes added this way were never actually matched.
         return $route; // so you can chain ->name()
     }
 

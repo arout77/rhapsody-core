@@ -453,4 +453,16 @@ class DocsController extends BaseController
             'canonical_url' => $request->getCanonicalUrl(),
         ]);
     }
+
+    /**
+     * Shows the module/plugin system documentation.
+     */
+    public function modules(Request $request): Response
+    {
+        return $this->view('@core/docs/modules.twig', [], [
+            'title'         => 'Modules – Rhapsody Documentation',
+            'description'   => 'Learn how to build, install, and distribute Rhapsody modules — the permission-based plugin system for extending the framework.',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
 }

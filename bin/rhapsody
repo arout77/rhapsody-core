@@ -54,6 +54,8 @@ if (is_dir($coreCommandsPath)) {
         
         // Skip abstract classes or interfaces
         if (!class_exists($className)) {
+            fwrite(STDERR, "[\033[33mWarning\033[0m] {$file} did not resolve to class \"{$className}\" " .
+                "(check the class name/namespace exactly match the filename) — skipped.\n");
             continue;
         }
         
@@ -76,6 +78,9 @@ if (is_dir($coreCommandsPath)) {
                         'description' => $description,
                         'type'        => 'symfony'
                     ];
+                } else {
+                    fwrite(STDERR, "[\033[33mWarning\033[0m] {$className} resolved but has no command name " .
+                        "(pass one to parent::__construct(), use #[AsCommand], or call \$this->setName() in configure()) — skipped.\n");
                 }
             } elseif (property_exists($commandInstance, 'signature')) {
                 $signature = $commandInstance->signature;
@@ -90,11 +95,12 @@ if (is_dir($coreCommandsPath)) {
                 ];
             }
         } catch (\Throwable $e) {
-            // Skip commands that fail to resolve (e.g., due to missing dependencies)
-            // Optionally log for debugging:
-            // if ($commandName === 'help' || $commandName === '--help') {
-            //     echo "[\033[33mWarning\033[0m] Could not load command '{$className}': " . $e->getMessage() . "\n";
-            // }
+            // Surfaced instead of silently skipped — a command failing to
+            // resolve (e.g. a constructor dependency that isn't bound in
+            // the container) used to be indistinguishable from a command
+            // that simply doesn't exist.
+            fwrite(STDERR, "[\033[31mWarning\033[0m] Could not load command \"{$className}\": " .
+                $e->getMessage() . "\n");
             continue;
         }
     }
@@ -142,12 +148,14 @@ if (is_dir($appCommandsPath)) {
                 ];
             }
         } catch (\Throwable $e) {
-            // Skip commands that fail to resolve
+            fwrite(STDERR, "[\033[31mWarning\033[0m] Could not load command \"{$className}\": " .
+                $e->getMessage() . "\n");
             continue;
         }
     }
 }
 
+// -------------------------------------------------------------------------
 // Strategy 3: Fallback to config.php commands (backward compatibility)
 $config = $container->has('config') ? $container->resolve('config') : [];
 $configCommands = $config['commands'] ?? [];

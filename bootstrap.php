@@ -2,7 +2,7 @@
 
 // bootstrap.php
 use App\Providers\EventServiceProvider;
-use App\Services\NotificationService;
+use Composer\InstalledVersions;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\ORMSetup;
@@ -27,19 +27,23 @@ use Rhapsody\Core\Commands\MigrateCommand;
 use Rhapsody\Core\Commands\ReactInstallCommand;
 use Rhapsody\Core\Commands\RouteCacheCommand;
 use Rhapsody\Core\Commands\RouteClearCommand;
-use Rhapsody\Core\Commands\UpdateCommand;
 use Rhapsody\Core\Container;
 use Rhapsody\Core\Contracts\PaymentGatewayInterface;
 use Rhapsody\Core\Events\EventDispatcher;
+use Rhapsody\Core\FrameworkInfo;
 use Rhapsody\Core\Helpers\OmnipayGateway;
 use Rhapsody\Core\Helpers\Path;
 use Rhapsody\Core\Mailer;
 use Rhapsody\Core\Middleware\DdosMiddleware;
+use Rhapsody\Core\Proxy\ContainerDecorator;
+use Rhapsody\Core\Proxy\LazyProxyFactory;
 use Rhapsody\Core\QueryLogger;
 use Rhapsody\Core\Request;
 use Rhapsody\Core\Routing\Router;
+use Rhapsody\Core\Services\NotificationService;
 use Rhapsody\Core\Services\RateLimiter;
 use Rhapsody\Core\Session;
+use Rhapsody\Core\Storage\Cookie;
 use Rhapsody\Core\Validator;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\Cache\Adapter\FilesystemAdapter;
@@ -53,11 +57,11 @@ use Twig\Loader\FilesystemLoader;
 // 1. Establish the explicit runtime application path base directory context Safely
 $basePath = Path::root();
 
-if (file_exists(__DIR__ . '/.env')) {
-    $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+$envFile = $basePath . '/.env';
+if (file_exists($basePath . '/.env')) {
+    $dotenv = Dotenv\Dotenv::createImmutable($basePath);
     $dotenv->load();
 }
-
 // 2. Create a new Service Container instance and assign it to global scope
 global $container;
 $container  = new Container();
@@ -72,6 +76,11 @@ $config = require $configPath;
 $container->bind('config', function () use ($config) {
     return $config;
 });
+
+// The framework version shown in the debug toolbar and available to CLI
+// commands via $config['app_version'] — same source as the update-check
+// banner (see NotificationService), so both stay in sync automatically.
+$config['app_version'] = FrameworkInfo::getVersion();
 
 // =========================================================================
 // STEP 2: SERVICE REGISTRATION (Register bindings into container memory)
@@ -102,9 +111,13 @@ $container->bind(EventDispatcher::class, function (Container $c) {
 });
 
 // --- QUERY LOGGER BINDING (SINGLETON) ---
-$container->bind(QueryLogger::class, function () {
-    return new QueryLogger();
-});
+// $container->bind(QueryLogger::class, function () {
+//     static $instance;
+//     if ($instance === null) {
+//         $instance = new QueryLogger();
+//     }
+//     return $instance;
+// });
 
 // --- DOCTRINE ENTITY MANAGER BINDING ---
 $container->bind(EntityManager::class, function ($container) use ($config, $basePath) {
@@ -115,8 +128,8 @@ $container->bind(EntityManager::class, function ($container) use ($config, $base
     $sqlLogger = $container->resolve(QueryLogger::class);
 
     $cache          = $isDevMode ? new ArrayAdapter() : new FilesystemAdapter('', 0, $basePath . '/storage/cache/doctrine');
+    $sqlLogger      = \Rhapsody\Core\QueryLogger::getInstance();
     $doctrineConfig = ORMSetup::createAttributeMetadataConfiguration($paths, $isDevMode, null, $cache);
-
     $doctrineConfig->setSQLLogger($sqlLogger);
 
     $dbParams = [
@@ -201,9 +214,11 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
     }
 
     if (is_dir($coreViewsPath)) {
+        // Add to the 'core' namespace for @core/... references
         $loader->addPath($coreViewsPath, 'core');
+        // Also add to the default namespace as a fallback for non-namespaced templates
         $loader->addPath($coreViewsPath);
-    }
+    };
 
     // --- TWIG CACHING ENABLED ---
     $isDevelopment = ($config['app_env'] === 'development');
@@ -215,12 +230,27 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
 
     $twig = new Environment($loader, $twigOptions);
 
-    // Register React island functions here — not in BaseController — so they are
-    // available on every render including error pages that run before any controller.
-    $twig->addExtension(new \Rhapsody\Core\React\ReactIslandExtension());
+    if (! empty($_ENV['APP_KEY'])) {
+        Cookie::setEncryptionKey($_ENV['APP_KEY']);
+    } elseif (($_ENV['APP_ENV'] ?? 'production') === 'production') {
+        throw new \RuntimeException(
+            'APP_KEY is not set. Generate one with: php -r "echo bin2hex(random_bytes(16));" ' .
+            'and add it to your .env file. The application cannot run in production without it, ' .
+            'since it is used to encrypt cookies.'
+        );
+    }
 
     $twig->addGlobal('app_url', $_ENV['APP_URL'] ?? '');
     $twig->addGlobal('app_env', $_ENV['APP_ENV'] ?? 'production');
+
+    // $twig->addExtension(new \Rhapsody\Core\React\ReactIslandExtension());
+
+    // Register a smart vite_assets function
+    // the ['is_safe'] arg is crucial here; Twig will escape the output
+    // and just print the HTML to screen without it.
+    $twig->addFunction(new \Twig\TwigFunction('vite_assets', function ($entry) {
+        return \Rhapsody\Core\React\ViteManifest::tags($entry);
+    }, ['is_safe' => ['html']]));
 
     // Auth lazy object
     $auth = new class($c)
@@ -248,6 +278,7 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
     $twig->addGlobal('base_url', $_ENV['APP_URL'] . $_ENV['APP_BASE_URL']);
     $twig->addGlobal('APP_THEME', $_ENV['APP_THEME']);
     $twig->addGlobal('app_theme', $_ENV['APP_THEME']);
+    $twig->addExtension(new \Rhapsody\Core\Twig\StorageExtension());
 
     // Lazy‑loaded flash messages
     $flash = new class {
@@ -259,12 +290,9 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
         {
             return Session::hasFlash($name);
         }
-    };;;;;;;;;;;;;;;;;;;;;;;;
+    };
 
     $twig->addGlobal('flash', $flash);
-
-    $cache = $c->resolve(Cache::class);
-    $twig->addGlobal('update_available', $cache->get('update_available'));
 
     $twig->addFunction(new \Twig\TwigFunction('csrf_field', function () {
         $token = Session::csrfToken();
@@ -276,11 +304,14 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
 
 // --- OTHER CORE SERVICES ---
 $container->bind(\Rhapsody\Core\Contracts\AuthenticatableInterface::class, \App\Models\User::class);
-$container->bind(PaymentGatewayInterface::class, function () {
-    // Instantiate Omnipay dynamically based on an ENV variable (e.g., Stripe, PayPal_Rest)
-    $gatewayType = $_ENV['PAYMENT_GATEWAY'] ?? 'Stripe';
+$container->bind(PaymentGatewayInterface::class, function () use ($config) {
+    $gatewayType = $config['payment']['gateway'] ?? 'Stripe';
+    $currency    = $config['payment']['currency'] ?? 'USD';
 
     $gateway = Omnipay::create($gatewayType);
+    if (! $gateway) {
+        throw new \RuntimeException("Unsupported payment gateway: \"{$gatewayType}\". Check the PAYMENT_GATEWAY env variable.");
+    }
 
     // Configure API keys based on the driver
     if ($gatewayType === 'Stripe') {
@@ -288,24 +319,10 @@ $container->bind(PaymentGatewayInterface::class, function () {
     } elseif ($gatewayType === 'PayPal_Rest') {
         $gateway->setClientId($_ENV['PAYPAL_CLIENT_ID'] ?? '');
         $gateway->setSecret($_ENV['PAYPAL_SECRET'] ?? '');
-        $gateway->setTestMode(true);
+        $gateway->setTestMode(filter_var($_ENV['PAYPAL_TEST_MODE'] ?? true, FILTER_VALIDATE_BOOLEAN));
     }
 
-    return new OmnipayGateway($gateway);
-});
-
-// bind the EventDispatcher with its listener map
-$container->bind(\Rhapsody\Core\Events\EventDispatcher::class, function () use ($container) {
-    $listeners = [
-        \App\Events\PaymentSucceededEvent::class => [
-            \App\Listeners\SendPaymentConfirmationEmail::class,
-            \App\Listeners\UpdateOrderStatus::class,
-        ],
-        \App\Events\PaymentFailedEvent::class    => [
-            \App\Listeners\LogPaymentFailure::class,
-        ],
-    ];
-    return new \Rhapsody\Core\Events\EventDispatcher($container, $listeners);
+    return new OmnipayGateway($gateway, $currency);
 });
 
 $container->bind(Rhapsody\Core\Mailer::class, function ($c) use ($config) {
@@ -320,15 +337,16 @@ $container->bind(NotificationService::class, function (Container $c) {
 });
 
 // --- COMMAND BINDINGS (Refactored to inject context-aware path mappings) ---
-$container->bind(UpdateCommand::class, function () use ($config) {
-    return new UpdateCommand($config);
+$container->bind(\Rhapsody\Core\Commands\AuthInstallCommand::class, function ($c) {
+    return new \Rhapsody\Core\Commands\AuthInstallCommand();
 });
 
 $container->bind(CheckVersionCommand::class, function ($c) use ($config) {
     return new CheckVersionCommand(
         $config,
         $c->resolve(Mailer::class),
-        $c->resolve(Cache::class)
+        $c->resolve(Cache::class),
+        $c->resolve(NotificationService::class)
     );
 });
 
@@ -388,28 +406,109 @@ $container->bind(ReactInstallCommand::class, function () use ($basePath) {
 $container->bind(MakeReactCommand::class, function () use ($basePath) {
     return new MakeReactCommand($basePath);
 });
+
+$container->bind(\Rhapsody\Core\Commands\BuildProxiesCommand::class, function ($c) use ($basePath) {
+    return new \Rhapsody\Core\Commands\BuildProxiesCommand;
+});
+
+// --------------------------------------------------------------
+// STEP 2.5: USER EXTENSION HOOK
+// --------------------------------------------------------------
+$userBootstrap = $basePath . '/bootstrap.php';
+if (file_exists($userBootstrap)) {
+    // The container is fully built; pass it to the user file.
+    require $userBootstrap;
+}
+
 // =========================================================================
-// STEP 3: ROUTING & ENVIRONMENT RUNTIME EXECUTION (Happens Last!)
+// STEP 2.6: MODULE BOOTSTRAP
+// =========================================================================
+// Discover every installed Composer package of type "rhapsody-module",
+// validate its manifest/compatibility, and boot it. Must run after the
+// container above is fully built (modules resolve EventDispatcher/Router/
+// Twig through it via ModuleContext) and before STEP 3 loads routes, since
+// a module's boot() is where it registers its own routes.
+$moduleInstalls = new \Rhapsody\Core\Modules\ModuleInstallationStore($basePath);
+$moduleRegistry = new \Rhapsody\Core\Modules\ModuleRegistry($container, $basePath, $moduleInstalls);
+$moduleRegistry->bootAll();
+$container->instance(\Rhapsody\Core\Modules\ModuleInstallationStore::class, $moduleInstalls);
+$container->instance(\Rhapsody\Core\Modules\ModuleRegistry::class, $moduleRegistry);
+
+// =========================================================================
+// STEP 2.7: LAZY LOADING DECORATOR (web only)
+// =========================================================================
+
+// Only apply lazy loading for web requests (not CLI)
+if (PHP_SAPI !== 'cli') {
+    $lazyEnabled = filter_var(
+        $_ENV['LAZY_LOADING_ENABLED'] ?? $config['lazy']['enabled'] ?? true,
+        FILTER_VALIDATE_BOOLEAN
+    );
+
+    if ($lazyEnabled) {
+        $eagerServices = array_merge(
+            $config['lazy']['eager'] ?? [],
+            [
+                \Rhapsody\Core\Container::class,
+                \Rhapsody\Core\Routing\Router::class,
+                \Rhapsody\Core\Events\EventDispatcher::class,
+                \Rhapsody\Core\Request::class,
+                \Rhapsody\Core\Response::class,
+                \Rhapsody\Core\Cache::class,
+                \Rhapsody\Core\Database::class,
+                \Rhapsody\Core\Session::class,
+                \Twig\Environment::class,
+                NotificationService::class,
+            ]
+        );
+
+        $proxyCacheDir = $basePath . '/storage/cache/proxies';
+        $proxyFactory  = new \Rhapsody\Core\Proxy\LazyProxyFactory($container, $proxyCacheDir);
+
+        $container = new \Rhapsody\Core\Proxy\ContainerDecorator(
+            $container,
+            $proxyFactory,
+            $lazyEnabled,
+            $eagerServices
+        );
+
+        // Update the global reference.
+        global $container;
+        $container = $container;
+    }
+}
+
+// =========================================================================
+// STEP 3: ROUTING & MIDDLEWARE CONFIGURATION (boot-time, once)
 // =========================================================================
 
 // Global Middleware Configuration Setup
 $middlewareConfig = $config['middleware'] ?? ['map' => [], 'global' => []];
-Router::setMiddlewareConfig(
-    $middlewareConfig['map'],
-    $middlewareConfig['global']
-);
+Router::setMiddlewareConfig($middlewareConfig);
 
-// Safely resolve the core router instance now that all configuration recipes are mapped
-$router = $container->resolve(\Rhapsody\Core\Routing\Router::class);
+// Load routes exactly once. In production, prefer the compiled route cache
+// if it exists; otherwise load the live route files. This used to be split
+// across bootstrap.php (which only ever loaded routes/web.php, unconditionally)
+// and index.php (which loaded routes/web.php + routes/api.php AGAIN whenever
+// not using the cache) — meaning every app route was registered twice on
+// every non-cached request.
+$routeCachePath = $basePath . '/storage/cache/routes/routes.php';
+if (file_exists($routeCachePath) && ($config['app_env'] ?? 'production') === 'production') {
+    $routes = require $routeCachePath;
+    Router::setRoutes($routes);
+} else {
+    // 1. Framework-defined routes (login, docs, password reset, social auth, etc.)
+    if (file_exists($basePath . '/vendor/arout/rhapsody-core/src/routes.php')) {
+        require $basePath . '/vendor/arout/rhapsody-core/src/routes.php';
+    }
 
-// 1. Load framework-defined routes first (using consistent context paths)
-if (file_exists($basePath . '/vendor/arout/rhapsody-core/src/routes.php')) {
-    require $basePath . '/vendor/arout/rhapsody-core/src/routes.php';
-}
-
-// 2. Load downstream application custom web workspace routes
-if (file_exists($basePath . '/routes/web.php')) {
-    require $basePath . '/routes/web.php';
+    // 2. Downstream application routes
+    if (file_exists($basePath . '/routes/web.php')) {
+        require $basePath . '/routes/web.php';
+    }
+    if (file_exists($basePath . '/routes/api.php')) {
+        require $basePath . '/routes/api.php';
+    }
 }
 
 // 3. Return the completely compiled and configured dependency injection container.

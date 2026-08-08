@@ -65,6 +65,7 @@ if (file_exists($basePath . '/.env')) {
 // 2. Create a new Service Container instance and assign it to global scope
 global $container;
 $container  = new Container();
+$container->instance(\Rhapsody\Core\Contracts\ContainerInterface::class, $container);
 $configPath = $basePath . '/config/config.php';
 
 if (! file_exists($configPath)) {
@@ -421,7 +422,21 @@ if (file_exists($userBootstrap)) {
 }
 
 // =========================================================================
-// STEP 2.6: LAZY LOADING DECORATOR (web only)
+// STEP 2.6: MODULE BOOTSTRAP
+// =========================================================================
+// Discover every installed Composer package of type "rhapsody-module",
+// validate its manifest/compatibility, and boot it. Must run after the
+// container above is fully built (modules resolve EventDispatcher/Router/
+// Twig through it via ModuleContext) and before STEP 3 loads routes, since
+// a module's boot() is where it registers its own routes.
+$moduleInstalls = new \Rhapsody\Core\Modules\ModuleInstallationStore($basePath);
+$moduleRegistry = new \Rhapsody\Core\Modules\ModuleRegistry($container, $basePath, $moduleInstalls);
+$moduleRegistry->bootAll();
+$container->instance(\Rhapsody\Core\Modules\ModuleInstallationStore::class, $moduleInstalls);
+$container->instance(\Rhapsody\Core\Modules\ModuleRegistry::class, $moduleRegistry);
+
+// =========================================================================
+// STEP 2.7: LAZY LOADING DECORATOR (web only)
 // =========================================================================
 
 // Only apply lazy loading for web requests (not CLI)

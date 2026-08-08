@@ -1,0 +1,235 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>Modules</h1>
+    <p>
+        Modules let you package functionality — event listeners, routes, Twig helpers, admin-configurable settings — as an installable Composer package, and optionally sell it on the Rhapsody Marketplace. Unlike a typical plugin system, a module's code never gets full run of the framework: it only ever receives a <code>ModuleContext</code> object, and every capability that object exposes checks the module's own manifest before doing anything on its behalf.
+    </p>
+    <p>
+        Declare what your module needs up front in <code>module.json</code>, and everything else follows from that — including making automated marketplace review possible, since a submission's entire capability surface can be checked before any of its code runs.
+    </p>
+    <hr>
+
+    <h2>1. Anatomy of a Module</h2>
+    <p>A module is an ordinary Composer package with one required addition: its <code>type</code> must be <code>rhapsody-module</code>.</p>
+    <pre class="command-line"><code class="language-bash">my-modules/welcome-bonus/
+├── composer.json
+├── module.json
+└── src/
+    └── ModuleProvider.php</code></pre>
+
+    <pre><code class="language-json">// composer.json
+{
+    "name": "acme/welcome-bonus",
+    "type": "rhapsody-module",
+    "require": {
+        "php": "^8.3",
+        "arout/rhapsody-core": "^2.0"
+    },
+    "autoload": {
+        "psr-4": { "Acme\\WelcomeBonus\\": "src/" }
+    }
+}</code></pre>
+
+    <hr>
+
+    <h2>2. The Manifest (<code>module.json</code>)</h2>
+    <p>
+        This is the single most important file in your module — it declares exactly what your module is allowed to do. Anything your provider tries to do that isn't declared here throws immediately, rather than failing silently or being caught later at marketplace review.
+    </p>
+
+    <h3>Required fields</h3>
+    <ul>
+        <li><code>name</code> – <code>vendor-slug/module-slug</code>, must match your Composer package name exactly.</li>
+        <li><code>type</code> – must be the literal string <code>"rhapsody-module"</code>. This is what makes your package discoverable.</li>
+        <li><code>version</code> – semver, e.g. <code>1.0.0</code>.</li>
+        <li><code>rhapsody_core</code> – a semver constraint against the installed core version, e.g. <code>"^2.0"</code>. Modules that don't satisfy this are skipped, not fatal.</li>
+        <li><code>title</code> – human-readable name, shown in the marketplace and <code>module:list</code>.</li>
+        <li><code>provider</code> – fully-qualified class name implementing <code>ModuleServiceProviderInterface</code>.</li>
+    </ul>
+
+    <h3>Optional fields</h3>
+    <ul>
+        <li><code>description</code>, <code>category</code>, <code>license</code>, <code>author</code> – shown on your marketplace listing. <code>category</code> must be one of <code>seo</code>, <code>commerce</code>, <code>content</code>, <code>analytics</code>, <code>integration</code>, <code>security</code>, <code>media</code>, <code>utility</code>, <code>other</code>.</li>
+        <li><code>settings_schema</code> – an array of field definitions that will drive an auto-generated admin settings form. Write it now even though the renderer isn't shipped yet — it's already validated.</li>
+    </ul>
+
+    <h3>Permissions</h3>
+    <p>
+        A closed set of six capability keys — anything else in this block fails validation on purpose. Omitting a key (or setting it to <code>false</code>) means your module can't do that thing at all. See <a href="{{ base_url }}/docs/modules#permissions">Permissions</a> below for what each one grants.
+    </p>
+
+    <pre><code class="language-json">{
+    "name": "acme/welcome-bonus",
+    "type": "rhapsody-module",
+    "version": "1.0.0",
+    "rhapsody_core": "^2.0",
+    "title": "Welcome Bonus",
+    "description": "Grants new users a configurable welcome bonus.",
+    "category": "commerce",
+    "provider": "Acme\\WelcomeBonus\\ModuleProvider",
+    "permissions": {
+        "events.listen": { "listen": ["Rhapsody\\Core\\Events\\UserRegistered"] },
+        "routes.register": { "prefix": "welcome-bonus" },
+        "settings.manage": {},
+        "storage.access": {}
+    },
+    "settings_schema": [
+        { "key": "bonus_amount", "type": "number", "label": "Bonus amount (USD)", "default": 10 }
+    ]
+}</code></pre>
+
+    <div class="bg-red-200 border-l-4 border-red-700 text-red-700 p-4">
+        <strong>Note:</strong> a manifest with an unknown permission key, or a malformed field, throws <code>ManifestValidationException</code> the moment it's parsed — during normal boot this disables just that one module (logged, not fatal), and during marketplace submission it's the very first, cheapest stage of automated review.
+    </div>
+
+    <hr>
+
+    <h2>3. Writing the Provider</h2>
+    <p>Your <code>provider</code> class is your module's entire entry point. It implements three methods from <code>ModuleServiceProviderInterface</code>:</p>
+    <ul>
+        <li><code>boot()</code> – runs on every request. Register your listeners, routes, and Twig helpers here.</li>
+        <li><code>install()</code> – runs once, the first time an operator runs <code>module:install</code>. Seed default settings here.</li>
+        <li><code>uninstall()</code> – runs once, when <code>module:uninstall</code> is run. Clean up whatever <code>install()</code> created.</li>
+    </ul>
+
+    <pre><code class="language-php">&lt;?php
+namespace Acme\WelcomeBonus;
+
+use Rhapsody\Core\Events\UserRegistered;
+use Rhapsody\Core\Modules\Contracts\ModuleServiceProviderInterface;
+use Rhapsody\Core\Modules\ModuleContext;
+use Rhapsody\Core\Response;
+
+class ModuleProvider implements ModuleServiceProviderInterface
+{
+    public function boot(ModuleContext $context): void
+    {
+        $context->events()->listen(UserRegistered::class, function (UserRegistered $event) use ($context) {
+            $amount = $context->settings()->get('bonus_amount', 10);
+            $context->storage()->put(
+                'bonus-log.txt',
+                sprintf("[%s] granted $%s to user #%s\n", date('c'), $amount, $event->user->getUserId())
+            );
+        });
+
+        // Mounted at /welcome-bonus/balance — prefix from module.json,
+        // no forced "/modules/" segment.
+        $context->routes()->get('/balance', function () use ($context) {
+            $amount = $context->settings()->get('bonus_amount', 10);
+            return (new Response())->setContent("Current welcome bonus: \${$amount}");
+        });
+    }
+
+    public function install(ModuleContext $context): void
+    {
+        $context->settings()->set('bonus_amount', 10);
+    }
+
+    public function uninstall(ModuleContext $context): void
+    {
+        // Clean up whatever install() created.
+    }
+}</code></pre>
+
+    <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
+        <strong>Golden Rule:</strong> everything your provider does goes through <code>$context</code> — never reach for the framework's service container, raw PDO, <code>$_SERVER</code>, or <code>eval</code>/<code>exec</code>. Static analysis during marketplace review specifically flags exactly that.
+    </div>
+
+    <hr>
+
+    <h2 id="permissions">4. Permissions</h2>
+
+    <h3><code>events.listen</code></h3>
+    <p>Lets you listen for framework/application events.</p>
+    <pre><code class="language-php">$context->events()->listen(UserRegistered::class, function (UserRegistered $event) {
+    // ...
+});</code></pre>
+    <p><strong>Restriction:</strong> <code>listen</code> must be a non-empty array of fully-qualified event class names in the manifest. There's no wildcard grant — trying to listen for an event outside your declared list throws, even with <code>events.listen</code> otherwise granted.</p>
+
+    <h3><code>routes.register</code></h3>
+    <p>Lets you register HTTP routes.</p>
+    <pre><code class="language-php">$context->routes()->get('/balance', function () { /* ... */ });
+// → mounted at /welcome-bonus/balance ("welcome-bonus" is this module's prefix)</code></pre>
+    <p><strong>Restriction:</strong> namespaced routes (<code>get</code>/<code>post</code>/<code>put</code>/<code>delete</code>) always mount at <code>/{prefix}/...</code>. <code>prefix</code> defaults to your module's own slug if omitted.</p>
+    <p>If you need a genuine root-level path — a sitemap, <code>robots.txt</code>, a fixed webhook URL — declare it explicitly and use <code>root()</code>:</p>
+    <pre><code class="language-json">"routes.register": {
+    "prefix": "seo-sitemap",
+    "paths": ["/sitemap.xml"]
+}</code></pre>
+    <pre><code class="language-php">$context->routes()->root('GET', '/sitemap.xml', function () { /* ... */ });</code></pre>
+    <p><code>root()</code> only works for exact paths listed in <code>routes.register.paths</code> — an explicit, reviewable whitelist rather than free rein over the URL space.</p>
+
+    <h3><code>twig.extensions</code> / <code>twig.functions</code></h3>
+    <p>Lets you extend the Twig environment used by themes.</p>
+    <pre><code class="language-php">$context->twig()->addFunction('formatBonus', fn ($amount) => '$' . number_format($amount, 2));
+// callable in templates as mod_welcome_bonus_formatBonus(...)</code></pre>
+    <p><strong>Restriction:</strong> function names are automatically prefixed <code>mod_{slug}_...</code> — enforced, not optional, so two modules (or a module and core) can never clobber each other's Twig functions.</p>
+
+    <h3><code>storage.access</code></h3>
+    <p>Lets you read/write files scoped to your module.</p>
+    <pre><code class="language-php">$context->storage()->put('log.txt', "some data\n");
+$context->storage()->get('log.txt');</code></pre>
+    <p><strong>Restriction:</strong> hard-confined to <code>storage/modules/{your-slug}/</code>. Every path is resolved and checked against that root — path traversal throws rather than silently escaping the sandbox.</p>
+
+    <h3><code>settings.manage</code></h3>
+    <p>Lets you persist your module's own configuration.</p>
+    <pre><code class="language-php">$context->settings()->set('bonus_amount', 25);   // requires settings.manage
+$context->settings()->get('bonus_amount', 10);   // reads are always allowed</code></pre>
+    <p><strong>Restriction:</strong> the one asymmetric permission — reads are always available (your module always needs to read its own config), only writes require <code>settings.manage</code>.</p>
+
+    <hr>
+
+    <h2>5. Installing & Testing Locally</h2>
+    <p>Point your app's Composer at your module via a path repository so you can iterate without publishing anywhere:</p>
+    <pre><code class="language-json">// your app's composer.json
+"repositories": [
+    { "type": "path", "url": "../my-modules/welcome-bonus" }
+],
+"require": {
+    "acme/welcome-bonus": "*"
+}</code></pre>
+    <p>
+        Being Composer-installed and being <em>active</em> are different things — a module is only discoverable until an operator explicitly activates it. This mirrors a real marketplace flow: <code>composer require</code> gets you the code, activation is a separate, deliberate step, and nothing in the module runs until it happens.
+    </p>
+    <pre class="command-line"><code class="language-bash">composer update acme/welcome-bonus
+php rhapsody module:list                       # confirm it's discovered
+php rhapsody module:install acme/welcome-bonus  # runs install(), activates it</code></pre>
+    <p>
+        Test the route directly with <code>curl</code> or your browser. To test an event listener, trigger it through your app's real flow (e.g. an actual registration through your signup form) — not a raw database insert — since the event only fires where your application code actually dispatches it.
+    </p>
+
+    <hr>
+
+    <h2>6. CLI Commands</h2>
+    <table class="w-full text-left border-collapse mb-6">
+        <thead>
+            <tr class="border-b border-gray-300 dark:border-gray-600">
+                <th class="py-2 pr-4">Command</th>
+                <th class="py-2">What it does</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr class="border-b border-gray-200 dark:border-gray-700">
+                <td class="py-2 pr-4"><code>module:list</code></td>
+                <td class="py-2">Lists every discovered <code>rhapsody-module</code> package and whether it's installed.</td>
+            </tr>
+            <tr class="border-b border-gray-200 dark:border-gray-700">
+                <td class="py-2 pr-4"><code>module:install {name}</code></td>
+                <td class="py-2">Runs the module's <code>install()</code> hook once and marks it installed. Fails on an incompatible core version, a missing provider class, or if <code>install()</code> itself throws.</td>
+            </tr>
+            <tr class="border-b border-gray-200 dark:border-gray-700">
+                <td class="py-2 pr-4"><code>module:uninstall {name} [--force]</code></td>
+                <td class="py-2">Runs <code>uninstall()</code> and deactivates the module. Prompts for confirmation unless <code>--force</code> is passed.</td>
+            </tr>
+        </tbody>
+    </table>
+    <p><code>module:uninstall</code> does not run <code>composer remove</code> for you — that's a separate, deliberate step if you also want the package gone from <code>vendor/</code>.</p>
+
+    <hr>
+
+    <h2>What's Not Here Yet</h2>
+    <p>
+        There's deliberately no capability for arbitrary database access, global middleware registration, or reaching another module's internals. Database migrations for modules, a <code>middleware.register</code> capability, and a <code>settings_schema</code> admin UI renderer are all planned, but out of scope today — the manifest schema already reserves space for them so adding support later won't be a breaking change to existing <code>module.json</code> files.
+    </p>
+{% endblock %}
