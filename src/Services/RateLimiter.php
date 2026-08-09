@@ -31,9 +31,13 @@ class RateLimiter
             ];
         }
 
-        // If block expired, remove the key (using forget)
+        // If the block expired, clear both the expiry marker AND the request
+        // counter — otherwise a stale over-limit count (which uses its own,
+        // separate TTL based on $window) can immediately re-trigger the block
+        // the instant it expires, whenever block_duration <= window.
         if ($expiry !== null) {
             $this->cache->forget($expiryKey);
+            $this->cache->forget($cacheKey);
         }
 
         // 2. Get current request count (this key uses TTL to auto-reset)

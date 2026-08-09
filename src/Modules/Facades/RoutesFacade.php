@@ -89,14 +89,32 @@ final class RoutesFacade
         $this->assertAllowed();
 
         return array_map(
-            static fn (Route $route) => new RegisteredRoute(
+            fn (Route $route) => new RegisteredRoute(
                 method: $route->getMethod(),
                 path: $route->getPath(),
                 name: $route->getName(),
                 middleware: $route->getMiddleware(),
+                controller: $this->controllerOf($route),
             ),
             Router::getRoutes(),
         );
+    }
+
+    /**
+     * Pulls the controller class name out of a route's callback, if it's the
+     * common [ControllerClass::class, 'method'] or [$instance, 'method']
+     * shape. Returns null for closures/first-class callables, where there's
+     * no class to report — never returns the callback itself.
+     */
+    private function controllerOf(Route $route): ?string
+    {
+        $callback = $route->getCallback();
+
+        if (! is_array($callback) || ! isset($callback[0])) {
+            return null;
+        }
+
+        return is_string($callback[0]) ? $callback[0] : get_class($callback[0]);
     }
 
     private function registerNamespaced(string $method, string $path, mixed $callback): Route
