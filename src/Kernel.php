@@ -39,13 +39,24 @@ class Kernel
         $response = Router::dispatch($request, $this->container);
 
         // A controller/middleware may set a 404/500 status directly on the
-        // Response rather than throwing HttpException; normalize both paths
-        // through the same themed error-page rendering.
-        if ($response->getStatusCode() === 404) {
-            throw new HttpException(404, 'Page not found');
-        }
-        if ($response->getStatusCode() === 500) {
-            throw new HttpException(500, 'Server error');
+        // Response rather than throwing HttpException; normalize that to
+        // the same themed error-page rendering — but ONLY for non-JSON
+        // responses. A JSON API response (e.g. BaseAiController) that
+        // deliberately built a real error body must reach the client as
+        // that body, not get discarded and replaced with a contentless
+        // HTML error page — that breaks the JSON contract every API caller
+        // is relying on, and throws away the actual reason for the failure.
+        $headers     = $response->getHeaders();
+        $contentType = $headers['Content-Type'] ?? 'text/html';
+        $isJson      = str_contains($contentType, 'application/json');
+
+        if (! $isJson) {
+            if ($response->getStatusCode() === 404) {
+                throw new HttpException(404, 'Page not found');
+            }
+            if ($response->getStatusCode() === 500) {
+                throw new HttpException(500, 'Server error');
+            }
         }
 
         return $response;

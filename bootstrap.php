@@ -28,6 +28,7 @@ use Rhapsody\Core\Commands\ReactInstallCommand;
 use Rhapsody\Core\Commands\RouteCacheCommand;
 use Rhapsody\Core\Commands\RouteClearCommand;
 use Rhapsody\Core\Container;
+use Rhapsody\Core\Contracts\AiClientInterface;
 use Rhapsody\Core\Contracts\PaymentGatewayInterface;
 use Rhapsody\Core\Events\EventDispatcher;
 use Rhapsody\Core\FrameworkInfo;
@@ -40,6 +41,7 @@ use Rhapsody\Core\Proxy\LazyProxyFactory;
 use Rhapsody\Core\QueryLogger;
 use Rhapsody\Core\Request;
 use Rhapsody\Core\Routing\Router;
+use Rhapsody\Core\Services\GeminiClient;
 use Rhapsody\Core\Services\NotificationService;
 use Rhapsody\Core\Services\RateLimiter;
 use Rhapsody\Core\Session;
@@ -290,7 +292,7 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
         {
             return Session::hasFlash($name);
         }
-    };
+    };;
 
     $twig->addGlobal('flash', $flash);
 
@@ -331,9 +333,18 @@ $container->bind(Rhapsody\Core\Mailer::class, function ($c) use ($config) {
 $container->bind(Validator::class, function (Container $c) {
     return new Validator($c->resolve(EntityManager::class));
 });
+
 $container->bind(Request::class, fn() => new Request());
+
 $container->bind(NotificationService::class, function (Container $c) {
     return new NotificationService($c->resolve(Cache::class));
+});
+
+$container->bind(AiClientInterface::class, function () use ($config) {
+    return new GeminiClient(
+        new \GuzzleHttp\Client(),
+        $config['ai']['gemini'] ?? []
+    );
 });
 
 // --- COMMAND BINDINGS (Refactored to inject context-aware path mappings) ---

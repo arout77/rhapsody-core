@@ -465,4 +465,16 @@ class DocsController extends BaseController
             'canonical_url' => $request->getCanonicalUrl(),
         ]);
     }
+
+    /**
+     * Shows the AI integration (Gemini) documentation.
+     */
+    public function ai(Request $request): Response
+    {
+        return $this->view('@core/docs/ai.twig', [], [
+            'title'         => 'AI Integration (Gemini) – Rhapsody Documentation',
+            'description'   => 'Learn how to use and customize the Gemini AI integration — the AiClientInterface contract, error handling, the BaseAiController endpoint, and the React island.',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
 }

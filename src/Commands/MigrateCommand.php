@@ -16,8 +16,8 @@ class MigrateCommand
 
     /**
      * Autowired via the container binding in bootstrap.php
-     * * @param string $basePath Context-aware application root directory path
-     * @param Database $db Core database utility singleton instance
+     * @param string   $basePath Context-aware application root directory path
+     * @param Database $db       Core database utility singleton instance
      */
     public function __construct(string $basePath, Database $db)
     {
@@ -27,7 +27,7 @@ class MigrateCommand
 
     /**
      * Automatically called by the refactored CLI dynamic runner
-     * * @param array $args Remaining command line arguments
+     * @param array $args Remaining command line arguments
      */
     public function execute(array $args): void
     {

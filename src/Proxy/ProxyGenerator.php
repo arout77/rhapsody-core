@@ -12,6 +12,29 @@ class ProxyGenerator
 {
     private string $cacheDir;
 
+    /**
+     * Method names owned by the proxy scaffold itself (see the generated
+     * class body below — getWrappedObject/setInitializer/getInitializer/
+     * isProxyInitialized are part of LazyProxyInterface's own contract).
+     * A target class that happens to declare a method with one of these
+     * names must NOT have it delegated — that would silently overwrite the
+     * scaffold's real implementation instead of generating a passthrough.
+     *
+     * Note: the scaffold's internal initialize() trigger is intentionally
+     * NOT listed here — it's handled separately by renaming it to
+     * __lazyProxyInitialize() below, specifically because unlike these four,
+     * "initialize" is a common enough method name on real classes (e.g.
+     * Symfony Console's Command::initialize()) that skipping it would mean
+     * silently never generating a delegate for a real lifecycle method,
+     * which is worse than a naming collision.
+     */
+    private const RESERVED_METHOD_NAMES = [
+        'getWrappedObject',
+        'setInitializer',
+        'getInitializer',
+        'isProxyInitialized',
+    ];
+
     public function __construct(string $cacheDir)
     {
         $this->cacheDir = $cacheDir;
@@ -57,6 +80,10 @@ class ProxyGenerator
                 continue;
             }
 
+            if (in_array($method->getName(), self::RESERVED_METHOD_NAMES, true)) {
+                continue;
+            }
+
             $visibility = $method->isProtected() ? 'protected' : 'public';
 
             // Build parameter list
@@ -98,7 +125,7 @@ class ProxyGenerator
             $methods[] = <<<METHOD
     {$visibility} function {$methodName}({$paramsStr}){$returnStr}
     {
-        \$this->initialize();
+        \$this->__lazyProxyInitialize();
         {$body}
     }
 METHOD;
@@ -126,7 +153,7 @@ class {$shortClassName} {$extends} {$implements}
         \$this->initializer = \$initializer;
     }
 
-    private function initialize(): void
+    private function __lazyProxyInitialize(): void
     {
         if (\$this->wrappedObject === null && \$this->initializer !== null) {
             \$initializer = \$this->initializer;
@@ -137,7 +164,7 @@ class {$shortClassName} {$extends} {$implements}
 
     public function getWrappedObject(): ?object
     {
-        \$this->initialize();
+        \$this->__lazyProxyInitialize();
         return \$this->wrappedObject;
     }
 

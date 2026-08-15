@@ -11,7 +11,7 @@ interface ContainerInterface
     /**
      * Binds an abstract to a concrete implementation or closure.
      *
-     * @param string $abstract
+     * @param string               $abstract
      * @param callable|string|null $concrete
      */
     public function bind(string $abstract, callable | string | null $concrete = null): void;
@@ -20,23 +20,23 @@ interface ContainerInterface
      * Stores a shared instance (singleton) in the container.
      *
      * @param string $abstract
-     * @param mixed $instance
+     * @param mixed  $instance
      */
     public function instance(string $abstract, $instance): void;
 
     /**
      * Finds an entry of the container by its identifier and returns it.
      *
-     * @param string $id
-     * @return mixed
+     * @param  string       $id
      * @throws \Exception
+     * @return mixed
      */
     public function get(string $id): mixed;
 
     /**
      * Checks if a binding exists in the container.
      *
-     * @param string $abstract
+     * @param  string $abstract
      * @return bool
      */
     public function has(string $abstract): bool;
@@ -44,21 +44,9 @@ interface ContainerInterface
     /**
      * Resolves a class from the container, automatically injecting dependencies.
      *
-     * @param string $abstract
-     * @return mixed
+     * @param  string       $abstract
      * @throws \Exception
+     * @return mixed
      */
     public function resolve(string $abstract): mixed;
-
-    /**
-     * Returns the resolution trace (for debugging).
-     *
-     * @return array
-     */
-    public static function getTrace(): array;
-
-    /**
-     * Resets the resolution trace.
-     */
-    public static function resetTrace(): void;
 }

@@ -63,16 +63,6 @@ class ContainerDecorator implements ContainerInterface
         return $this->proxyFactory->create($abstract);
     }
 
-    public static function getTrace(): array
-    {
-        return Container::getTrace();
-    }
-
-    public static function resetTrace(): void
-    {
-        Container::resetTrace();
-    }
-
     private function isEager(string $abstract): bool
     {
         return in_array($abstract, $this->eagerServices, true);

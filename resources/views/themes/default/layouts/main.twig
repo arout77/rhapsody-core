@@ -7,11 +7,11 @@
     {# Dynamic Title & Description Blocks #}
     <title>{% block title %}{{ meta.title }}{% endblock %}</title>
     <meta name="description" content="{% block description %}{{ meta.description }}{% endblock %}">
-    
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     {# Assumes the full URL is needed for canonical and OG tags #}
     {% set current_url = app_url ~ app.request.uri %}
     {% if meta.canonical_url %}
-        <link rel="canonical" href="{{ meta.canonical_url }}">
+    <link rel="canonical" href="{{ meta.canonical_url }}">
     {% endif %}
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ current_url }}">
@@ -28,11 +28,11 @@
     
     {# Framework Default Styles (Wrapped in a block so it can be completely emptied or modified) #}
     {% block styles %}
-        <link rel="stylesheet" href="{{ base_url }}/public/themes/default/css/style.css">
-        <link rel="stylesheet" href="{{ base_url }}/public/css/prism.css">
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ base_url }}/public/themes/default/css/style.css">
+    <link rel="stylesheet" href="{{ base_url }}/public/css/prism.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
     {% endblock %}
     
     <script>
