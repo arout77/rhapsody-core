@@ -48,6 +48,13 @@ class GeminiClient implements AiClientInterface
         $model = $options['model'] ?? $this->config['model'] ?? 'gemini-2.5-flash';
         $url   = self::API_BASE . rawurlencode($model) . ':generateContent';
 
+        $generationConfig = array_filter([
+            'temperature'     => $options['temperature'] ?? $this->config['temperature'] ?? null,
+            'maxOutputTokens' => $options['max_tokens'] ?? $this->config['max_tokens'] ?? null,
+            'topP'            => $options['top_p'] ?? null,
+            'topK'            => $options['top_k'] ?? null,
+        ], fn ($value) => $value !== null);
+
         $body = [
             'contents' => array_map(
                 fn (array $m) => [
@@ -57,13 +64,16 @@ class GeminiClient implements AiClientInterface
                 ],
                 $messages
             ),
-            'generationConfig' => array_filter([
-                'temperature'     => $options['temperature'] ?? $this->config['temperature'] ?? null,
-                'maxOutputTokens' => $options['max_tokens'] ?? $this->config['max_tokens'] ?? null,
-                'topP'            => $options['top_p'] ?? null,
-                'topK'            => $options['top_k'] ?? null,
-            ], fn ($value) => $value !== null),
         ];
+
+        // PHP's json_encode([]) produces a JSON array ('[]'), not an object
+        // ('{}') — there's no way to distinguish an empty associative array
+        // from an empty list. Gemini's API expects generationConfig to be an
+        // object when present, so when there's nothing to configure, omit
+        // the key entirely rather than sending a malformed empty array.
+        if (! empty($generationConfig)) {
+            $body['generationConfig'] = $generationConfig;
+        }
 
         // Generation can genuinely take tens of seconds for long output —
         // this default is deliberately more generous than a typical web
