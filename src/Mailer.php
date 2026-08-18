@@ -3,6 +3,7 @@ namespace Rhapsody\Core;
 
 use Symfony\Component\Mailer\Mailer as SymfonyMailer;
 use Symfony\Component\Mailer\Transport;
+use Symfony\Component\Mime\Address;
 use Symfony\Component\Mime\Email;
 
 class Mailer
@@ -30,8 +31,8 @@ class Mailer
         }
 
         $transportStr = $mailConfig['transport'] ?? 'smtp';
-        $username     = $mailConfig['username'] ?? '';
-        $password     = $mailConfig['password'] ?? '';
+        $username     = rawurlencode($mailConfig['username'] ?? '');
+        $password     = rawurlencode($mailConfig['password'] ?? '');
         $host         = $mailConfig['host'];
         $port         = $mailConfig['port'] ?? 25;
 
@@ -58,7 +59,7 @@ class Mailer
         $fromName    = (string) ($this->mailConfig['from_name'] ?? 'Example');
 
         $email = (new Email())
-            ->from("{$fromName} <{$fromAddress}>")
+            ->from(new Address($fromAddress, $fromName))
             ->to($to)
             ->subject($subject)
             ->html($htmlBody);

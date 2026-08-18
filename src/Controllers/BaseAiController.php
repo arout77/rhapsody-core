@@ -3,6 +3,7 @@ namespace Rhapsody\Core\Controllers;
 
 use Rhapsody\Core\Ai\Exceptions\AiAuthenticationException;
 use Rhapsody\Core\Ai\Exceptions\AiException;
+use Rhapsody\Core\Ai\Exceptions\AiModelUnavailableException;
 use Rhapsody\Core\Ai\Exceptions\AiRateLimitException;
 use Rhapsody\Core\Ai\Exceptions\AiServerException;
 use Rhapsody\Core\Ai\Exceptions\AiTimeoutException;
@@ -122,6 +123,20 @@ class BaseAiController extends BaseController
             ], $debug), 502);
         }
 
+        if ($e instanceof AiModelUnavailableException) {
+            error_log('AI model unavailable [' . ($e->model ?? 'unknown') . ']: ' . $e->getMessage());
+            // This is a config problem (a stale/retired model name), not a
+            // transient failure — it'll keep happening on every request
+            // until GEMINI_MODEL gets updated. Give a subclass a chance to
+            // do something about that (e.g. alert an admin) — core has no
+            // opinion on how; see BaseAiController::onModelUnavailable().
+            $this->onModelUnavailable($e);
+
+            return $this->json(array_merge([
+                'error' => 'The AI service is temporarily unavailable. Please try again shortly.',
+            ], $debug), 503);
+        }
+
         if ($e instanceof AiAuthenticationException) {
             error_log('AI auth error [' . get_class($e) . ']: ' . $e->getMessage());
             return $this->json(array_merge([
@@ -133,6 +148,26 @@ class BaseAiController extends BaseController
         return $this->json(array_merge([
             'error' => 'Something went wrong generating a response.',
         ], $debug), 500);
+    }
+
+    /**
+     * Called whenever a request fails because the configured model is
+     * invalid, deprecated, or no longer available — a no-op by default.
+     * Core has no opinion on how you want to be notified (email, Slack,
+     * an incident tool, whatever); override this in an app-level subclass
+     * to hook in whichever mechanism fits, the same way BillingController
+     * extends BaseBillingController to dispatch PaymentSucceededEvent/
+     * PaymentFailedEvent on top of the base charge-handling.
+     *
+     * Example:
+     *   protected function onModelUnavailable(AiModelUnavailableException $e): void
+     *   {
+     *       $this->dispatcher->dispatch(new AiModelUnavailableEvent($e->model, $e->getMessage()));
+     *   }
+     */
+    protected function onModelUnavailable(AiModelUnavailableException $e): void
+    {
+        // Intentionally empty — see docblock above.
     }
 
     /**

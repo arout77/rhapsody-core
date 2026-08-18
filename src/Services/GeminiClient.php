@@ -7,6 +7,7 @@ use GuzzleHttp\Exception\RequestException;
 use Rhapsody\Core\Ai\AiResponse;
 use Rhapsody\Core\Ai\Exceptions\AiAuthenticationException;
 use Rhapsody\Core\Ai\Exceptions\AiException;
+use Rhapsody\Core\Ai\Exceptions\AiModelUnavailableException;
 use Rhapsody\Core\Ai\Exceptions\AiRateLimitException;
 use Rhapsody\Core\Ai\Exceptions\AiServerException;
 use Rhapsody\Core\Ai\Exceptions\AiTimeoutException;
@@ -45,7 +46,7 @@ class GeminiClient implements AiClientInterface
             );
         }
 
-        $model = $options['model'] ?? $this->config['model'] ?? 'gemini-2.5-flash';
+        $model = $options['model'] ?? $this->config['model'] ?? 'gemini-3.7-flash';
         $url   = self::API_BASE . rawurlencode($model) . ':generateContent';
 
         $generationConfig = array_filter([
@@ -96,7 +97,7 @@ class GeminiClient implements AiClientInterface
                 previous: $e
             );
         } catch (RequestException $e) {
-            throw $this->translateRequestException($e, $timeout);
+            throw $this->translateRequestException($e, $timeout, $model);
         }
 
         $data = json_decode((string) $response->getBody(), true);
@@ -107,7 +108,7 @@ class GeminiClient implements AiClientInterface
         return AiResponse::fromGeminiPayload($data);
     }
 
-    private function translateRequestException(RequestException $e, float $timeout): AiException
+    private function translateRequestException(RequestException $e, float $timeout, string $model): AiException
     {
         $response = $e->getResponse();
 
@@ -131,6 +132,10 @@ class GeminiClient implements AiClientInterface
         $decoded = json_decode((string) $response->getBody(), true);
         $message = $decoded['error']['message'] ?? $e->getMessage();
 
+        if ($this->isModelUnavailableError($decoded, $message)) {
+            return new AiModelUnavailableException($message, model: $model, previous: $e);
+        }
+
         return match (true) {
             $status === 429 => new AiRateLimitException(
                 $message,
@@ -141,6 +146,50 @@ class GeminiClient implements AiClientInterface
             $status >= 500 => new AiServerException($message, previous: $e),
             default => new AiException($message, previous: $e),
         };
+    }
+
+    /**
+     * Detects "the configured model is invalid/deprecated/unavailable"
+     * specifically, as distinct from other 400/404-class errors (a
+     * malformed request body, an invalid parameter, etc.).
+     *
+     * Uses Gemini's structured error.status enum where possible (more
+     * reliable than free-text matching), falling back to message-pattern
+     * matching for phrasings that don't map to a single clean status enum
+     * — Google has already used at least two differently-worded messages
+     * for this same underlying situation ("is not found for API version",
+     * "is no longer available to new users"), so relying on exact wording
+     * alone is fragile.
+     */
+    private function isModelUnavailableError(?array $decoded, string $message): bool
+    {
+        $status = $decoded['error']['status'] ?? null;
+        $lower  = strtolower($message);
+
+        if ($status === 'NOT_FOUND' && str_contains($lower, 'model')) {
+            return true;
+        }
+
+        if (! str_contains($lower, 'model')) {
+            return false;
+        }
+
+        $modelProblemPhrases = [
+            'no longer available',
+            'not found for api version',
+            'not supported for generatecontent',
+            'has been deprecated',
+            'has been retired',
+            'is not supported',
+        ];
+
+        foreach ($modelProblemPhrases as $phrase) {
+            if (str_contains($lower, $phrase)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function parseRetryAfter(\Psr\Http\Message\ResponseInterface $response): ?int
