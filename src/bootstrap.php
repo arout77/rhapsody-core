@@ -431,9 +431,17 @@ if (file_exists($userBootstrap)) {
 // a module's boot() is where it registers its own routes.
 $moduleInstalls = new \Rhapsody\Core\Modules\ModuleInstallationStore($basePath);
 $moduleRegistry = new \Rhapsody\Core\Modules\ModuleRegistry($container, $basePath, $moduleInstalls);
-$moduleRegistry->bootAll();
+
+// Register both in the container BEFORE bootAll() runs — modules get
+// container access during boot (indirectly, via ModuleContext), so if a
+// module's boot() ever resolves either of these services to inspect its
+// own or another module's installation state, it needs to find the real,
+// already-constructed instances here, not a resolution failure or a
+// stale duplicate built from scratch.
 $container->instance(\Rhapsody\Core\Modules\ModuleInstallationStore::class, $moduleInstalls);
 $container->instance(\Rhapsody\Core\Modules\ModuleRegistry::class, $moduleRegistry);
+
+$moduleRegistry->bootAll();
 
 // =========================================================================
 // STEP 2.7: LAZY LOADING DECORATOR (web only)
