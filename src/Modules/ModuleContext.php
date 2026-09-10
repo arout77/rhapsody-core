@@ -4,6 +4,7 @@ namespace Rhapsody\Core\Modules;
 
 use Rhapsody\Core\Contracts\ContainerInterface;
 use Rhapsody\Core\Events\EventDispatcher;
+use Rhapsody\Core\Modules\Facades\DatabaseFacade;
 use Rhapsody\Core\Modules\Facades\EventsFacade;
 use Rhapsody\Core\Modules\Facades\RoutesFacade;
 use Rhapsody\Core\Modules\Facades\SettingsFacade;
@@ -79,6 +80,16 @@ final class ModuleContext
         return new SettingsFacade(
             $this->basePath . '/storage/modules/' . $this->manifest->slug() . '/settings.json',
             $this->manifest->permissions,
+        );
+    }
+
+    public function database(): DatabaseFacade
+    {
+        return new DatabaseFacade(
+            $this->container->resolve(\Rhapsody\Core\Database::class)->getConnection(),
+            $this->container->resolve(\Doctrine\ORM\EntityManager::class),
+            $this->manifest->permissions,
+            $this->manifest->tablePrefix(),
         );
     }
 }

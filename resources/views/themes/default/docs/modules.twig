@@ -22,7 +22,7 @@
         <li><a href="{{ base_url }}/docs/modules#structure">2. Module structure</a></li>
         <li><a href="{{ base_url }}/docs/modules#manifest">3. The manifest (<code>module.json</code>)</a></li>
         <li><a href="{{ base_url }}/docs/modules#provider">4. Writing the provider</a></li>
-        <li><a href="{{ base_url }}/docs/modules#context">5. <code>ModuleContext</code> and the five facades</a></li>
+        <li><a href="{{ base_url }}/docs/modules#context">5. <code>ModuleContext</code> and the six facades</a></li>
         <li><a href="{{ base_url }}/docs/modules#permissions">&nbsp;&nbsp;&nbsp;4.1 <code>events.listen</code></a></li>
         <li><a href="{{ base_url }}/docs/modules#routes">&nbsp;&nbsp;&nbsp;4.2 <code>routes.register</code></a></li>
         <li><a href="{{ base_url }}/docs/modules#twig">&nbsp;&nbsp;&nbsp;4.3 <code>twig.extensions</code> / <code>twig.functions</code></a></li>
@@ -143,7 +143,7 @@ $twig   = $container->resolve(Environment::class);</code></pre>
 
     <h3>Permissions</h3>
     <p>
-        There are exactly six capability keys, and this is a <strong>closed list</strong> — you cannot invent a seventh, and putting anything else here fails validation. Omitting a key (or explicitly setting it to <code>false</code>) means your module cannot perform that action, full stop; there's no "maybe" or "ask at runtime." Each one is covered in exhaustive detail in <a href="{{ base_url }}/docs/modules#context">section 5</a> below, but as a quick preview, they are: <code>events.listen</code>, <code>routes.register</code>, <code>twig.extensions</code>, <code>twig.functions</code>, <code>storage.access</code>, <code>settings.manage</code>.
+        There are exactly seven capability keys, and this is a <strong>closed list</strong> — you cannot invent an eighth, and putting anything else here fails validation. Omitting a key (or explicitly setting it to <code>false</code>) means your module cannot perform that action, full stop; there's no "maybe" or "ask at runtime." Each one is covered in exhaustive detail in <a href="{{ base_url }}/docs/modules#context">section 5</a> below, but as a quick preview, they are: <code>events.listen</code>, <code>routes.register</code>, <code>twig.extensions</code>, <code>twig.functions</code>, <code>storage.access</code>, <code>settings.manage</code>, <code>database.access</code>.
     </p>
 
     <h3>Full Example</h3>
@@ -177,7 +177,7 @@ $twig   = $container->resolve(Environment::class);</code></pre>
 module.json: "type" must be "rhapsody-module", got "plugin"
 module.json: "name" must look like "vendor-slug/module-slug"
 module.json: "version" must be valid semver, got "1.0"
-module.json: unknown permission "database.access" — allowed: events.listen, routes.register, twig.extensions, twig.functions, storage.access, settings.manage
+module.json: unknown permission "payments.charge" — allowed: events.listen, routes.register, twig.extensions, twig.functions, storage.access, settings.manage, database.access
 module.json: "events.listen" requires a non-empty "listen" array of event class names</code></pre>
     <p>Each of those corresponds to exactly one thing going wrong — a typo'd field name, a permission key that doesn't exist, forgetting the <code>listen</code> array. If you see one of these, the fix is almost always a one-line edit to <code>module.json</code>.</p>
 
@@ -271,15 +271,16 @@ class ModuleProvider implements ModuleServiceProviderInterface
 
     <hr>
 
-    <h2 id="context">5. <code>ModuleContext</code> and the Five Facades</h2>
+    <h2 id="context">5. <code>ModuleContext</code> and the Six Facades</h2>
     <p>
-        <code>$context</code> — the single argument every one of your three provider methods receives — is an instance of <code>Rhapsody\Core\Modules\ModuleContext</code>. It doesn't do much on its own; its entire job is to hand you one of five small, focused objects (the "facades" from <a href="{{ base_url }}/docs/modules#concepts">section 1</a>) when you call a method on it:
+        <code>$context</code> — the single argument every one of your three provider methods receives — is an instance of <code>Rhapsody\Core\Modules\ModuleContext</code>. It doesn't do much on its own; its entire job is to hand you one of six small, focused objects (the "facades" from <a href="{{ base_url }}/docs/modules#concepts">section 1</a>) when you call a method on it:
     </p>
     <pre><code class="language-php">$context->events()    // → EventsFacade
 $context->routes()    // → RoutesFacade
 $context->twig()      // → TwigFacade
 $context->storage()   // → StorageFacade
-$context->settings()  // → SettingsFacade</code></pre>
+$context->settings()  // → SettingsFacade
+$context->database()  // → DatabaseFacade</code></pre>
     <p>
         Every single one of these facades does the same thing before doing anything else: it checks <code>ModulePermissions::can('the.relevant.key')</code> against your manifest. If the answer is no, it throws <code>ModulePermissionException</code> immediately — your code never even reaches the real framework service underneath. This check happens on <em>every call</em>, not just once at boot, so there's no way to "get away with it" by calling something in an unusual order.
     </p>
@@ -455,7 +456,116 @@ $all    = $context->settings()->all();                       // every setting as
         Every <code>set()</code> call reads that whole file, updates the one key you're setting, and writes the whole file back out — so it's safe to call <code>set()</code> repeatedly with different keys over time; nothing gets clobbered. There's no schema enforcement at the storage layer itself — you can store a string, a number, an array, whatever <code>json_encode()</code> can represent — but your <code>settings_schema</code> declaration is what tells the (future) admin UI what type each field should be and how to render it.
     </p>
     <p>
-        This is a JSON file rather than a database table on purpose, for now: it keeps the module system usable before database migrations for modules exist (see <a href="{{ base_url }}/docs/modules#whats-coming">What's Coming</a>). The <code>get()</code>/<code>set()</code>/<code>all()</code> API is intentionally stable — when a real <code>module_settings</code> table ships in a future version, your module's code won't need to change at all, only what's underneath the facade.
+        This is a JSON file rather than a database table by design, and that's not just a historical accident from before <code>database.access</code> existed — it keeps a module's own configuration readable and versionable as a single small file, with no schema migration of its own to manage. If your module needs genuinely relational storage instead (multiple rows, foreign keys, querying by anything other than a settings key), that's exactly what <a href="#database"><code>database.access</code></a> below is for — the two are complementary, not one superseding the other.
+    </p>
+
+    <hr>
+
+    <h3 id="database"><code>database.access</code></h3>
+    <p>
+        Grants read access to <em>every</em> table in the application's database, and write access (including creating your own tables) to a table namespace reserved for your module alone — every table starting with <code>mod_{your-slug}_</code>. That prefix is not something you declare: it's derived automatically from your manifest's own <code>name</code> field, the exact same way <code>slug()</code> already is. There's no permissions-block field for it, on purpose — if a module could simply declare its own table prefix, it could declare <code>"tablePrefix": "users"</code> and write to a table it has no business touching. Deriving it from identity that's already fixed at manifest-parse time closes that off entirely.
+    </p>
+    <p>Declare it in <code>module.json</code> with no extra configuration, same as <code>storage.access</code>:</p>
+    <pre><code class="language-json">{
+    "permissions": {
+        "database.access": {}
+    }
+}</code></pre>
+    <p>
+        <strong>The permission gates reads too</strong> — this is the one place that's easy to get backwards relative to <code>settings.manage</code>, where reads are free and only writes require the key. Here, <code>query()</code>, <code>select()</code>, <code>find()</code>, and <code>findBy()</code> all check <code>can('database.access')</code> exactly like the write methods do. What's asymmetric isn't whether the permission is required, but which <em>tables</em> a write is allowed to touch.
+    </p>
+    <p><code>DatabaseFacade</code> offers two ways in — plain SQL, or Doctrine — and the same ownership rule applies to both:</p>
+    <table class="w-full text-left border-collapse mb-6">
+        <thead>
+            <tr class="border-b border-gray-300 dark:border-gray-600">
+                <th class="py-2 pr-4">Method</th>
+                <th class="py-2 pr-4">Scope</th>
+                <th class="py-2">Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr class="border-b border-gray-200 dark:border-gray-700">
+                <td class="py-2 pr-4"><code>query($sql, $params)</code></td>
+                <td class="py-2 pr-4">Any table, read-only</td>
+                <td class="py-2">Must start with <code>SELECT</code>/<code>WITH</code>; a write-like keyword found anywhere else in the string is rejected too, as a defense against a stacked statement slipping through.</td>
+            </tr>
+            <tr class="border-b border-gray-200 dark:border-gray-700">
+                <td class="py-2 pr-4"><code>select($table, $where)</code></td>
+                <td class="py-2 pr-4">Any table, read-only</td>
+                <td class="py-2">A structured convenience wrapper for the common case — no need to hand-write SQL for a simple lookup.</td>
+            </tr>
+            <tr class="border-b border-gray-200 dark:border-gray-700">
+                <td class="py-2 pr-4"><code>insert() / update() / delete()</code></td>
+                <td class="py-2 pr-4">Your tables only</td>
+                <td class="py-2">Table name is a real parameter, not embedded in a SQL string — checked with a plain string comparison against your prefix, not parsed out of free-form SQL.</td>
+            </tr>
+            <tr class="border-b border-gray-200 dark:border-gray-700">
+                <td class="py-2 pr-4"><code>migrate($sql)</code></td>
+                <td class="py-2 pr-4">Your tables only</td>
+                <td class="py-2">Accepts <code>CREATE TABLE</code>, <code>ALTER TABLE</code>, or <code>DROP TABLE</code> only — this is how a module gets its own real tables in the first place. Call it from <code>install()</code> to create, <code>uninstall()</code> to drop.</td>
+            </tr>
+            <tr class="border-b border-gray-200 dark:border-gray-700">
+                <td class="py-2 pr-4"><code>find() / findBy()</code></td>
+                <td class="py-2 pr-4">Any entity, read-only</td>
+                <td class="py-2">Doctrine equivalent of <code>query()</code> — works against any entity the application already has mapped, e.g. <code>Rhapsody\Core\Entities\User</code>.</td>
+            </tr>
+            <tr>
+                <td class="py-2 pr-4"><code>save() / remove()</code></td>
+                <td class="py-2 pr-4">Your entities only</td>
+                <td class="py-2">Checked via Doctrine's own metadata — <code>getClassMetadata($entity)->getTableName()</code> — against your prefix before <code>persist()</code>/<code>flush()</code> is allowed to run.</td>
+            </tr>
+        </tbody>
+    </table>
+    <p><strong>Raw SQL example</strong> — a module tracking its own click-through counts, called from a route handler:</p>
+    <pre><code class="language-php">public function recordClick(ModuleContext $context, int $itemId): void
+{
+    $context->database()->insert('mod_acme_click_tracker_clicks', [
+        'item_id'    => $itemId,
+        'clicked_at' => date('Y-m-d H:i:s'),
+    ]);
+}
+
+public function topItems(ModuleContext $context): array
+{
+    // Reading your own table works the same as reading any other —
+    // select()/query() aren't scoped by ownership, only writes are.
+    return $context->database()->select(
+        'mod_acme_click_tracker_clicks',
+        [],
+        ['item_id', 'COUNT(*) as total']
+    );
+}</code></pre>
+    <p><strong>Doctrine example</strong> — the same module, using an entity instead of raw SQL:</p>
+    <pre><code class="language-php">// src/Entities/Click.php — table name must fall under your prefix,
+// checked at save() time, not at class-definition time.
+#[ORM\Entity]
+#[ORM\Table(name: 'mod_acme_click_tracker_clicks')]
+class Click
+{
+    #[ORM\Id, ORM\GeneratedValue, ORM\Column(type: 'integer')]
+    private int $id;
+
+    #[ORM\Column(type: 'integer')]
+    private int $itemId;
+
+    #[ORM\Column(type: 'datetime')]
+    private \DateTime $clickedAt;
+
+    // ...constructor/getters omitted
+}
+
+public function recordClick(ModuleContext $context, int $itemId): void
+{
+    $context->database()->save(new Click($itemId, new \DateTime()));
+}
+
+public function lookUpBuyer(ModuleContext $context, string $userId): ?object
+{
+    // Reading an entity you don't own — allowed, read-only.
+    return $context->database()->find(\Rhapsody\Core\Entities\User::class, $userId);
+}</code></pre>
+    <p>
+        Notice <code>$context->database()</code> never hands you a raw <code>PDO</code> connection or the application's actual <code>EntityManager</code> — on purpose. Either one would come with unrestricted <code>exec()</code> or unrestricted <code>persist()</code> on any entity, which would make every other rule in this section decorative. Everything above is the entire surface area; if something isn't listed here, <code>DatabaseFacade</code> doesn't do it.
     </p>
 
     <hr>
@@ -528,7 +638,7 @@ composer remove acme/welcome-bonus</code></pre>
 
     <h2 id="worked-example">8. A Second, Bigger Worked Example</h2>
     <p>
-        The welcome-bonus example above touches four of the five facades but keeps each one simple. For a module that leans harder into <code>routes.register</code> — using both namespacing styles, <code>root()</code>, and <code>registered()</code> in one place — read through <code>acme/seo-toolkit</code>, also shipped with the framework at <code>vendor/arout/rhapsody-core/examples/acme-seo-toolkit/</code>. It generates <code>sitemap.xml</code> and <code>robots.txt</code> entirely from the live route table, configurable through settings, with zero database dependency and zero manually-maintained URL list. Its manifest:
+        The welcome-bonus example above touches four of the six facades but keeps each one simple. For a module that leans harder into <code>routes.register</code> — using both namespacing styles, <code>root()</code>, and <code>registered()</code> in one place — read through <code>acme/seo-toolkit</code>, also shipped with the framework at <code>vendor/arout/rhapsody-core/examples/acme-seo-toolkit/</code>. It generates <code>sitemap.xml</code> and <code>robots.txt</code> entirely from the live route table, configurable through settings, with zero database dependency and zero manually-maintained URL list. Its manifest:
     </p>
     <pre><code class="language-json">{
     "name": "acme/seo-toolkit",
@@ -623,6 +733,14 @@ private function sitemapResponse(ModuleContext $context): Response
         <li>Check <code>storage/modules/{your-slug}/settings.json</code> directly to see the actual current state on disk — this sidesteps any question of whether your code is reading the value you think it's reading.</li>
     </ul>
 
+    <h3>"My database write throws <code>ModulePermissionException</code>"</h3>
+    <ul>
+        <li>First check the message itself — it tells you which of two things went wrong: missing <code>database.access</code> entirely, or a table name that doesn't start with your prefix. They're different fixes.</li>
+        <li>Remember reads need the permission too. Unlike <code>settings.manage</code>, forgetting to declare <code>database.access</code> breaks <code>query()</code>/<code>select()</code>/<code>find()</code> just as much as it breaks a write.</li>
+        <li>Your table prefix is always <code>mod_</code> + your manifest's <code>name</code> field with <code>/</code> and <code>-</code> both converted to <code>_</code> — e.g. <code>acme/click-tracker</code> becomes <code>mod_acme_click_tracker_</code>. If your table doesn't start with exactly that, <code>insert()</code>/<code>update()</code>/<code>delete()</code>/<code>migrate()</code>/<code>save()</code>/<code>remove()</code> will all reject it — there's no way to configure or override the prefix.</li>
+        <li>For a Doctrine entity specifically, the check runs against the table name in your entity's own <code>#[ORM\Table(name: ...)]</code> attribute, not the entity's class name — a mismatched attribute is the usual cause here.</li>
+    </ul>
+
     <hr>
 
     <h2 id="glossary">10. Glossary</h2>
@@ -640,7 +758,7 @@ private function sitemapResponse(ModuleContext $context): Response
         <dd class="mb-3">A module's <code>name</code> field with the slash replaced by a dash — <code>acme/welcome-bonus</code> becomes <code>acme-welcome-bonus</code>. Used to namespace routes, scoped storage, and settings so modules can never collide with each other.</dd>
 
         <dt><strong>Capability / Permission</strong></dt>
-        <dd class="mb-3">One of the six fixed keys in a manifest's <code>permissions</code> block, each unlocking one facade method (or part of one).</dd>
+        <dd class="mb-3">One of the seven fixed keys in a manifest's <code>permissions</code> block, each unlocking one facade method (or part of one).</dd>
 
         <dt><strong>Facade</strong> (as used on this page)</dt>
         <dd class="mb-3">A small object (<code>EventsFacade</code>, <code>RoutesFacade</code>, etc.) that stands between your module's code and a real framework service, checking your manifest's permissions before doing anything. Not the same concept as a "Laravel Facade," if you've encountered that term elsewhere — no static magic methods here, just plain objects.</dd>
@@ -666,7 +784,6 @@ private function sitemapResponse(ModuleContext $context): Response
     <h2 id="whats-coming">11. What's Coming</h2>
     <p>Future capabilities on the roadmap:</p>
     <ul>
-        <li><strong>Database migrations</strong> – for modules that need their own real database tables, rather than the JSON-file-backed settings/storage available today.</li>
         <li><strong>Admin UI renderer</strong> – automatically generate a working settings form from <code>settings_schema</code>, no extra code required.</li>
         <li><strong>Global middleware</strong> – for modules that need to intercept every request (e.g. a maintenance-mode module), deliberately not available yet since it's the single most powerful capability a module could have.</li>
     </ul>
@@ -677,14 +794,15 @@ private function sitemapResponse(ModuleContext $context): Response
     <h2 id="quick-reference">Quick Reference</h2>
     <ul>
         <li><strong>Modules are Composer packages</strong> with <code>type: "rhapsody-module"</code>, discovered via <code>Composer\InstalledVersions</code>.</li>
-        <li><strong>The manifest (<code>module.json</code>) declares permissions</strong> – only what's listed is allowed; six fixed capability keys, no exceptions.</li>
+        <li><strong>The manifest (<code>module.json</code>) declares permissions</strong> – only what's listed is allowed; seven fixed capability keys, no exceptions.</li>
         <li><strong>The provider is the entry point</strong> – implements <code>boot()</code> (every request), <code>install()</code> (once, on activation), <code>uninstall()</code> (once, on deactivation).</li>
-        <li><strong>Everything goes through <code>$context</code></strong> – never the container, never raw PDO/<code>$_SERVER</code>/<code>exec()</code>.</li>
+        <li><strong>Everything goes through <code>$context</code></strong> – never the raw container, never a raw <code>PDO</code> connection or <code>EntityManager</code>, never <code>$_SERVER</code>/<code>exec()</code> directly; use <code>$context->database()</code> for scoped database access.</li>
         <li><strong>Composer install ≠ module activation</strong> – <code>module:install</code> is what actually turns a module on.</li>
         <li><strong>Namespaced routes are auto-prefixed</strong> with your slug; use <code>root()</code> plus an explicit <code>paths</code> whitelist for true root-level URLs.</li>
         <li><strong><code>routes()->registered()</code></strong> gives read-only access to the live route table, gated by the same <code>routes.register</code> permission.</li>
         <li><strong>Storage is sandboxed</strong> to <code>storage/modules/{slug}/</code>, with path traversal actively blocked.</li>
         <li><strong>Settings are JSON-file-backed</strong> at <code>storage/modules/{slug}/settings.json</code> — reads always allowed, writes require <code>settings.manage</code>.</li>
+        <li><strong>Database access is table-namespace-scoped</strong> — read any table, but write only to your own <code>mod_{slug}_*</code> tables (row data via <code>insert()</code>/<code>update()</code>/<code>delete()</code>, schema via <code>migrate()</code>); unlike settings, reads also require <code>database.access</code>.</li>
         <li><strong>Twig function names are auto-prefixed</strong> <code>mod_{slug}_</code> to prevent collisions.</li>
         <li><strong>Request only the permissions you actually use</strong> — smaller manifests review faster, both by automation and by humans.</li>
     </ul>

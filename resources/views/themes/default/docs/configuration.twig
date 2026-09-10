@@ -3,14 +3,13 @@
 {% block doc_content %}
     <h1>Application Configuration</h1>
     <p>
-        Rhapsody keeps all configuration in the <code>config/</code> directory and the <code>.env</code> file. <strong>You should never modify files inside <code>/core</code>.</strong> This ensures that framework updates won't overwrite your customisations.
+        Rhapsody keeps all configuration in the <code>config/</code> directory and the <code>.env</code> file. <strong>You should never modify files inside the <code>/vendor</code> directory.</strong> This ensures that framework updates won't overwrite your customisations. Rhapsody is built with extensibility in mind; consult the documentation to learn how to extend or create custom functionality.
     </p>
 
     <h2>Configuration Files</h2>
     <ul>
         <li><code>.env</code> – environment‑specific variables (database, mail, caching driver, etc.).</li>
-        <li><code>config.php</code> – general settings (app version, theme, logging paths).</li>
-        <li><code>config/middleware.php</code> – middleware definitions (map and global list).</li>
+        <li><code>config.php</code> – general settings (middleware, theme, logging paths, etc.).</li>
     </ul>
 
     <hr>
@@ -19,8 +18,7 @@
     </div>
 
     <h3>Adding New Configuration</h3>
-    <p>You can create additional config files in the <code>config/</code> folder and load them in your controllers or services as needed:</p>
-    <pre><code class="language-php">$myConfig = require __DIR__ . '/config/my-settings.php';</code></pre>
+    <p>You can create additional config files in the <code>config/</code> folder and load them in your controllers or services as needed. This is useful for tasks like defining constants or paths, or for custom modules you create. Your custom config files will never be touched when updating the framework.</p>
 
     <hr>
 
@@ -28,10 +26,6 @@
     <p>
         The <code>.env</code> file contains sensitive or environment‑specific data. Never commit it to version control. Use <code>.env.example</code> as a template.
     </p>
-    <pre><code class="language-bash">APP_ENV=development
-APP_BASE_URL="/rhapsody"
-DB_HOST=127.0.0.1
-CACHE_DRIVER=file</code></pre>
 
     <hr>
 
@@ -44,18 +38,18 @@ CACHE_DRIVER=file</code></pre>
     <p>The default view directories are:</p>
     <pre><code class="language-bash">views/
 ├── themes/
-│   ├── default/          ← Fallback theme (always available)
+│   ├── default/                ← Fallback theme (always available)
 │   │   
-│   └── my_custom_theme/  ← Your active theme (if set)
+│   └── my_custom_theme/        ← Your active theme (if set)
 │       ├── layouts/
 │       └── home/
-└── core/                  ← Core framework views (default, but overridable)
-    ├── layouts/
+└── vendor/arout/rhapsody-core/resources/views/themes/       ← Core framework views (default, but overridable.)
+    ├── default/
     ├── docs/
     └── ...</code></pre>
 
     <h3>Theme Resolution Order</h3>
-    <p>When you render a view (e.g., <code>$this->view('home/index.twig')</code>), the framework searches in this order:</p>
+    <p>When you render a view from your controller (e.g., <code>$this->view('home/index.twig')</code>), the framework searches in this order:</p>
     <ol>
         <li><strong>Active theme</strong> – <code>views/themes/{{ APP_THEME }}/</code> <small>← this is what you currently have set in <code>.env</code></small></li>
         <li><strong>Default theme</strong> – <code>views/themes/default/</code></li>
@@ -87,7 +81,7 @@ CACHE_DRIVER=file</code></pre>
     <hr>
 
     <h2>Middleware Configuration</h2>
-    <p>See the <a href="{{ base_url }}/docs/middleware">Middleware documentation</a> for details on <code>config/middleware.php</code>.</p>
+    <p>See the <a href="{{ base_url }}/docs/middleware">Middleware documentation</a> for details on setting up middleware.</p>
 
     <hr>
 

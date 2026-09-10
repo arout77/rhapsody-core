@@ -30,6 +30,7 @@ final class ModuleManifest
         'twig.functions',
         'storage.access',
         'settings.manage',
+        'database.access',
     ];
 
     public const CATEGORIES = [
@@ -119,5 +120,20 @@ final class ModuleManifest
     public function slug(): string
     {
         return str_replace('/', '-', $this->name);
+    }
+
+    /**
+     * "acme/welcome-bonus" -> "mod_acme_welcome_bonus_" — every table a
+     * module may write to must start with this. Deliberately derived
+     * from the manifest's own name field, exactly like slug(), rather
+     * than being a value the module can declare in its permissions
+     * block: a self-declared prefix would let a module simply claim
+     * "users" and get write access to a table it doesn't own. Read
+     * access (DatabaseFacade::query()/find()/findBy()) is not scoped by
+     * this prefix — only writes are.
+     */
+    public function tablePrefix(): string
+    {
+        return 'mod_' . str_replace('-', '_', $this->slug()) . '_';
     }
 }

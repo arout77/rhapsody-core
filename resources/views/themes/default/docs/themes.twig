@@ -127,7 +127,7 @@
 
     <h2>Creating a Completely Custom Theme (From Scratch)</h2>
     <p>
-        If you want a <strong>totally custom design</strong> that does <em>not</em> rely on the framework’s default styles or layout, you can build your own parent template.
+        If you want a <strong>totally custom design</strong> that does <em>not</em> rely on the framework's default styles or layout, you can build your own parent template.
     </p>
     <ul>
         <li>Do <strong>not</strong> use <code>@core</code> in your templates.</li>
@@ -135,18 +135,41 @@
         <li>Include your own CSS (e.g., via <code>&lt;link&gt;</code> tags, or use your own build tool).</li>
         <li>You are responsible for providing the necessary global Twig variables (like <code>base_url</code>, <code>auth</code>, <code>flash</code>) if you need them – they are still available globally, but you must output them as needed.</li>
     </ul>
-    <p>Example custom <code>main.twig</code>:</p>
+
+    <h3>Every theme must define the same blocks as the default theme</h3>
+    <p>
+        Twig's behavior when a child template overrides a block that doesn't exist <em>anywhere</em> in the layout it extends is to silently drop that content — no error, no warning, just missing output. For a block as foundational as <code>content</code> or <code>scripts</code>, that's a uniquely confusing way to fail: the page renders successfully, just without whatever a page template put in that block.
+    </p>
+    <p>
+        To catch this before it ever reaches that point, any theme other than <code>default</code> has its <code>layouts/main.twig</code> checked at boot for these exact block names — the same ones <code>views/themes/default/layouts/main.twig</code> itself defines:
+    </p>
+    <pre><code class="language-text">title, description, styles, head_extensions, body_class,
+navigation, full_width_content, main, content, scripts</code></pre>
+    <p>
+        If any are missing, the application throws a fatal error at boot listing exactly which ones — not a blank page, not silently-missing content on whichever page happens to use that block first. A block is allowed to be empty (<code>{{ '{%' }} block scripts {{ '%}' }}{{ '{%' }} endblock {{ '%}' }}</code> is completely valid and satisfies the check), it just has to exist.
+    </p>
+    <p>Here's a minimal but fully compliant custom <code>main.twig</code> — every required block is present, several intentionally empty:</p>
     <pre><code class="language-twig">&lt;!DOCTYPE html&gt;
 &lt;html&gt;
 &lt;head&gt;
-    &lt;title&gt;My Custom Site&lt;/title&gt;
+    &lt;title&gt;{{ '{%' }} block title {{ '%}' }}My Custom Site{{ '{%' }} endblock {{ '%}' }}&lt;/title&gt;
+    &lt;meta name="description" content="{{ '{%' }} block description {{ '%}' }}{{ '{%' }} endblock {{ '%}' }}"&gt;
     &lt;link rel="stylesheet" href="{{ base_url }}/css/my-styles.css"&gt;
+    {{ '{%' }} block styles {{ '%}' }}{{ '{%' }} endblock {{ '%}' }}
+    {{ '{%' }} block head_extensions {{ '%}' }}{{ '{%' }} endblock {{ '%}' }}
 &lt;/head&gt;
-&lt;body&gt;
-    &lt;header&gt;My Header&lt;/header&gt;
-    {{ '{%' }} block content {{ '%}' }}{{ '{%' }} endblock {{ '%}' }}
+&lt;body class="{{ '{%' }} block body_class {{ '%}' }}{{ '{%' }} endblock {{ '%}' }}"&gt;
+    {{ '{%' }} block navigation {{ '%}' }}&lt;header&gt;My Header&lt;/header&gt;{{ '{%' }} endblock {{ '%}' }}
+
+    {{ '{%' }} block full_width_content {{ '%}' }}{{ '{%' }} endblock {{ '%}' }}
+
+    &lt;main class="{{ '{%' }} block main {{ '%}' }}{{ '{%' }} endblock {{ '%}' }}"&gt;
+        {{ '{%' }} block content {{ '%}' }}{{ '{%' }} endblock {{ '%}' }}
+    &lt;/main&gt;
+
     &lt;footer&gt;My Footer&lt;/footer&gt;
     &lt;script src="{{ base_url }}/js/app.js"&gt;&lt;/script&gt;
+    {{ '{%' }} block scripts {{ '%}' }}{{ '{%' }} endblock {{ '%}' }}
 &lt;/body&gt;
 &lt;/html&gt;</code></pre>
     <p>
@@ -156,6 +179,33 @@
 {{ '{%' }} block content {{ '%}' }}
     &lt;!-- custom content --&gt;
 {{ '{%' }} endblock {{ '%}' }}</code></pre>
+
+    <hr>
+
+    <h2>Preserving Layout Content with <code>{{ '{{' }} parent() {{ '}}' }}</code></h2>
+    <p>
+        This is the single most common mistake when building a theme, or a page within one, and unlike the missing-block problem above, <strong>nothing catches it automatically</strong> — it fails exactly as silently as Twig's default behavior for blocks always does.
+    </p>
+    <p>
+        When <code>layouts/main.twig</code> puts something meaningful inside a block — a script tag, a stylesheet link, anything — any child template that overrides that <em>same</em> block <strong>completely replaces</strong> that content unless it explicitly calls <code>{{ '{{' }} parent() {{ '}}' }}</code> first. This is ordinary Twig inheritance behavior, not a Rhapsody-specific rule, but it's easy to forget precisely because the failure is invisible: the page still renders, it just quietly lost whatever the parent put there.
+    </p>
+    <p>
+        The most consequential real example: the <a href="{{ base_url }}/docs/react">React bridge</a> is typically wired up with <code>{{ '{{' }} vite_assets('resources/js/app.jsx') {{ '}}' }}</code> placed inside <code>layouts/main.twig</code>'s <code>scripts</code> (or <code>head_extensions</code>) block. Any page template that overrides that same block to add its own inline script — a hero slider, a checkout form, anything — will silently break every React island on that specific page if it doesn't call <code>parent()</code> first:
+    </p>
+    <pre><code class="language-twig">{{ '{%' }} extends 'layouts/main.twig' {{ '%}' }}
+
+{{ '{%' }} block scripts {{ '%}' }}
+    {{ '{{' }} parent() {{ '}}' }}  {# without this line, vite_assets() output from main.twig never renders on this page #}
+    &lt;script&gt;
+        // this page's own script
+    &lt;/script&gt;
+{{ '{%' }} endblock {{ '%}' }}</code></pre>
+    <p>
+        The symptom is exactly as confusing as it sounds: everything works — the page loads, other pages using the same layout work fine — except one specific feature (a React-powered widget, a piece of interactive JS from the layout) is simply absent on this one page and nowhere else, with no error anywhere to point at why. If a page seems to be "missing" something that other pages on the same theme have, checking whether that page overrides a block without calling <code>parent()</code> first is the first thing worth checking.
+    </p>
+    <p>
+        The rule of thumb: if you're overriding a block that the layout you're extending puts <em>anything</em> into — not just scripts, this applies equally to <code>styles</code>, <code>head_extensions</code>, <code>navigation</code>, or any other block — call <code>parent()</code> as the first line of your override unless you specifically intend to replace that content entirely.
+    </p>
 
     <hr>
 
@@ -173,6 +223,8 @@
         <li><strong>Extend core</strong> → use <code>@core</code> and override blocks (inherits Tailwind design).</li>
         <li><strong>Override a core template</strong> → place a file with the same path in your active theme (for login, register, errors).</li>
         <li><strong>Build a custom theme from scratch</strong> → create your own <code>layouts/main.twig</code> and avoid <code>@core</code>.</li>
+        <li><strong>Every non-default theme's <code>layouts/main.twig</code> must define all 10 required blocks</strong> (empty is fine) — checked at boot, with a fatal error listing exactly what's missing if it doesn't.</li>
+        <li><strong>Call <code>parent()</code></strong> when overriding a block the layout already puts something into (scripts, styles, head_extensions, navigation) — otherwise that content is silently dropped on whichever page overrides it, including things like the React bridge's <code>vite_assets()</code> call.</li>
         <li>All theme files live in <code>/views/themes/</code>.</li>
         <li>The core design is built with <strong>Tailwind CSS v4.3</strong>.</li>
         <li>Core views are <strong>limited</strong> – only documentation, auth, and errors. For all other views, you must provide them yourself.</li>

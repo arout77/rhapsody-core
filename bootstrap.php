@@ -46,6 +46,7 @@ use Rhapsody\Core\Services\NotificationService;
 use Rhapsody\Core\Services\RateLimiter;
 use Rhapsody\Core\Session;
 use Rhapsody\Core\Storage\Cookie;
+use Rhapsody\Core\Theming\ThemeValidator;
 use Rhapsody\Core\Validator;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\Cache\Adapter\FilesystemAdapter;
@@ -292,7 +293,7 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
         {
             return Session::hasFlash($name);
         }
-    };;
+    };;;
 
     $twig->addGlobal('flash', $flash);
 
@@ -300,6 +301,8 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
         $token = Session::csrfToken();
         return new \Twig\Markup('<input type="hidden" name="_token" value="' . $token . '">', 'UTF-8');
     }));
+
+    ThemeValidator::validate($twig, $activeTheme);
 
     return $twig;
 });

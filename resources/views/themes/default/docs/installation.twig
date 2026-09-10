@@ -34,8 +34,8 @@
     <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4">
         <p><span class="font-bold">⚠️ Important:</span> Before any page will load, you <span class="font-bold">must</span> set at least the following variables in your <code>.env</code>:</p>
         <ul>
-            <li><code>APP_URL</code> – the full base URL of your site (e.g., <code>http://localhost/your-site-name</code>)</li>
-            <li><code>DB_HOST</code>, <code>DB_PORT</code>, <code>DB_NAME</code>, <code>DB_USER</code>, <code>DB_PASS</code> – your database connection details</li>
+            <li><code>APP_URL</code> – the full base URL of your site (e.g., <code>https://your-website.com</code>)</li>
+            <li><code>DB_HOST</code>, <code>DB_PORT</code>, <code>DB_NAME</code>, <code>DB_USER</code>, <code>DB_PASS</code>, <code>DB_DRIVER</code> – your database connection details</li>
         </ul>
     </div>
 
@@ -49,26 +49,51 @@ npm run dev</code></pre>
     <p><strong>Note:</strong> Even if you don’t use React anywhere else, the debug toolbar’s performance tabs rely on React islands. We recommend running this step to get the full debugging experience.</p>
 
     <h2>3. Environment Configuration</h2>
-    <p>Rhapsody uses a <code>.env</code> file to manage environment‑specific variables. This file is <strong>required</strong> for the application to run.</p>
+    <p>Rhapsody uses a <code>.env</code> file to manage environment‑specific variables. This file is <strong>required</strong> for the application to run. It is located in your root install directory and should be created automatically during the Composer install process. If for some reason it does not exist, simply run the command below.</p>
     <p>Copy the example file:</p>
     <pre class="command-line"><code class="language-bash">cp .env.example .env</code></pre>
     <p>Example configuration:</p>
-    <pre><code class="language-bash">APP_URL="http://localhost/your-site-name"
-APP_BASE_URL="/your-site-name"
+    <pre><code class="language-bash">APP_URL="https://your-website.com"
+APP_BASE_URL="/{subirectory name}" # Leave blank unless installed in a subdirectory
 
 DB_HOST="127.0.0.1"
 DB_PORT="3306"
 DB_NAME="database_name"
 DB_USER="username"
-DB_PASS="password"</code></pre>
+DB_PASS="password"
+DB_DRIVER="mysql" # Supported databases: mysql, pgsql, sqlite, or sqlsrv</code></pre>
 
     <p>Without these values, the application will not be able to connect to the database or generate correct URLs.</p>
 
     <h2>4. Database Setup</h2>
-    <p>Create a database with the name you specified in <code>DB_NAME</code>. If you want to receive email notifications about updates, set <code>MAIL_ADMIN_EMAIL</code> as well.</p>
+    <p>Create a database with the name you specified in <code>DB_NAME</code>. If you want to receive email notifications about updates, set <code>MAIL_ADMIN_EMAIL</code> in the .env as well.</p>
 
     <h2>5. Web Server Configuration</h2>
     <p>Your web server must be configured to direct all requests to the front controller (<code>index.php</code>). The repository includes a <code>.htaccess</code> file for Apache; for other servers (Nginx, etc.) please consult your server’s documentation.</p>
     <p>Once everything is set up, visit your site in the browser – you should see the Rhapsody welcome page.</p>
+
+    <h2>6. Useful commands</h2>
+    <p>After installation is complete, you may find it beneficial to run a few commands using the Rhapsody runner (see <a href="{{ base_url }}/docs/cli" target="_blank">Rhapsody Console</a> and <a href="{{ base_url }}/docs/console-commands" target="_blank">console commands</a> for a complete command list and using the CLI runner).</p>
+
+    <p>
+        Some of the commands you may wish to run immediately after installation:
+    </p>
+
+    <p>
+        <table>
+            <tr>
+                <td width="35%">php rhapsody auth:install</td><td>Install authentication tables (users, password_resets, etc.). Run this if you plan on using the built-in authentication system. See <a href="{{ base_url }}/docs/authentication" target="_blank">authentication</a> for more details.</td>
+            </tr>
+            <tr>
+                <td>php rhapsody build:proxies</td><td>Pre-generates lazy proxy classes for all container services. See <a href="{{ base_url }}/docs/lazy-service-loading" target="_blank">lazy loading</a> for more details.</td>
+            </tr>
+            <tr>
+                <td>php rhapsody app:cache-warm</td><td>Warm up the Twig template cache by compiling all templates. Recommended for live site only; keep cache disabled in dev environment.</td>
+            </tr>
+            <tr>
+                <td>php rhapsody route:cache</td><td>Compile all application routes into a cached file for performance. Recommended for live site only; keep cache disabled in dev environment.</td>
+            </tr>
+        </table>
+    </p>
 
 {% endblock %}
