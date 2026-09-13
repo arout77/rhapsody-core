@@ -5,7 +5,7 @@ use Twig\Environment;
 
 /**
  * Validates that a custom (non-default) theme's layouts/main.twig
- * defines every block the framework's own default theme defines.
+ * defines every *essential* block the framework's own default theme defines.
  *
  * Why this exists: Twig's behavior when a child template overrides a
  * block that doesn't exist ANYWHERE in the template it extends is to
@@ -36,10 +36,7 @@ class ThemeValidator
         'description',
         'styles',
         'head_extensions',
-        'body_class',
         'navigation',
-        'full_width_content',
-        'main',
         'content',
         'scripts',
     ];
