@@ -49,4 +49,22 @@ interface ContainerInterface
      * @return mixed
      */
     public function resolve(string $abstract): mixed;
+
+    /**
+     * Checks whether the given singleton abstract has already been resolved
+     * and cached, without triggering resolution itself.
+     *
+     * @param  string $abstract
+     * @return bool
+     */
+    public function resolved(string $abstract): bool;
+
+    /**
+     * Drops a cached singleton instance, forcing the next resolve() call for
+     * this abstract to rebuild it from scratch via its original binding.
+     *
+     * @param  string $abstract
+     * @return void
+     */
+    public function forgetSingleton(string $abstract): void;
 }

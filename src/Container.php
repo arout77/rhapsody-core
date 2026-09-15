@@ -15,6 +15,7 @@
  * │ • Detects and prevents circular dependencies                            │
  * │ • Supports closure-based bindings (factory pattern)                     │
  * │ • Stores singleton instances via instance() method                      │
+ * │ • Supports singleton() bindings that resolve once and cache the result  │
  * │ • Provides resolution tracing for debugging/profiling                   │
  * │ • Tracks resolution duration (milliseconds) per dependency              │
  * │ • Includes proxy mode flag for extended functionality                   │
@@ -25,6 +26,9 @@
  * ├─────────────────────────────────────────────────────────────────────────┤
  * │ BINDING     → Associating an abstract name with concrete                │
  * │               implementation or factory closure                         │
+ * │ SINGLETON   → A binding that resolves once per container instance and   │
+ * │               returns the same cached instance on every subsequent      │
+ * │               resolve() call                                            │
  * │ RESOLVING   → Instantiating a class with all its dependencies           │
  * │ CIRCULAR    → When A depends on B, and B depends on A                   │
  * │ TRACE       → Log of all resolutions with timing and caller info        │
@@ -42,6 +46,11 @@
  * │ // Bind factory closure                                                 │
  * │ $container->bind('db', function() {                                     │
  * │     return new PDO('mysql:host=localhost;dbname=test', 'user', 'pwd');  │
+ * │ });                                                                     │
+ * │                                                                         │
+ * │ // Bind a factory closure that should only ever run once                │
+ * │ $container->singleton(EntityManager::class, function ($c) {             │
+ * │     return new EntityManager($connection, $config);                     │
  * │ });                                                                     │
  * │                                                                         │
  * │ // Store singleton instance                                             │
@@ -68,20 +77,21 @@
  * │ • Service Locator (via get() method)                                    │
  * │ • Dependency Injection (auto-wiring)                                    │
  * │ • Factory Pattern (via closure bindings)                                │
- * │ • Singleton Pattern (via instance() method)                             │
+ * │ • Singleton Pattern (via instance() and singleton() methods)            │
  * │ • Observer/Logging (via trace system)                                   │
  * └─────────────────────────────────────────────────────────────────────────┘
  *
  * ┌─────────────────────────────────────────────────────────────────────────┐
  * │ LIMITATIONS:                                                            │
  * ├─────────────────────────────────────────────────────────────────────────┤
- * │ • No singleton caching (resolves new instance each time)                │
+ * │ • bind() still resolves a new instance each time by design — use        │
+ * │   singleton() for anything that should be shared                        │
  * │ • No contextual binding (different implementations per context)         │
  * │ • Static trace is shared across all instances                           │
  * │ • No interface autowiring unless explicitly bound                       │
  * └─────────────────────────────────────────────────────────────────────────┘
  *
- * @version    1.0.0
+ * @version    1.1.0
  * ============================================================================
  * @package    Rhapsody\Core
  *
@@ -126,6 +136,24 @@ class Container implements ContainerInterface
     protected array $resolving = [];
 
     /**
+     * @var array<string, true> Abstracts registered via singleton() rather than bind().
+     *
+     * Marks which bindings should be resolved once and cached, as opposed to
+     * bind()'s default of constructing a fresh instance on every resolve() call.
+     */
+    protected array $singletonAbstracts = [];
+
+    /**
+     * @var array<string, mixed> Cache of already-resolved singleton instances.
+     *
+     * Populated the first time resolve() is called for an abstract registered
+     * via singleton(). Subsequent resolve() calls for that abstract return the
+     * cached instance directly without re-running the binding closure or
+     * reflection-based instantiation.
+     */
+    protected array $resolvedSingletons = [];
+
+    /**
      * @var array<int, array<string, mixed>> Resolution trace log
      *
      * Each entry contains:
@@ -150,6 +178,10 @@ class Container implements ContainerInterface
     /**
      * Binds an abstract name to a concrete implementation or factory closure.
      *
+     * A binding registered this way resolves a brand new instance on every
+     * resolve() call. Use singleton() instead when the same instance should
+     * be shared across every resolution.
+     *
      *                                       If null, binds to itself.
      * @example
      * // Bind interface to class
@@ -170,6 +202,73 @@ class Container implements ContainerInterface
             $concrete = $abstract;
         }
         $this->bindings[$abstract] = $concrete;
+    }
+
+    /**
+     * Binds an abstract name to a concrete implementation or factory closure,
+     * resolving it only once. The first resolve() call builds the instance and
+     * caches it on this container; every subsequent resolve() call for the same
+     * abstract returns that cached instance instead of re-running the closure
+     * or re-instantiating via reflection.
+     *
+     * Use this for anything expensive or stateful that should be shared for the
+     * life of the container (a DB connection, the Twig environment, the event
+     * dispatcher). Use bind() instead when a fresh instance is wanted on every
+     * resolution (e.g. Request).
+     *
+     * @example
+     * $container->singleton(EntityManager::class, function ($container) {
+     *     return new EntityManager($connection, $config);
+     * });
+     * // Every resolve(EntityManager::class) call after the first returns the
+     * // same EntityManager instance instead of opening a new DB connection.
+     * @param  string               $abstract The abstract name (interface, class name, or alias)
+     * @param  callable|string|null $concrete The concrete class name or factory closure.
+     * @return void
+     */
+    public function singleton(string $abstract, callable | string | null $concrete = null): void
+    {
+        if (is_null($concrete)) {
+            $concrete = $abstract;
+        }
+        $this->bindings[$abstract]           = $concrete;
+        $this->singletonAbstracts[$abstract] = true;
+    }
+
+    /**
+     * Checks whether the given singleton abstract has already been resolved
+     * and cached on this container, without triggering resolution itself.
+     *
+     * Useful for per-request reset hygiene under a persistent-worker runtime:
+     * something that clears/health-checks a singleton (e.g. an EntityManager)
+     * between requests should only touch it if a previous request actually
+     * resolved it — forcing resolution here would defeat the laziness that
+     * makes singleton() worthwhile for services a given request never uses.
+     *
+     * @param  string $abstract The abstract name to check
+     * @return bool   True if already resolved and cached, false otherwise
+     */
+    public function resolved(string $abstract): bool
+    {
+        return array_key_exists($abstract, $this->resolvedSingletons);
+    }
+
+    /**
+     * Drops a cached singleton instance, forcing the next resolve() call for
+     * this abstract to rebuild it from scratch via its original binding.
+     *
+     * Intended for recovering from a singleton that entered an unusable state
+     * mid-request (e.g. Doctrine permanently closes an EntityManager after
+     * certain unrecoverable ORM exceptions) — without this, every subsequent
+     * resolve() for the life of the process would keep returning the same
+     * broken instance.
+     *
+     * @param  string  $abstract The abstract name to forget
+     * @return void
+     */
+    public function forgetSingleton(string $abstract): void
+    {
+        unset($this->resolvedSingletons[$abstract]);
     }
 
     /**
@@ -220,6 +319,8 @@ class Container implements ContainerInterface
      * Resolves a class with all its dependencies (the core resolution logic).
      *
      * Resolution flow:
+     * 0. If this abstract was already resolved as a singleton, return the
+     *    cached instance immediately.
      * 1. Check if binding exists and is callable → execute closure with timing
      * 2. Check for circular dependency → throw exception if detected
      * 3. Mark as resolving
@@ -227,7 +328,8 @@ class Container implements ContainerInterface
      * 5. Resolve constructor dependencies recursively
      * 6. Instantiate the class
      * 7. Log trace entry with timing and caller info
-     * 8. Unmark as resolving (in finally block)
+     * 8. If this abstract was registered via singleton(), cache the result
+     * 9. Unmark as resolving (in finally block)
      *
      * @example
      * // Resolve a simple class with no dependencies
@@ -242,6 +344,11 @@ class Container implements ContainerInterface
      */
     public function resolve(string $abstract): mixed
     {
+        // --- Return the cached instance if this abstract was already resolved as a singleton ---
+        if (array_key_exists($abstract, $this->resolvedSingletons)) {
+            return $this->resolvedSingletons[$abstract];
+        }
+
         // --- Handle closure bindings with trace ---
         if (isset($this->bindings[$abstract]) && is_callable($this->bindings[$abstract])) {
             $start    = microtime(true);
@@ -259,6 +366,11 @@ class Container implements ContainerInterface
                 $entry['proxy'] = true;
             }
             self::$resolveTrace[] = $entry;
+
+            if (isset($this->singletonAbstracts[$abstract])) {
+                $this->resolvedSingletons[$abstract] = $result;
+            }
+
             return $result;
         }
 
@@ -309,6 +421,10 @@ class Container implements ContainerInterface
                 $entry['proxy'] = true;
             }
             self::$resolveTrace[] = $entry;
+
+            if (isset($this->singletonAbstracts[$abstract])) {
+                $this->resolvedSingletons[$abstract] = $instance;
+            }
 
             return $instance;
         } finally {

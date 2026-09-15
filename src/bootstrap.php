@@ -2,7 +2,6 @@
 
 // bootstrap.php
 use App\Providers\EventServiceProvider;
-use Rhapsody\Core\Services\NotificationService;
 use Composer\InstalledVersions;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\ORM\EntityManager;
@@ -13,7 +12,6 @@ use Rhapsody\Core\Cache;
 use Rhapsody\Core\Cache\CacheInterface;
 use Rhapsody\Core\Cache\FileCacheDriver;
 use Rhapsody\Core\Cache\RedisCacheDriver;
-use Rhapsody\Core\FrameworkInfo;
 use Rhapsody\Core\Commands\CacheClearCommand;
 use Rhapsody\Core\Commands\CacheWarmCommand;
 use Rhapsody\Core\Commands\CheckVersionCommand;
@@ -32,15 +30,16 @@ use Rhapsody\Core\Commands\RouteClearCommand;
 use Rhapsody\Core\Container;
 use Rhapsody\Core\Contracts\PaymentGatewayInterface;
 use Rhapsody\Core\Events\EventDispatcher;
+use Rhapsody\Core\FrameworkInfo;
 use Rhapsody\Core\Helpers\OmnipayGateway;
 use Rhapsody\Core\Helpers\Path;
 use Rhapsody\Core\Mailer;
 use Rhapsody\Core\Middleware\DdosMiddleware;
 use Rhapsody\Core\Proxy\ContainerDecorator;
 use Rhapsody\Core\Proxy\LazyProxyFactory;
-use Rhapsody\Core\QueryLogger;
 use Rhapsody\Core\Request;
 use Rhapsody\Core\Routing\Router;
+use Rhapsody\Core\Services\NotificationService;
 use Rhapsody\Core\Services\RateLimiter;
 use Rhapsody\Core\Session;
 use Rhapsody\Core\Storage\Cookie;
@@ -64,7 +63,7 @@ if (file_exists($basePath . '/.env')) {
 }
 // 2. Create a new Service Container instance and assign it to global scope
 global $container;
-$container  = new Container();
+$container = new Container();
 $container->instance(\Rhapsody\Core\Contracts\ContainerInterface::class, $container);
 $configPath = $basePath . '/config/config.php';
 
@@ -89,12 +88,8 @@ $config['app_version'] = FrameworkInfo::getVersion();
 
 // --- DDOS Middleware ---
 // Bind RateLimiter as a singleton (manual caching)
-$container->bind(RateLimiter::class, function ($container) use ($config) {
-    static $instance = null;
-    if ($instance === null) {
-        $instance = new RateLimiter(Cache::getInstance(), $config);
-    }
-    return $instance;
+$container->singleton(RateLimiter::class, function ($container) use ($config) {
+    return new RateLimiter(Cache::getInstance(), $config);
 });
 
 // Bind DdosMiddleware with its dependencies
@@ -106,27 +101,15 @@ $container->bind(DdosMiddleware::class, function ($container) use ($config) {
 });
 
 // --- EVENT DISPATCHER BINDING ---
-$container->bind(EventDispatcher::class, function (Container $c) {
+$container->singleton(EventDispatcher::class, function (Container $c) {
     $eventServiceProvider = new EventServiceProvider();
     return new EventDispatcher($c, $eventServiceProvider->getListeners());
 });
 
-// --- QUERY LOGGER BINDING (SINGLETON) ---
-// $container->bind(QueryLogger::class, function () {
-//     static $instance;
-//     if ($instance === null) {
-//         $instance = new QueryLogger();
-//     }
-//     return $instance;
-// });
-
 // --- DOCTRINE ENTITY MANAGER BINDING ---
-$container->bind(EntityManager::class, function ($container) use ($config, $basePath) {
+$container->singleton(EntityManager::class, function ($container) use ($config, $basePath) {
     $paths     = [$basePath . '/app/Entities'];
     $isDevMode = ($config['app_env'] ?? 'production') === 'development';
-
-    // Retrieve the same logger instance (singleton)
-    $sqlLogger = $container->resolve(QueryLogger::class);
 
     $cache          = $isDevMode ? new ArrayAdapter() : new FilesystemAdapter('', 0, $basePath . '/storage/cache/doctrine');
     $sqlLogger      = \Rhapsody\Core\QueryLogger::getInstance();
@@ -147,7 +130,7 @@ $container->bind(EntityManager::class, function ($container) use ($config, $base
 });
 
 // --- CACHE SYSTEM BINDING ---
-$container->bind(CacheInterface::class, function () use ($config, $basePath) {
+$container->singleton(CacheInterface::class, function () use ($config, $basePath) {
     if ($config['cache']['driver'] === 'redis') {
         $redisClient = new RedisClient([
             'scheme'   => 'tcp',
@@ -161,7 +144,7 @@ $container->bind(CacheInterface::class, function () use ($config, $basePath) {
     return new FileCacheDriver($basePath . '/storage/cache/app');
 });
 
-$container->bind(Cache::class, function (Container $c) {
+$container->singleton(Cache::class, function (Container $c) {
     return new Cache($c->resolve(CacheInterface::class));
 });
 
@@ -169,7 +152,7 @@ $container->bind(Cache::class, function (Container $c) {
 Cache::setInstance($container->resolve(Cache::class));
 
 // --- CORE PACKAGE DATABASE SINGLETON BINDING ---
-$container->bind(\Rhapsody\Core\Database::class, function () use ($config) {
+$container->singleton(\Rhapsody\Core\Database::class, function () use ($config) {
     if (empty($config)) {
         throw new \Exception("The global \$config array is empty during Container service compilation.");
     }
@@ -179,7 +162,7 @@ $container->bind(\Rhapsody\Core\Database::class, function () use ($config) {
 });
 
 // --- TWIG BINDING ---
-$container->bind(Environment::class, function (Container $c) use ($config, $basePath) {
+$container->singleton(Environment::class, function (Container $c) use ($config, $basePath) {
     $activeTheme = $config['theme'] ?? 'default';
     $paths       = [];
 
@@ -291,7 +274,7 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
         {
             return Session::hasFlash($name);
         }
-    };;;;;;;;;;;;
+    };;;;;;;;;;;;;;;;;
 
     $twig->addGlobal('flash', $flash);
 
@@ -468,6 +451,7 @@ if (PHP_SAPI !== 'cli') {
                 \Rhapsody\Core\Session::class,
                 \Twig\Environment::class,
                 NotificationService::class,
+                \Doctrine\ORM\EntityManager::class,
             ]
         );
 

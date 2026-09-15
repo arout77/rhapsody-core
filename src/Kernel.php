@@ -1,10 +1,11 @@
 <?php
 namespace Rhapsody\Core;
 
-use Rhapsody\Core\Services\NotificationService;
+use Doctrine\ORM\EntityManager;
 use Rhapsody\Core\Contracts\ContainerInterface;
 use Rhapsody\Core\Exceptions\HttpException;
 use Rhapsody\Core\Routing\Router;
+use Rhapsody\Core\Services\NotificationService;
 
 /**
  * The application Kernel: the single seam between "I have a Request" and
@@ -36,6 +37,8 @@ class Kernel
      */
     public function handle(Request $request): Response
     {
+        $this->resetState();
+
         $response = Router::dispatch($request, $this->container);
 
         // A controller/middleware may set a 404/500 status directly on the
@@ -60,6 +63,59 @@ class Kernel
         }
 
         return $response;
+    }
+
+    /**
+     * Per-request reset hygiene. Called at the very start of handle(), before
+     * Router::dispatch() runs — deliberately NOT from terminate(), which only
+     * runs its body for development-environment 2xx HTML responses and would
+     * silently skip this in production, the one environment a persistent
+     * worker actually runs in.
+     *
+     * Cheap and safe under classic per-request PHP too: Container::resetTrace()
+     * and Router::resetMatchedRoute() are near-zero-cost, and the EntityManager
+     * branch only does anything if a singleton EntityManager has already been
+     * resolved — a request that never touches the database skips it entirely.
+     */
+    private function resetState(): void
+    {
+        Container::resetTrace();
+        Router::resetMatchedRoute();
+
+        if (! $this->container->resolved(EntityManager::class)) {
+            // Never resolved this request/process — nothing to reset.
+            return;
+        }
+
+        /**
+         * @var EntityManager $entityManager
+         */
+        $entityManager = $this->container->resolve(EntityManager::class);
+
+        if (! $entityManager->isOpen()) {
+            // A previous request caused Doctrine to close this EntityManager
+            // permanently (e.g. after an unrecoverable ORM exception). It can't
+            // be reused — drop it so the next resolve() rebuilds a fresh one
+            // from the original binding instead of returning the dead one.
+            $this->container->forgetSingleton(EntityManager::class);
+            return;
+        }
+
+        // Clear the identity map so entities loaded by a previous request don't
+        // linger and leak into this one's object graph.
+        $entityManager->clear();
+
+        // The underlying DB connection can be silently dropped between requests
+        // by the server's wait_timeout while a worker sits idle. Doctrine won't
+        // notice until a query fails mid-request, so check and reconnect
+        // proactively instead.
+        $connection = $entityManager->getConnection();
+        try {
+            $connection->executeQuery('SELECT 1');
+        } catch (\Throwable $e) {
+            $connection->close();
+            $connection->connect();
+        }
     }
 
     /**
@@ -101,9 +157,11 @@ class Kernel
         }
         $response->setContent($content);
 
-        /** @var NotificationService $notificationService */
+        /**
+         * @var NotificationService $notificationService
+         */
         $notificationService = $this->container->resolve(NotificationService::class);
-        $response             = $notificationService->injectBanner($response);
+        $response            = $notificationService->injectBanner($response);
 
         return $response;
     }

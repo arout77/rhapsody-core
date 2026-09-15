@@ -8,9 +8,20 @@ class Request
     private readonly array $cookies;
     private readonly array $files;
     private readonly array $server;
+    private readonly string $rawBody;
     public readonly string $uri;
 
-    public function __construct()
+    /**
+     *                             to reading php://input once (the classic
+     *                             per-request SAPI behavior). A persistent-worker
+     *                             front controller (e.g. a RoadRunner adapter)
+     *                             should pass the body it received over the wire
+     *                             here instead, since php://input is not
+     *                             populated per-iteration outside a real SAPI
+     *                             request.
+     * @param string|null $rawBody The raw request body. When omitted, falls back
+     */
+    public function __construct(?string $rawBody = null)
     {
         $this->getParams  = $_GET;
         $this->postParams = $_POST;
@@ -18,6 +29,7 @@ class Request
         $this->files      = $_FILES;
         $this->server     = $_SERVER;
         $this->uri        = $_SERVER['REQUEST_URI'] ?? '/';
+        $this->rawBody    = $rawBody ?? (file_get_contents('php://input') ?: '');
     }
 
     /**
@@ -32,7 +44,7 @@ class Request
      * Automatically generates a clean, standardized canonical URL tag.
      * Filters out non-structural parameters to prevent duplicate content penalties.
      *
-     * @param array $allowedParams Query parameters allowed to persist in the canonical link (e.g., 'page')
+     * @param  array    $allowedParams Query parameters allowed to persist in the canonical link (e.g., 'page')
      * @return string
      */
     public function getCanonicalUrl(array $allowedParams = ['page']): string
@@ -98,8 +110,7 @@ class Request
     {
         // 1. JSON content type (always attempt, regardless of HTTP method)
         if (isset($this->server['CONTENT_TYPE']) && str_contains(strtolower($this->server['CONTENT_TYPE']), 'application/json')) {
-            $json = file_get_contents('php://input');
-            $data = json_decode($json, true);
+            $data = json_decode($this->rawBody, true);
             return is_array($data) ? $data : [];
         }
 
@@ -108,10 +119,9 @@ class Request
             return $this->postParams;
         }
 
-        // 3. Fallback: parse php://input for PUT/PATCH/DELETE with application/x-www-form-urlencoded
-        $input = file_get_contents('php://input');
-        if (! empty($input) && str_contains($input, '=')) {
-            parse_str($input, $data);
+        // 3. Fallback: parse the captured raw body for PUT/PATCH/DELETE with application/x-www-form-urlencoded
+        if (! empty($this->rawBody) && str_contains($this->rawBody, '=')) {
+            parse_str($this->rawBody, $data);
             return $data;
         }
 
@@ -119,8 +129,8 @@ class Request
     }
 
     /**
-     * @param string $key
-     * @param $default
+     * @param  string     $key
+     * @param  $default
      * @return mixed
      */
     public function get(string $key, $default = null)
@@ -129,8 +139,8 @@ class Request
     }
 
     /**
-     * @param string $key
-     * @param $default
+     * @param  string     $key
+     * @param  $default
      * @return mixed
      */
     public function post(string $key, $default = null)
@@ -139,7 +149,7 @@ class Request
     }
 
     /**
-     * @param string $key
+     * @param string     $key
      * @param $default
      */
     public function getQueryParam(string $key, $default = null)
@@ -148,7 +158,7 @@ class Request
     }
 
     /**
-     * @param string $key
+     * @param string     $key
      * @param $default
      */
     public function allQueryParams(string $key, $default = null)
@@ -159,8 +169,8 @@ class Request
     /**
      * Get a request header by name (case-insensitive).
      *
-     * @param string $name
-     * @param mixed $default
+     * @param  string  $name
+     * @param  mixed   $default
      * @return mixed
      */
     public function header(string $name, $default = null)
@@ -184,7 +194,7 @@ class Request
      */
     public function getContent(): string
     {
-        return file_get_contents('php://input') ?: '';
+        return $this->rawBody;
     }
 
     /**
@@ -199,8 +209,8 @@ class Request
      * Get a single value from the request body (POST fields or JSON payload —
      * see getBody()), falling back to the query string if not present there.
      *
-     * @param string $key
-     * @param mixed $default
+     * @param  string  $key
+     * @param  mixed   $default
      * @return mixed
      */
     public function input(string $key, $default = null)
@@ -228,7 +238,7 @@ class Request
      * Determine if the request's path matches a given pattern.
      * Supports a trailing wildcard, e.g. 'api/*' matches 'api/users', 'api/foo/bar', etc.
      *
-     * @param string $pattern
+     * @param  string $pattern
      * @return bool
      */
     public function is(string $pattern): bool

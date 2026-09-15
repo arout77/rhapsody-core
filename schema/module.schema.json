@@ -104,7 +104,12 @@
           "type": { "type": "string", "enum": ["string", "number", "boolean", "select"] },
           "label": { "type": "string" },
           "default": {},
-          "options": { "type": "array" }
+          "options": { "type": "array" },
+          "required": {
+            "type": "boolean",
+            "default": false,
+            "description": "If true, boot fails (and the configured dev alert fires) when this setting has no stored value and no default."
+          }
         }
       }
     }

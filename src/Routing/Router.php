@@ -68,9 +68,9 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
     {
         $route          = new Route($method, $path, $callback);
         self::$routes[] = $route; // must land in the same collection dispatch()/getRoutes() read —
-                                   // previously this wrote to a non-existent $this->routes property,
-                                   // so routes added this way were never actually matched.
-        return $route; // so you can chain ->name()
+                                  // previously this wrote to a non-existent $this->routes property,
+                                  // so routes added this way were never actually matched.
+        return $route;            // so you can chain ->name()
     }
 
     public function registerNamedRoute(Route $route): void
@@ -104,8 +104,8 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
      * Dispatches the incoming request, matching it against registered routes,
      * executing global and route-specific middleware, and returning a Response.
      *
-     * @param Request $request
-     * @param Container $container
+     * @param  Request    $request
+     * @param  Container  $container
      * @return Response
      */
     public static function dispatch(Request $request, ContainerInterface $container): Response
@@ -164,9 +164,9 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
     /**
      * Safely executes the resolved route callback.
      *
-     * @param Route $route
-     * @param Request $request
-     * @param Container $container The application's service container.
+     * @param  Route      $route
+     * @param  Request    $request
+     * @param  Container  $container The application's service container.
      * @return Response
      */
     protected static function execute(Route $route, Request $request, ContainerInterface $container): Response
@@ -214,6 +214,21 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
     }
 
     /**
+     * Clears the last matched route.
+     *
+     * Under classic per-request PHP this is harmless and never observably
+     * matters, since the process (and this static property) dies before
+     * anything could read a stale value. Under a persistent-worker runtime,
+     * where this class's statics survive across requests, it should be called
+     * at the start of every request so a route matched by a previous request
+     * is never visible before the current request's dispatch() runs.
+     */
+    public static function resetMatchedRoute(): void
+    {
+        self::$matchedRoute = null;
+    }
+
+    /**
      * Returns all registered routes.
      */
     public static function getRoutes(): array
@@ -237,10 +252,10 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
     /**
      * Generate a URL from a named route.
      *
-     * @param string $name   The route name.
-     * @param array  $params Parameters to replace in the path (e.g., ['id' => 123]).
-     * @return string
+     * @param  string     $name   The route name.
+     * @param  array      $params Parameters to replace in the path (e.g., ['id' => 123]).
      * @throws \Exception If the route name is not found.
+     * @return string
      */
     public static function generateUrl(string $name, array $params = []): string
     {

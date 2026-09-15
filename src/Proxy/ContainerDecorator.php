@@ -67,4 +67,14 @@ class ContainerDecorator implements ContainerInterface
     {
         return in_array($abstract, $this->eagerServices, true);
     }
+
+    public function resolved(string $abstract): bool
+    {
+        return $this->container->resolved($abstract);
+    }
+
+    public function forgetSingleton(string $abstract): void
+    {
+        $this->container->forgetSingleton($abstract);
+    }
 }
