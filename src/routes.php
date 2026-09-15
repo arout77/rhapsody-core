@@ -53,6 +53,7 @@ Router::get('/docs/toolbar', [DocsController::class, 'toolbar']);
 Router::get('/docs/lazy-service-loading', [DocsController::class, 'lazyServiceLoading']);
 Router::get('/docs/cookie-storage', [DocsController::class, 'cookieStorage']);
 Router::get('/docs/ai', [DocsController::class, 'ai']);
+Router::get('/docs/roadrunner', [DocsController::class, 'roadrunner']);
 
 // Omnipay
 Router::post('/payment/checkout', [PaymentController::class, 'checkout']);

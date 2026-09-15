@@ -477,4 +477,16 @@ class DocsController extends BaseController
             'canonical_url' => $request->getCanonicalUrl(),
         ]);
     }
+
+    /**
+     * Shows the RoadRunner persistent-worker adapter documentation.
+     */
+    public function roadrunner(Request $request): Response
+    {
+        return $this->view('@core/docs/roadrunner.twig', [], [
+            'title'         => 'RoadRunner Persistent Workers – Rhapsody Documentation',
+            'description'   => 'Run Rhapsody under RoadRunner to eliminate per-request framework boot time — requirements, installation, deployment, and the state-reset behavior that makes it safe.',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
 }
