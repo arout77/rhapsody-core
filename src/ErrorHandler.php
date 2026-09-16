@@ -271,6 +271,33 @@ class ErrorHandler
         echo "<a href='{$baseUrl}/'>Go Home</a></body></html>";
     }
 
+    /**
+     * Renders the same themed production error page handleException() would,
+     * but returns it as [$statusCode, $html] instead of echoing directly, and
+     * never calls exit(). For a persistent-worker front controller that needs
+     * to build a Response object rather than write straight to stdout and
+     * terminate the process.
+     *
+     * Always renders the production (non-Whoops) page regardless of app_env —
+     * a raw Whoops debug page (stack trace, env values) inside a long-lived
+     * worker is a bigger liability than under classic per-request PHP, since
+     * it could end up served to whichever client happens to be connected when
+     * the worker faults, not necessarily the developer debugging it.
+     */
+    public static function renderErrorContent(\Throwable $e, array $config): array
+    {
+        self::$config = $config;
+        self::logError($e);
+
+        ob_start();
+        self::renderProductionError($e);
+        $content = ob_get_clean();
+
+        $statusCode = ($e instanceof HttpException) ? $e->getStatusCode() : 500;
+
+        return [$statusCode, $content];
+    }
+
     private static function isDevelopment(): bool
     {
         return (self::$config['app_env'] ?? 'production') === 'development';
