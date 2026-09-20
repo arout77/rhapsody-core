@@ -3,8 +3,7 @@
 {% block doc_content %}
     <h1>Pagination</h1>
     <p>
-        Rhapsody includes a <code>Rhapsody\Core\Pagination</code> class that makes breaking large datasets into
-        navigable pages straightforward, with optional support for custom CSS classes and a custom base URL.
+        Rhapsody includes a <code>Rhapsody\Core\Pagination</code> class that makes breaking large datasets into navigable pages straightforward, with optional support for custom CSS classes, a custom base URL, windowed page ranges with First/Last links, a jump-to-page menu, AJAX-friendly data attributes, and rendering through your own Twig template.
     </p>
 
     <h2>1. Model Setup</h2>
@@ -111,4 +110,149 @@ public function showUsers(Request $request): Response
         as well. This happens automatically by reading the current request's query string; there's no method to add
         parameters that aren't already part of it.
     </p>
+
+        <h2>7. Windowed Pages, First & Last Links</h2>
+    <p>
+        By default, <code>render()</code> shows every page number — unchanged from the original behavior. For large
+        page counts, pass <code>maxLinks</code> (either via <code>setMaxLinks()</code> as a standing default, or as a
+        one-off <code>render()</code> option) to show a window of pages centered on the current one, with
+        <strong>First</strong>/<strong>Last</strong> links and an ellipsis appearing automatically whenever page 1 or
+        the last page falls outside that window:
+    </p>
+    <pre><code class="language-php">// Standing default — every render() call after this uses a 7-page window
+$pagination->setMaxLinks(7);
+
+// One-off override for a single render() call
+echo $pagination->render(['maxLinks' => 7]);
+// e.g. with 20 total pages, on page 10:
+// Previous  First … 8 9 [10] 11 12 … Last  Next</code></pre>
+
+    <h2>8. Jump-to-Page Menu</h2>
+    <p>
+        Enable a <code>&lt;select&gt;</code> that lets visitors jump straight to any page, rendered immediately
+        after the nav:
+    </p>
+    <pre><code class="language-php">$pagination->setShowJumpMenu(true);
+echo $pagination->render();</code></pre>
+    <p>
+        It works with no JavaScript — a <strong>Go</strong> button submits a standard GET form that preserves every
+        other current query parameter as hidden inputs — and progressively enhances to jump immediately on
+        <code>&lt;select&gt;</code> change when JavaScript is available. To place the menu somewhere other than
+        right after the nav, call <code>renderJumpMenu()</code> on its own instead of passing <code>showJumpMenu</code>
+        to <code>render()</code>:
+    </p>
+    <pre><code class="language-twig">&#123;&#123; pagination.render()|raw &#125;&#125;
+&lt;div class="mt-4"&gt;
+    &#123;&#123; pagination.renderJumpMenu()|raw &#125;&#125;
+&lt;/div&gt;</code></pre>
+
+    <h2>9. AJAX Data Attributes</h2>
+    <p>
+        <code>getDataAttributes()</code> returns an associative array of <code>data-*</code> attributes describing
+        the current pagination state, for a JavaScript-driven pagination widget to read:
+    </p>
+    <pre><code class="language-php">$pagination->getDataAttributes();
+// [
+//     'data-pagination'   => '',
+//     'data-current-page' => 3,
+//     'data-total-pages'  => 12,
+//     'data-per-page'     => 10,
+//     'data-total-items'  => 117,
+// ]</code></pre>
+
+    <h2>10. Rendering a Custom Twig Template</h2>
+    <p>
+        Instead of the built-in markup, hand off rendering to your own Twig template with
+        <code>renderTemplate()</code>. The <code>Pagination</code> instance is passed into the template as
+        <code>pagination</code>, giving you direct access to <code>pagination.pageRange</code>,
+        <code>pagination.previousPage</code>, <code>pagination.nextPage</code>, and <code>pagination.url(n)</code> —
+        set <code>setMaxLinks()</code> beforehand if you want <code>pagination.pageRange</code> to reflect a window
+        rather than every page:
+    </p>
+    <pre><code class="language-php">$pagination->setMaxLinks(5);
+echo $pagination->renderTemplate('@app/components/pagination.twig');</code></pre>
+    <pre><code class="language-twig">{# views/components/pagination.twig #}
+&lt;nav&gt;
+    &#123;&#123;# pagination.previousPage %} &lt;a href="&#123;&#123; pagination.url(pagination.previousPage) &#125;&#125;"&gt;&larr;&lt;/a&gt; &#123;&#123;% endif %&#125;
+
+    &#123;&#123;% for page in pagination.pageRange %&#125;
+        &lt;a href="&#123;&#123; pagination.url(page) &#125;&#125;"&gt;&#123;&#123; page &#125;&#125;&lt;/a&gt;
+    &#123;&#123;% endfor %&#125;
+
+    &#123;&#123;# pagination.nextPage %} &lt;a href="&#123;&#123; pagination.url(pagination.nextPage) &#125;&#125;"&gt;&rarr;&lt;/a&gt; &#123;&#123;% endif %&#125;
+&lt;/nav&gt;</code></pre>
+    <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
+        <strong>Note:</strong> <code>renderTemplate()</code> resolves the framework's Twig environment via
+        <code>Container::getInstance()</code>, so it requires a bootstrapped container — see the
+        <a href="{{ base_url }}/docs/container">Service Container</a> documentation. Plain <code>render()</code> has
+        no such requirement and works anywhere, including isolated unit tests.
+    </div>
+
+    <h2>11. New CSS Class Keys</h2>
+    <p>In addition to the keys from section 4, <code>setCssClasses()</code> now also accepts:</p>
+    <ul>
+        <li><code>ellipsis</code> – the "&hellip;" shown between a First/Last link and the windowed page range</li>
+        <li><code>jumpForm</code> – the jump-to-page <code>&lt;form&gt;</code></li>
+        <li><code>jumpLabel</code> – the "Jump to page:" <code>&lt;label&gt;</code></li>
+        <li><code>jumpMenu</code> – the <code>&lt;select&gt;</code> itself</li>
+        <li><code>jumpButton</code> – the "Go" fallback <code>&lt;button&gt;</code></li>
+    </ul>
+
+    <h2>12. AJAX Pagination (Zero Full-Page Reloads)</h2>
+    <p>
+        Combine <code>toAjaxPayload()</code> with <code>Request::wantsJson()</code> to get near-instant page transitions on a rapidly changing dataset, without giving up a fast, fully-rendered initial page load or risking stale cached HTML — the same controller and the same route serve both the normal page load and the AJAX request, so there's no separate API endpoint or duplicated list-rendering logic to maintain.
+    </p>
+
+    <h3>A. Include the script once</h3>
+    <pre><code class="language-twig">{{ '{%' }} include "@core/partials/pagination-ajax.twig" {{ '%}' }}</code></pre>
+
+    <h3>B. Wire up the controller</h3>
+    <pre><code class="language-php">public function index(Request $request): Response
+{
+    $pagination = new Pagination($totalItems, 20, (int) $request->get('page', 1));
+    $products   = $this->productModel->paginated($pagination->getLimit(), $pagination->getOffset());
+
+    $listHtml = $this->twig->render('@app/partials/product-list.twig', ['products' => $products]);
+
+    if ($request->wantsJson()) {
+        return $this->json($pagination->toAjaxPayload($listHtml));
+    }
+
+    return $this->view('@app/marketplace/index.twig', [
+        'products'   => $products,
+        'listHtml'   => $listHtml,
+        'pagination' => $pagination,
+    ]);
+}</code></pre>
+
+    <h3>C. Wrap the markup</h3>
+    <p>
+        <code>data-list-target</code>, <code>data-pagination-target</code>, and <code>data-jump-target</code> tell
+        the script which elements to swap — the last is optional, only needed when
+        <code>setShowJumpMenu(true)</code> is in use:
+    </p>
+    <pre><code class="language-twig">&lt;div data-ajax-pagination
+     data-list-target="#product-list"
+     data-pagination-target="#product-pagination"
+     data-jump-target="#product-jump"&gt;
+
+    &lt;div id="product-list"&gt;
+        &#123;&#123; listHtml|raw &#125;&#125;
+    &lt;/div&gt;
+
+    &lt;div id="product-pagination"&gt;
+        &#123;&#123; pagination.render(&#123;showJumpMenu: false&#125;)|raw &#125;&#125;
+    &lt;/div&gt;
+
+    &lt;div id="product-jump"&gt;
+        &#123;&#123; pagination.renderJumpMenu()|raw &#125;&#125;
+    &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+
+    <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
+        <strong>Progressive by design:</strong> every link in <code>render()</code>'s output is a real,
+        fully-working <code>href</code>, and the jump-menu is a real <code>&lt;form&gt;</code> — with JavaScript
+        disabled (or before the script has finished loading) the page just navigates normally. The script only
+        intercepts what it can enhance.
+    </div>
 {% endblock %}

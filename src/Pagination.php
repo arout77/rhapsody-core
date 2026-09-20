@@ -424,4 +424,31 @@ class Pagination
 
         return $twig->render($template, array_merge(['pagination' => $this], $extraVars));
     }
+
+    /**
+     * Builds the JSON-ready payload for an AJAX pagination response: the
+     * pagination nav markup, the jump-menu markup (only when enabled), and
+     * whatever list content the caller supplies — typically the same
+     * partial the full-page render already uses. The nav markup here never
+     * embeds the jump menu (unlike render()) — it's returned as its own key
+     * so the client can swap it into a separate container without having
+     * to strip it back out.
+     *
+     * @param  string      $listHtml Pre-rendered HTML for the paginated list itself
+     * @param  array       $options  Same options accepted by render() (maxLinks, cssClasses, baseUrl, showJumpMenu)
+     * @return array{list: string, pagination: string, jumpMenu: string|null, currentPage: int, totalPages: int}
+     */
+    public function toAjaxPayload(string $listHtml, array $options = []): array
+    {
+        $showJumpMenu = $options['showJumpMenu'] ?? $this->showJumpMenu;
+        $navHtml      = $this->render(array_merge($options, ['showJumpMenu' => false]));
+
+        return [
+            'list'        => $listHtml,
+            'pagination'  => $navHtml,
+            'jumpMenu'    => $showJumpMenu ? $this->renderJumpMenu() : null,
+            'currentPage' => $this->currentPage,
+            'totalPages'  => $this->totalPages,
+        ];
+    }
 }

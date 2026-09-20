@@ -258,4 +258,17 @@ class Request
 
         return (bool) preg_match($regex, $path);
     }
+
+    /**
+     * Whether the client is requesting a JSON response, based on the
+     * Accept header — the convention AJAX pagination (and any other
+     * fetch()-driven endpoint) uses to distinguish an AJAX request from
+     * a normal navigation.
+     *
+     * @return bool
+     */
+    public function wantsJson(): bool
+    {
+        return str_contains((string) $this->header('Accept', ''), 'application/json');
+    }
 }

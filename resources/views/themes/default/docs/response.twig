@@ -32,6 +32,7 @@ public function getUser(string $id): Response
 
     return $this->json($user);
 }</code></pre>
+    <p>Pair this with <code>Request::wantsJson()</code> to let a single route serve both a full page and an AJAX response — see <a href="{{ base_url }}/docs/pagination">AJAX Pagination</a>.</p>
 
     <h3>Redirecting Users</h3>
     <p>

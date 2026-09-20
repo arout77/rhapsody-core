@@ -80,6 +80,15 @@ public function viewUser(Request $request, string $user_id)
         For performance, the container can be configured to lazy‑load services (see the <a href="{{ base_url }}/docs/performance">Performance</a> documentation).
     </p>
 
+    <h2>AJAX-Aware Routes</h2>
+    <p>
+        A single route can serve both a full page load and a JSON response for the same data — check
+        <code>Request::wantsJson()</code> (true when the client sends <code>Accept: application/json</code>) inside
+        the controller action and branch to <code>$this->json(...)</code> instead of <code>$this->view(...)</code>.
+        No separate API route needed. See <a href="{{ base_url }}/docs/pagination">AJAX Pagination</a> for a full
+        example.
+    </p>
+
     <h2>Debugging Routes</h2>
     <p>
         The debug toolbar includes a <strong>Services</strong> and <strong>Middleware</strong> panel that show which routes were matched, which middleware were executed, and which services were resolved during the request. This is invaluable for profiling and debugging.
