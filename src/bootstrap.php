@@ -274,7 +274,7 @@ $container->singleton(Environment::class, function (Container $c) use ($config, 
         {
             return Session::hasFlash($name);
         }
-    };;;;;;;;;;;;;;;;;
+    };;;;;;;;;;;;;;;;;;
 
     $twig->addGlobal('flash', $flash);
 
@@ -505,4 +505,5 @@ if (file_exists($routeCachePath) && ($config['app_env'] ?? 'production') === 'pr
 }
 
 // 3. Return the completely compiled and configured dependency injection container.
+Container::setInstance($container);
 return $container;

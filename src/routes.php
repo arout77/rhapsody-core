@@ -21,6 +21,7 @@ Router::get('/docs/authentication', [DocsController::class, 'authentication']);
 Router::get('/docs/caching', [DocsController::class, 'performance']);
 Router::get('/docs/cli', [DocsController::class, 'cli']);
 Router::get('/docs/configuration', [DocsController::class, 'configuration']);
+Router::get('/docs/container', [DocsController::class, 'container']);
 Router::get('/docs/controllers', [DocsController::class, 'controllers']);
 Router::get('/docs/debugging', [DocsController::class, 'debugging']);
 Router::get('/docs/doctrine', [DocsController::class, 'doctrine']);

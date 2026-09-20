@@ -176,6 +176,16 @@ class Container implements ContainerInterface
     private static bool $proxyMode = false;
 
     /**
+     * @var ContainerInterface|null The globally registered container instance.
+     *
+     * Set once via setInstance() — typically at the end of bootstrap.php,
+     * after every ->bind()/->singleton() call has run — and retrieved
+     * anywhere in the framework via getInstance() without requiring the
+     * container to be threaded through every constructor.
+     */
+    private static ?ContainerInterface $instance = null;
+
+    /**
      * Binds an abstract name to a concrete implementation or factory closure.
      *
      * A binding registered this way resolves a brand new instance on every
@@ -519,5 +529,68 @@ class Container implements ContainerInterface
     public static function setProxyMode(bool $enabled): void
     {
         self::$proxyMode = $enabled;
+    }
+
+    /**
+     * Registers the given container as the globally accessible instance.
+     *
+     * Call this at the end of bootstrap.php, after all bindings are
+     * configured — registering too early is the same footgun that
+     * previously caused the custom 404 page to render without Twig bound:
+     * a bare, unconfigured container captured before its bindings existed.
+     *
+     * @example
+     * // End of bootstrap.php, after every ->bind()/->singleton() call:
+     * Container::setInstance($container);
+     * @param  ContainerInterface $container The fully configured container
+     * @return void
+     */
+    public static function setInstance(ContainerInterface $container): void
+    {
+        self::$instance = $container;
+    }
+
+    /**
+     * Returns the globally registered container instance.
+     *
+     * @example
+     * $twig = Container::getInstance()->get('twig');
+     * @throws \RuntimeException  If setInstance() has not been called yet
+     * @return ContainerInterface The globally registered container
+     */
+    public static function getInstance(): ContainerInterface
+    {
+        if (self::$instance === null) {
+            throw new \RuntimeException(
+                'No container instance has been set. Call Container::setInstance() during bootstrap before using Container::getInstance().'
+            );
+        }
+        return self::$instance;
+    }
+
+    /**
+     * Checks whether a global container instance has been registered,
+     * without throwing if it hasn't. Useful for code paths that want to
+     * fall back to explicit dependency injection when no global instance
+     * is available (e.g. isolated unit tests).
+     *
+     * @return bool True if setInstance() has been called, false otherwise
+     */
+    public static function hasInstance(): bool
+    {
+        return self::$instance !== null;
+    }
+
+    /**
+     * Clears the globally registered container instance.
+     *
+     * Intended for test isolation — call this in a tearDown() so state
+     * from one test's container doesn't bleed into the next.
+     *
+     * @return void
+     */
+    public static function forgetInstance(): void
+    {
+        self::$instance = null;
     }
 }

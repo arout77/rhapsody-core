@@ -1,0 +1,224 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>The Service Container</h1>
+    <p>
+        Rhapsody's <code>Rhapsody\Core\Container</code> is the framework's dependency injection (DI) container.
+        That's a fancy way of saying: it's the thing that builds your objects for you and hands them their
+        dependencies, so you don't have to wire everything up by hand.
+    </p>
+    <p>
+        You tell the container two things: <strong>what</strong> you want (an interface, a class name, or a plain
+        string alias like <code>'config'</code>) and <strong>how</strong> to build it (a concrete class name, or a
+        function that returns the object). Then, whenever you need an object, you ask the container for it. If that
+        object needs other objects to be constructed, the container figures those out too — recursively — by
+        inspecting the class's constructor with PHP's Reflection API. In practice, you rarely have to write
+        <code>new Something(...)</code> yourself.
+    </p>
+
+    <h2>What It Does</h2>
+    <ul>
+        <li><strong>Binds names to things.</strong> An interface or alias can be mapped to a concrete class or to a factory function (a closure).</li>
+        <li><strong>Auto-wires constructor dependencies.</strong> If a class's constructor asks for <code>LoggerInterface</code> and <code>UserRepository</code>, the container will resolve both and pass them in — recursively, all the way down.</li>
+        <li><strong>Detects circular dependencies.</strong> If <code>A</code> needs <code>B</code> and <code>B</code> needs <code>A</code>, the container stops immediately and tells you, instead of looping forever.</li>
+        <li><strong>Supports singletons.</strong> <code>singleton()</code> bindings are built once and then reused on every later request.</li>
+        <li><strong>Traces every resolution.</strong> Class name, how long it took, who asked for it — all logged for debugging.</li>
+    </ul>
+
+    <hr>
+
+    <h2>Binding Dependencies</h2>
+
+    <h3><code>bind()</code> — a fresh instance every time</h3>
+    <p>
+        <code>bind()</code> tells the container: <em>"When someone asks for this abstract name, build it like this."</em>
+        A <strong>new</strong> instance is created on <strong>every</strong> <code>resolve()</code> call. Use this for
+        things that shouldn't be shared, like a per-request <code>Request</code> object.
+    </p>
+    <pre><code class="language-php">// Bind a class to a factory function
+$container->bind(Request::class, fn() => new Request());
+
+// Bind an interface to a concrete implementation
+$container->bind(LoggerInterface::class, FileLogger::class);
+
+// Bind a string alias to a factory function
+$container->bind('db', function () {
+    return new PDO('mysql:host=localhost;dbname=test', 'user', 'pwd');
+});</code></pre>
+
+    <h3><code>singleton()</code> — build once, reuse forever</h3>
+    <p>
+        <code>singleton()</code> works exactly like <code>bind()</code>, except the <strong>first</strong>
+        <code>resolve()</code> call builds the instance and <strong>caches</strong> it. Every call after that returns
+        the same object instead of running the factory again.
+    </p>
+    <p>
+        Use this for anything expensive or stateful that should be shared for the life of the container — a database
+        connection, the Twig environment, an event dispatcher.
+    </p>
+    <pre><code class="language-php">$container->singleton(EntityManager::class, function ($container) {
+    return new EntityManager($connection, $config);
+});</code></pre>
+
+    <h3><code>instance()</code> — register an object you already built</h3>
+    <p>
+        If you've already constructed the object yourself and just want the container to return that exact instance,
+        use <code>instance()</code>:
+    </p>
+    <pre><code class="language-php">$logger = new Logger($config);
+$container->instance(LoggerInterface::class, $logger);
+// Every resolve(LoggerInterface::class) call now returns this exact object</code></pre>
+
+    <hr>
+
+    <h2>Resolving Dependencies</h2>
+    <p>
+        <code>resolve()</code> (also available as <code>get()</code> — they're identical) builds and returns an
+        instance of the given abstract:
+    </p>
+    <pre><code class="language-php">$logger = $container->resolve(Logger::class);
+$logger = $container->get(Logger::class); // same thing</code></pre>
+
+    <p>
+        If you want to check whether something has been explicitly bound <em>before</em> trying to resolve it, use
+        <code>has()</code>:
+    </p>
+    <pre><code class="language-php">if ($container->has('db')) {
+    $connection = $container->get('db');
+}</code></pre>
+
+    <h3>Auto-Wiring</h3>
+    <p>
+        If a class was never explicitly bound, <code>resolve()</code> falls back to <strong>reflection</strong>: it
+        looks at the class's constructor and, for each parameter, tries to resolve that parameter's type
+        automatically.
+    </p>
+    <p>The rules are simple:</p>
+    <ul>
+        <li><strong>Type-hinted with a class or interface</strong> → resolved recursively.</li>
+        <li><strong>Has a default value</strong> (like <code>$debug = false</code>) → that default is used.</li>
+        <li><strong>Anything else</strong> → an exception is thrown, telling you exactly which parameter couldn't be resolved and where.</li>
+    </ul>
+    <pre><code class="language-php">class UserService
+{
+    public function __construct(
+        private LoggerInterface $logger,
+        private UserRepository $repository
+    ) {}
+}
+
+// LoggerInterface and UserRepository are both resolved automatically.
+// LoggerInterface needs a binding (see above); UserRepository doesn't,
+// as long as its own constructor has no unresolvable dependencies.
+$userService = $container->resolve(UserService::class);</code></pre>
+
+    <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
+        <strong>Heads up:</strong> interfaces must be explicitly bound. PHP can't instantiate an interface on its
+        own, so the container has no way to guess which concrete class you meant.
+        <code>bind(LoggerInterface::class, FileLogger::class)</code> is what makes the example above work.
+    </div>
+
+    <hr>
+
+    <h2>Singleton Lifecycle</h2>
+    <p>
+        Two methods exist for managing already-resolved singletons <strong>without</strong> triggering a new
+        resolution:
+    </p>
+    <ul>
+        <li><code>resolved(string $abstract): bool</code> — returns <code>true</code> if this singleton has already been built and cached on this container.</li>
+        <li><code>forgetSingleton(string $abstract): void</code> — drops the cached instance, so the next <code>resolve()</code> call rebuilds it from scratch.</li>
+    </ul>
+    <p>
+        These matter most under a <strong>persistent-worker runtime</strong> (see <a href="{{ base_url }}/docs/roadrunner">RoadRunner Persistent Workers</a>),
+        where the container is built once and reused for the life of the worker. <code>forgetSingleton()</code> lets
+        you recover a singleton that entered an unusable state mid-request — for example, an
+        <code>EntityManager</code> that Doctrine has permanently closed after an unrecoverable ORM exception —
+        without restarting the whole worker.
+    </p>
+
+    <hr>
+
+    <h2>Circular Dependency Detection</h2>
+    <p>
+        If class <code>A</code> depends on <code>B</code>, and <code>B</code> depends back on <code>A</code>,
+        resolving either one throws immediately rather than recursing forever:
+    </p>
+    <pre><code class="language-php">// Throws: Circular dependency detected: App\A → App\B → App\A
+$container->resolve(App\A::class);</code></pre>
+
+    <hr>
+
+    <h2>Resolution Tracing</h2>
+    <p>
+        Every resolution — successful or not — is logged with timing and caller information. This is useful for
+        hunting down slow or unexpected instantiations:
+    </p>
+    <pre><code class="language-php">$trace = Container::getTrace();
+foreach ($trace as $entry) {
+    echo "Resolved {$entry['class']} in {$entry['duration']}ms (called by {$entry['called_by']})\n";
+}
+
+Container::resetTrace();        // clear the log
+Container::setProxyMode(true);  // flag subsequent entries as proxy resolutions</code></pre>
+
+    <hr>
+
+    <h2>The Global Accessor</h2>
+    <p>
+        For the vast majority of classes, the container should be <strong>threaded in through the constructor</strong>
+        — that's what auto-wiring is for, and it's what keeps a class's real dependencies visible and easy to test.
+    </p>
+    <p>
+        But some infrastructure-level classes are routinely instantiated directly with <code>new</code> by
+        application code (never resolved through the container itself) and only occasionally need to reach a bound
+        service. The <a href="{{ base_url }}/docs/pagination">Pagination</a> class rendering a custom Twig template
+        is a good example. Forcing every caller of <code>new Pagination(...)</code> to also pass in a
+        <code>Twig\Environment</code> just for that one optional feature would be worse than the alternative: a
+        global accessor.
+    </p>
+    <pre><code class="language-php">// End of bootstrap.php, after every bind()/singleton() call has run:
+Container::setInstance($container);
+
+// Anywhere else in the framework:
+$twig = Container::getInstance()->get(Twig\Environment::class);
+
+// Check without triggering an exception if nothing has been set yet:
+if (Container::hasInstance()) { ... }
+
+// Test isolation — clear the registered instance between tests:
+Container::forgetInstance();</code></pre>
+
+    <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
+        <strong>Important:</strong> call <code>setInstance()</code> <strong>at the end</strong> of
+        <code>bootstrap.php</code>, after every <code>bind()</code> and <code>singleton()</code> call has run.
+        Registering too early is the same footgun that previously caused the custom 404 page to render without Twig
+        bound — a bare, unconfigured container captured before its bindings existed.
+    </div>
+
+    <h3>Pros and Cons</h3>
+    <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
+        <strong>Pros:</strong> no need to thread the container through classes that only need it occasionally;
+        avoids forcing every constructor along a call chain to accept and forward a dependency it doesn't itself use;
+        works identically under a persistent-worker runtime, since <code>setInstance()</code> only ever needs to run
+        once at boot.
+    </div>
+    <div class="bg-red-200 border-l-4 border-red-700 text-red-700 p-4">
+        <strong>Cons:</strong> pulling a dependency out of a global hides it from a class's public API — a caller
+        can no longer tell what a class needs just by reading its constructor. It also makes unit testing harder,
+        since a test now has to call <code>Container::setInstance()</code> with a suitable double before exercising
+        the class, rather than simply passing one in. <strong>Reserve <code>getInstance()</code> for classes the
+        container doesn't itself resolve</strong> — anything the container builds for you (controllers, services
+        bound via <code>bind()</code>/<code>singleton()</code>) should keep using constructor injection.
+    </div>
+
+    <hr>
+
+    <h2>Limitations</h2>
+    <ul>
+        <li><strong><code>bind()</code> always creates a new instance.</strong> If you want something shared, use <code>singleton()</code>.</li>
+        <li><strong>No contextual binding.</strong> You can't say "give this class implementation X of the interface, but give that class implementation Y." One binding per abstract, period.</li>
+        <li><strong>The resolution trace is static and shared.</strong> <code>getTrace()</code> returns the same log across every container instance in the process.</li>
+        <li><strong>No implicit interface autowiring.</strong> An interface must be explicitly <code>bind()</code>'d to a concrete class before it can be resolved.</li>
+    </ul>
+{% endblock %}

@@ -489,4 +489,16 @@ class DocsController extends BaseController
             'canonical_url' => $request->getCanonicalUrl(),
         ]);
     }
+
+    /**
+     * Shows the service container documentation.
+     */
+    public function container(Request $request): Response
+    {
+        return $this->view('@core/docs/container.twig', [], [
+            'title'         => 'The Service Container – Rhapsody Documentation',
+            'description'   => 'Learn how to bind, resolve, and auto-wire dependencies with Rhapsody\'s DI container, including the global Container::getInstance() accessor.',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
 }
