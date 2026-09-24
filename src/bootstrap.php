@@ -27,6 +27,7 @@ use Rhapsody\Core\Commands\MigrateCommand;
 use Rhapsody\Core\Commands\ReactInstallCommand;
 use Rhapsody\Core\Commands\RouteCacheCommand;
 use Rhapsody\Core\Commands\RouteClearCommand;
+use Rhapsody\Core\Commands\SkeletonSyncCommand;
 use Rhapsody\Core\Container;
 use Rhapsody\Core\Contracts\PaymentGatewayInterface;
 use Rhapsody\Core\Events\EventDispatcher;
@@ -274,7 +275,7 @@ $container->singleton(Environment::class, function (Container $c) use ($config, 
         {
             return Session::hasFlash($name);
         }
-    };;;;;;;;;;;;;;;;;;
+    };;;;;;;;;;;;;;;;;;;;;;
 
     $twig->addGlobal('flash', $flash);
 
@@ -370,9 +371,12 @@ $container->bind(MakeModelCommand::class, function () use ($basePath) {
     return new MakeModelCommand($basePath);
 });
 
-// Fix: Resolved the Database dependency singleton out of the container instance cleanly
 $container->bind(MigrateCommand::class, function ($c) use ($basePath) {
     return new MigrateCommand($basePath, $c->resolve(\Rhapsody\Core\Database::class));
+});
+
+$container->bind(SkeletonSyncCommand::class, function () use ($basePath) {
+    return new SkeletonSyncCommand($basePath);
 });
 
 $container->bind(RouteCacheCommand::class, function () use ($basePath) {

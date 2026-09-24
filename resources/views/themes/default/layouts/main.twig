@@ -15,15 +15,16 @@
     {% endif %}
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ current_url }}">
+    <meta property="og:site_name" content="{{ meta.site_name }}">
     <meta property="og:title" content="{{ meta.title }}">
     <meta property="og:description" content="{{ meta.description }}">
-    <meta property="og:image" content="{{ base_url }}/public/img/logo.png">
+    <meta property="og:image" content="{{ meta.og_image }}">
 
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="{{ current_url }}">
     <meta property="twitter:title" content="{{ meta.title }}">
     <meta property="twitter:description" content="{{ meta.description }}">
-    <meta property="twitter:image" content="{{ base_url }}/public/img/logo.png">
+    <meta property="twitter:image" content="{{ meta.og_image }}">
     <link rel="icon" href="{{ base_url }}/favicon.ico" type="image/x-icon">
     
     {# Framework Default Styles (Wrapped in a block so it can be completely emptied or modified) #}

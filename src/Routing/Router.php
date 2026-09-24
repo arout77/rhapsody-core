@@ -3,6 +3,8 @@ namespace Rhapsody\Core\Routing;
 
 use Rhapsody\Core\Container;
 use Rhapsody\Core\Contracts\ContainerInterface;
+use Rhapsody\Core\Events\EventDispatcher;
+use Rhapsody\Core\Events\RouteNotFound;
 use Rhapsody\Core\Exceptions\HttpException;
 use Rhapsody\Core\Middleware\MiddlewareTracer;
 use Rhapsody\Core\Request;
@@ -158,7 +160,7 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
             }
         }
 
-        return self::handleNotFound();
+        return self::handleNotFound($request, $container);
     }
 
     /**
@@ -194,14 +196,32 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
             return $response;
         }
 
-        return self::handleNotFound();
+        return self::handleNotFound($request, $container);
     }
 
     /**
-     * Handles the case where no route is found.
+     * Handles the case where no route matched the request.
+     *
+     * Before giving up, this dispatches a RouteNotFound event — a
+     * StoppableEventInterface event — so a module (e.g. a redirect manager
+     * resolving an old slug) gets a chance to supply a Response of its own.
+     * If no listener does, behavior is unchanged from before: a 404
+     * HttpException is thrown for the ErrorHandler to render.
+     *
+     * @param  Request             $request
+     * @param  ContainerInterface  $container
+     * @return Response
      */
-    protected static function handleNotFound(): Response
+    protected static function handleNotFound(Request $request, ContainerInterface $container): Response
     {
+        $dispatcher = $container->resolve(EventDispatcher::class);
+
+        $event = $dispatcher->dispatch(new RouteNotFound($request->getPath(), $request->getMethod()));
+
+        if ($event->getResponse() !== null) {
+            return $event->getResponse();
+        }
+
         throw new HttpException(404, 'Page not found');
     }
 

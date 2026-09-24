@@ -89,6 +89,56 @@ public function viewUser(Request $request, string $user_id)
         example.
     </p>
 
+    <h2>Route Caching</h2>
+    <p>
+        For optimal performance, you can cache your routes by running:<br>
+        <pre><code class="language-bash">php rhapsody route:cache</code></pre>
+    </p>
+    <p>
+        This will cache your routes to a flat file in <code>/storage/cache/routes/routes.php</code>; saving you the overhead of processing your routing definitions on every request. There is only one thing to be aware of - any time you add a new route, you must clear the cache by either deleting the file manually, or running <code class="language-bash">php rhapsody route:clear</code>, and then recompiling the cache with <code class="language-bash">php rhapsody route:cache</code> again. If you do not regenerate the cache after adding a new route, you will hit a 404 error when you attempt to visit the new page.<br>
+    </p>
+    <p>
+        <strong>Additional notes on routing:</strong><br>
+        <ul>
+            <li>It is recommended to leave route caching off in your dev environment.</li>
+            <li>The route cache will be cleared automatically when you update the framework, or when you clear the app cache: <code class="language-bash">php rhapsody cache:clear</code></li>
+        </ul>
+    </p>
+
+    <h2>404 Handling &amp; the RouteNotFound Event</h2>
+    <p>
+        When no registered route matches the incoming request, the router doesn't immediately show the 404 page. First, it dispatches a <code>Rhapsody\Core\Events\RouteNotFound</code> event, giving other code one last chance to resolve the URL to something real — most commonly, redirecting a URL that's since moved to a new one.
+    </p>
+    <p>
+        If nothing is listening for this event, or every listener that is declines to act, behavior is unchanged from a normal 404: an <code>HttpException</code> is thrown and handled the usual way. This event only changes anything if something actually listens for it.
+    </p>
+    <pre><code class="language-php">namespace App\Listeners;
+
+use Rhapsody\Core\Events\RouteNotFound;
+use Rhapsody\Core\Response;
+
+class RedirectLegacyUrls
+{
+    public function handle(RouteNotFound $event): void
+    {
+        $newPath = /* look up $event->uri in your own redirects table */ null;
+
+        if ($newPath !== null) {
+            $response = (new Response())
+                ->setStatusCode(301)
+                ->setHeader('Location', $newPath);
+
+            $event->setResponse($response); // tells the router to use this instead of 404ing
+        }
+    }
+}</code></pre>
+    <p>
+        <strong>Important:</strong> <code>RouteNotFound</code> is what the docs call a <em>stoppable event</em> — once a listener calls <code>$event->setResponse()</code>, no further <code>RouteNotFound</code> listeners run, and the router returns that response directly instead of throwing the 404. This is the exception, not the rule, for how events behave in Rhapsody — see <a href="{{ base_url }}/docs/events">Events &amp; Listeners</a> for the full explanation of stoppable events and why almost no other event works this way.
+    </p>
+    <p>
+        A module that wants to listen for this event must declare <code>Rhapsody\Core\Events\RouteNotFound</code> under <code>events.listen.listen</code> in its <code>module.json</code> manifest before it's allowed to — this follows the same permission model as any other module event listener.
+    </p>
+
     <h2>Debugging Routes</h2>
     <p>
         The debug toolbar includes a <strong>Services</strong> and <strong>Middleware</strong> panel that show which routes were matched, which middleware were executed, and which services were resolved during the request. This is invaluable for profiling and debugging.

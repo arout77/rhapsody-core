@@ -92,4 +92,101 @@ class AuthController extends BaseController
     <p>
         Now, your controller's only responsibility is to handle the registration. It no longer knows anything about sending emails. You can easily add more listeners (e.g., `LogUserRegistration`, `UpdateUserStats`) to the `EventServiceProvider` in the future without ever having to change your `AuthController` again.
     </p>
+
+    <hr>
+
+    <h2 id="stoppable-events">4. Stoppable Events (Advanced)</h2>
+    <p>
+        Everything above describes the normal way events work in Rhapsody: dispatching an event is <strong>fire-and-forget</strong>. The code that calls <code>dispatch()</code> doesn't wait to see what listeners do, and nothing a listener does can change what happens next. This is true for <code>UserRegistered</code>, and it's true for almost every event you'll ever write — the whole point of events is to let listeners react to something without the original code needing to know or care.
+    </p>
+    <p>
+        A very small number of events in the framework break that rule on purpose: they let a listener supply an answer that the dispatching code actually uses. The framework ships one example of this, <code>Rhapsody\Core\Events\RouteNotFound</code>, which the router dispatches right before it gives up and shows a 404 page — see the <a href="{{ base_url }}/docs/routing">Routing</a> documentation for that specific example. This section explains the general mechanism behind it, in case you ever need to build something similar for your own application.
+    </p>
+
+    <h3>The StoppableEventInterface</h3>
+    <p>
+        An event opts into this behavior by implementing <code>Rhapsody\Core\Events\StoppableEventInterface</code>, which requires a single method:
+    </p>
+    <pre><code class="language-php">interface StoppableEventInterface
+{
+    public function isPropagationStopped(): bool;
+}</code></pre>
+    <p>
+        Inside <code>EventDispatcher::dispatch()</code>, after every listener runs, the dispatcher asks two questions: does this event implement <code>StoppableEventInterface</code>, and if so, is <code>isPropagationStopped()</code> now <code>true</code>? If the answer to both is yes, the dispatcher stops calling any remaining listeners and hands the event straight back to whoever called <code>dispatch()</code>.
+    </p>
+    <p>
+        <strong>Important:</strong> this check only ever applies to events that implement the interface. <code>UserRegistered</code> and every other ordinary event you create do not implement it, so they are completely unaffected by any of this — every listener always runs for them, in the order they were registered, exactly as described in the sections above.
+    </p>
+
+    <h3>Example: RouteNotFound</h3>
+    <p>
+        <code>RouteNotFound</code> is a good concrete example to study, and you can use it directly rather than building your own. It carries the unmatched URI and HTTP method, plus a place for a listener to put a response:
+    </p>
+    <pre><code class="language-php">class RouteNotFound extends Event implements StoppableEventInterface
+{
+    private ?Response $response = null;
+    private bool $propagationStopped = false;
+
+    public function __construct(
+        public readonly string $uri,
+        public readonly string $method,
+    ) {}
+
+    // A listener calls this when it has resolved the URI to something real.
+    public function setResponse(Response $response): void
+    {
+        $this->response = $response;
+        $this->propagationStopped = true; // setting a response always stops propagation
+    }
+
+    public function getResponse(): ?Response
+    {
+        return $this->response;
+    }
+
+    public function isPropagationStopped(): bool
+    {
+        return $this->propagationStopped;
+    }
+}</code></pre>
+    <p>
+        Notice that <code>setResponse()</code> is the <em>only</em> way to mark the event as stopped. You can't accidentally stop propagation without also providing a response, and you can't end up with two different responses from two different listeners — whichever listener calls <code>setResponse()</code> first wins, and no listener registered after it gets a turn.
+    </p>
+
+    <h3>Writing a Listener for a Stoppable Event</h3>
+    <p>
+        A listener for a stoppable event is written exactly like any other listener (see <strong>1. Creating Events and Listeners</strong> above). The only difference is in what it does inside <code>handle()</code>: if it finds a match, it calls <code>setResponse()</code>; if it doesn't, it simply returns and does nothing, leaving the event unstopped so the next listener — or the framework's normal fallback behavior — gets a chance.
+    </p>
+    <pre><code class="language-php">namespace App\Listeners;
+
+use Rhapsody\Core\Events\RouteNotFound;
+use Rhapsody\Core\Response;
+
+class RedirectLegacyUrls
+{
+    public function handle(RouteNotFound $event): void
+    {
+        // Look up $event->uri in your own table of old-slug -> new-slug redirects.
+        $newPath = $this->findRedirectFor($event->uri);
+
+        if ($newPath === null) {
+            return; // no match — let the next listener try, or fall through to the 404
+        }
+
+        $response = new Response();
+        $response->setStatusCode(301);
+        $response->setHeader('Location', $newPath);
+
+        $event->setResponse($response);
+    }
+
+    private function findRedirectFor(string $uri): ?string
+    {
+        // your own lookup logic here
+        return null;
+    }
+}</code></pre>
+    <p>
+        You register this listener for <code>RouteNotFound</code> the same way you'd register any other listener — see <strong>2. Registering Listeners</strong> above. If you're writing this inside a marketplace module rather than the main application, remember that a module also needs to declare <code>Rhapsody\Core\Events\RouteNotFound</code> in its <code>events.listen.listen</code> permission list in <code>module.json</code> before it's allowed to listen for the event at all — a module that omits this will get a <code>ModulePermissionException</code> instead.
+    </p>
 {% endblock %}

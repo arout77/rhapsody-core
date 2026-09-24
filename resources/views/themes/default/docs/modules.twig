@@ -289,7 +289,7 @@ $context->database()  // → DatabaseFacade</code></pre>
     <p>
         First, what an "event" actually is, if that's a new concept: an event is a small object representing "something already happened" — a user registered, a payment succeeded — broadcast to anyone who cares, without the code that dispatched it needing to know who (if anyone) is listening. This is what lets your module react to things happening elsewhere in the application without the application needing to know your module exists.
     </p>
-    <p>As of this version of the framework, there are exactly three events dispatched by core that a module can listen for:</p>
+    <p>As of this version of the framework, there are exactly four events dispatched by core that a module can listen for:</p>
     <table class="w-full text-left border-collapse mb-6">
         <thead>
             <tr class="border-b border-gray-300 dark:border-gray-600">
@@ -314,8 +314,16 @@ $context->database()  // → DatabaseFacade</code></pre>
                 <td class="py-2 pr-4">A payment attempt fails</td>
                 <td class="py-2"><code>$event->message</code>, <code>$event->context</code></td>
             </tr>
+            <tr class="border-b border-gray-200 dark:border-gray-700">
+                <td class="py-2 pr-4"><code>Rhapsody\Core\Events\RouteNotFound</code>*</td>
+                <td class="py-2 pr-4">No registered route matches the incoming request</td>
+                <td class="py-2"><code>$event->uri</code>, <code>$event->method</code> — plus a <code>setResponse(Response $response)</code> method</td>
+            </tr>
         </tbody>
     </table>
+    <p>
+        *<code>RouteNotFound</code> is not like the other three. <code>UserRegistered</code> and the two payment events are plain notifications — nothing your listener does can change what core does next. <code>RouteNotFound</code> is a <em>stoppable event</em>: if your listener calls <code>$event->setResponse(...)</code> — for example, after resolving the requested URI against your module's own table of old-slug-to-new-slug redirects — the router returns that response directly instead of showing a 404, and no other <code>RouteNotFound</code> listener runs. If your listener finds nothing, just return without calling <code>setResponse()</code> and the normal 404 proceeds untouched. See <a href="{{ base_url }}/docs/events#stoppable-events">Stoppable Events</a> for the full mechanism behind this, and <a href="{{ base_url }}/docs/routing">Routing</a> for how the router uses it.
+    </p>
 
     <p>Declare it in your manifest — remember, no wildcards, you list every event class you want by its full name:</p>
     <pre><code class="language-json">"permissions": {
