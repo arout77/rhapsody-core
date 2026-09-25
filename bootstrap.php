@@ -27,8 +27,8 @@ use Rhapsody\Core\Commands\MigrateCommand;
 use Rhapsody\Core\Commands\ReactInstallCommand;
 use Rhapsody\Core\Commands\RouteCacheCommand;
 use Rhapsody\Core\Commands\RouteClearCommand;
+use Rhapsody\Core\Commands\SkeletonSyncCommand;
 use Rhapsody\Core\Container;
-use Rhapsody\Core\Contracts\AiClientInterface;
 use Rhapsody\Core\Contracts\PaymentGatewayInterface;
 use Rhapsody\Core\Events\EventDispatcher;
 use Rhapsody\Core\FrameworkInfo;
@@ -38,16 +38,14 @@ use Rhapsody\Core\Mailer;
 use Rhapsody\Core\Middleware\DdosMiddleware;
 use Rhapsody\Core\Proxy\ContainerDecorator;
 use Rhapsody\Core\Proxy\LazyProxyFactory;
-use Rhapsody\Core\QueryLogger;
 use Rhapsody\Core\Request;
 use Rhapsody\Core\Routing\Router;
-use Rhapsody\Core\Services\GeminiClient;
 use Rhapsody\Core\Services\NotificationService;
 use Rhapsody\Core\Services\RateLimiter;
 use Rhapsody\Core\Session;
 use Rhapsody\Core\Storage\Cookie;
-use Rhapsody\Core\Theming\ThemeValidator;
 use Rhapsody\Core\Validator;
+use Rhapsody\Core\View\ViewRenderer;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\Cache\Adapter\FilesystemAdapter;
 use Twig\Environment;
@@ -67,7 +65,8 @@ if (file_exists($basePath . '/.env')) {
 }
 // 2. Create a new Service Container instance and assign it to global scope
 global $container;
-$container  = new Container();
+$container = new Container();
+$container->instance(\Rhapsody\Core\Contracts\ContainerInterface::class, $container);
 $configPath = $basePath . '/config/config.php';
 
 if (! file_exists($configPath)) {
@@ -91,12 +90,8 @@ $config['app_version'] = FrameworkInfo::getVersion();
 
 // --- DDOS Middleware ---
 // Bind RateLimiter as a singleton (manual caching)
-$container->bind(RateLimiter::class, function ($container) use ($config) {
-    static $instance = null;
-    if ($instance === null) {
-        $instance = new RateLimiter(Cache::getInstance(), $config);
-    }
-    return $instance;
+$container->singleton(RateLimiter::class, function ($container) use ($config) {
+    return new RateLimiter(Cache::getInstance(), $config);
 });
 
 // Bind DdosMiddleware with its dependencies
@@ -108,27 +103,15 @@ $container->bind(DdosMiddleware::class, function ($container) use ($config) {
 });
 
 // --- EVENT DISPATCHER BINDING ---
-$container->bind(EventDispatcher::class, function (Container $c) {
+$container->singleton(EventDispatcher::class, function (Container $c) {
     $eventServiceProvider = new EventServiceProvider();
     return new EventDispatcher($c, $eventServiceProvider->getListeners());
 });
 
-// --- QUERY LOGGER BINDING (SINGLETON) ---
-// $container->bind(QueryLogger::class, function () {
-//     static $instance;
-//     if ($instance === null) {
-//         $instance = new QueryLogger();
-//     }
-//     return $instance;
-// });
-
 // --- DOCTRINE ENTITY MANAGER BINDING ---
-$container->bind(EntityManager::class, function ($container) use ($config, $basePath) {
+$container->singleton(EntityManager::class, function ($container) use ($config, $basePath) {
     $paths     = [$basePath . '/app/Entities'];
     $isDevMode = ($config['app_env'] ?? 'production') === 'development';
-
-    // Retrieve the same logger instance (singleton)
-    $sqlLogger = $container->resolve(QueryLogger::class);
 
     $cache          = $isDevMode ? new ArrayAdapter() : new FilesystemAdapter('', 0, $basePath . '/storage/cache/doctrine');
     $sqlLogger      = \Rhapsody\Core\QueryLogger::getInstance();
@@ -149,7 +132,7 @@ $container->bind(EntityManager::class, function ($container) use ($config, $base
 });
 
 // --- CACHE SYSTEM BINDING ---
-$container->bind(CacheInterface::class, function () use ($config, $basePath) {
+$container->singleton(CacheInterface::class, function () use ($config, $basePath) {
     if ($config['cache']['driver'] === 'redis') {
         $redisClient = new RedisClient([
             'scheme'   => 'tcp',
@@ -163,7 +146,7 @@ $container->bind(CacheInterface::class, function () use ($config, $basePath) {
     return new FileCacheDriver($basePath . '/storage/cache/app');
 });
 
-$container->bind(Cache::class, function (Container $c) {
+$container->singleton(Cache::class, function (Container $c) {
     return new Cache($c->resolve(CacheInterface::class));
 });
 
@@ -171,7 +154,7 @@ $container->bind(Cache::class, function (Container $c) {
 Cache::setInstance($container->resolve(Cache::class));
 
 // --- CORE PACKAGE DATABASE SINGLETON BINDING ---
-$container->bind(\Rhapsody\Core\Database::class, function () use ($config) {
+$container->singleton(\Rhapsody\Core\Database::class, function () use ($config) {
     if (empty($config)) {
         throw new \Exception("The global \$config array is empty during Container service compilation.");
     }
@@ -181,7 +164,7 @@ $container->bind(\Rhapsody\Core\Database::class, function () use ($config) {
 });
 
 // --- TWIG BINDING ---
-$container->bind(Environment::class, function (Container $c) use ($config, $basePath) {
+$container->singleton(Environment::class, function (Container $c) use ($config, $basePath) {
     $activeTheme = $config['theme'] ?? 'default';
     $paths       = [];
 
@@ -293,7 +276,7 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
         {
             return Session::hasFlash($name);
         }
-    };;;
+    };;;;;;;;;;;;;;;;;;;;;
 
     $twig->addGlobal('flash', $flash);
 
@@ -302,9 +285,17 @@ $container->bind(Environment::class, function (Container $c) use ($config, $base
         return new \Twig\Markup('<input type="hidden" name="_token" value="' . $token . '">', 'UTF-8');
     }));
 
-    ThemeValidator::validate($twig, $activeTheme);
-
     return $twig;
+});
+
+// --- VIEW RENDERER BINDING ---
+// Shared render pipeline (meta-merge -> schema -> captcha -> Twig render ->
+// Response wrap) used by BaseController::view() and, from Phase 3 onward,
+// module-facing rendering (TwigFacade). Bound against the same Twig
+// Environment singleton above, so extensions/globals registered on it
+// (by BaseController's constructor or elsewhere) are visible here too.
+$container->singleton(ViewRenderer::class, function (Container $c) {
+    return new ViewRenderer($c->resolve(Environment::class));
 });
 
 // --- OTHER CORE SERVICES ---
@@ -336,18 +327,9 @@ $container->bind(Rhapsody\Core\Mailer::class, function ($c) use ($config) {
 $container->bind(Validator::class, function (Container $c) {
     return new Validator($c->resolve(EntityManager::class));
 });
-
 $container->bind(Request::class, fn() => new Request());
-
 $container->bind(NotificationService::class, function (Container $c) {
     return new NotificationService($c->resolve(Cache::class));
-});
-
-$container->bind(AiClientInterface::class, function () use ($config) {
-    return new GeminiClient(
-        new \GuzzleHttp\Client(),
-        $config['ai']['gemini'] ?? []
-    );
 });
 
 // --- COMMAND BINDINGS (Refactored to inject context-aware path mappings) ---
@@ -400,9 +382,12 @@ $container->bind(MakeModelCommand::class, function () use ($basePath) {
     return new MakeModelCommand($basePath);
 });
 
-// Fix: Resolved the Database dependency singleton out of the container instance cleanly
 $container->bind(MigrateCommand::class, function ($c) use ($basePath) {
     return new MigrateCommand($basePath, $c->resolve(\Rhapsody\Core\Database::class));
+});
+
+$container->bind(SkeletonSyncCommand::class, function () use ($basePath) {
+    return new SkeletonSyncCommand($basePath);
 });
 
 $container->bind(RouteCacheCommand::class, function () use ($basePath) {
@@ -444,9 +429,17 @@ if (file_exists($userBootstrap)) {
 // a module's boot() is where it registers its own routes.
 $moduleInstalls = new \Rhapsody\Core\Modules\ModuleInstallationStore($basePath);
 $moduleRegistry = new \Rhapsody\Core\Modules\ModuleRegistry($container, $basePath, $moduleInstalls);
-$moduleRegistry->bootAll();
+
+// Register both in the container BEFORE bootAll() runs — modules get
+// container access during boot (indirectly, via ModuleContext), so if a
+// module's boot() ever resolves either of these services to inspect its
+// own or another module's installation state, it needs to find the real,
+// already-constructed instances here, not a resolution failure or a
+// stale duplicate built from scratch.
 $container->instance(\Rhapsody\Core\Modules\ModuleInstallationStore::class, $moduleInstalls);
 $container->instance(\Rhapsody\Core\Modules\ModuleRegistry::class, $moduleRegistry);
+
+$moduleRegistry->bootAll();
 
 // =========================================================================
 // STEP 2.7: LAZY LOADING DECORATOR (web only)
@@ -472,7 +465,9 @@ if (PHP_SAPI !== 'cli') {
                 \Rhapsody\Core\Database::class,
                 \Rhapsody\Core\Session::class,
                 \Twig\Environment::class,
+                ViewRenderer::class,
                 NotificationService::class,
+                \Doctrine\ORM\EntityManager::class,
             ]
         );
 
@@ -526,4 +521,5 @@ if (file_exists($routeCachePath) && ($config['app_env'] ?? 'production') === 'pr
 }
 
 // 3. Return the completely compiled and configured dependency injection container.
+Container::setInstance($container);
 return $container;

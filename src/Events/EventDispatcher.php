@@ -64,16 +64,6 @@ class EventDispatcher implements EventDispatcherInterface
                     $e->getMessage()
                 ));
             }
-
-            // Opt-in only: plain events (e.g. UserRegistered) don't implement
-            // StoppableEventInterface, so this is always false for them and
-            // every listener always runs, exactly as before. Only an event
-            // that explicitly implements the interface and reports itself
-            // stopped (e.g. RouteNotFound once a listener supplies a
-            // response) skips any remaining listeners.
-            if ($event instanceof StoppableEventInterface && $event->isPropagationStopped()) {
-                break;
-            }
         }
 
         return $event;

@@ -45,6 +45,7 @@ use Rhapsody\Core\Services\RateLimiter;
 use Rhapsody\Core\Session;
 use Rhapsody\Core\Storage\Cookie;
 use Rhapsody\Core\Validator;
+use Rhapsody\Core\View\ViewRenderer;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\Cache\Adapter\FilesystemAdapter;
 use Twig\Environment;
@@ -275,7 +276,7 @@ $container->singleton(Environment::class, function (Container $c) use ($config, 
         {
             return Session::hasFlash($name);
         }
-    };;;;;;;;;;;;;;;;;;;;;;
+    };
 
     $twig->addGlobal('flash', $flash);
 
@@ -285,6 +286,16 @@ $container->singleton(Environment::class, function (Container $c) use ($config, 
     }));
 
     return $twig;
+});
+
+// --- VIEW RENDERER BINDING ---
+// Shared render pipeline (meta-merge -> schema -> captcha -> Twig render ->
+// Response wrap) used by BaseController::view() and, from Phase 3 onward,
+// module-facing rendering (TwigFacade). Bound against the same Twig
+// Environment singleton above, so extensions/globals registered on it
+// (by BaseController's constructor or elsewhere) are visible here too.
+$container->singleton(ViewRenderer::class, function (Container $c) {
+    return new ViewRenderer($c->resolve(Environment::class));
 });
 
 // --- OTHER CORE SERVICES ---
@@ -454,6 +465,7 @@ if (PHP_SAPI !== 'cli') {
                 \Rhapsody\Core\Database::class,
                 \Rhapsody\Core\Session::class,
                 \Twig\Environment::class,
+                ViewRenderer::class,
                 NotificationService::class,
                 \Doctrine\ORM\EntityManager::class,
             ]

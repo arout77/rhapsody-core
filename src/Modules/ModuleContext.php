@@ -11,6 +11,7 @@ use Rhapsody\Core\Modules\Facades\SettingsFacade;
 use Rhapsody\Core\Modules\Facades\StorageFacade;
 use Rhapsody\Core\Modules\Facades\TwigFacade;
 use Rhapsody\Core\Routing\Router;
+use Rhapsody\Core\View\ViewRenderer;
 use Twig\Environment;
 
 /**
@@ -62,9 +63,34 @@ final class ModuleContext
     {
         return new TwigFacade(
             $this->container->resolve(Environment::class),
+            $this->container->resolve(ViewRenderer::class),
             $this->manifest->permissions,
             $this->manifest->slug(),
+            $this->resolveViewsPath(),
         );
+    }
+
+    /**
+     * A module's views live at <install path>/views/ — Phase 1 decision
+     * that module views are module-owned, not app-owned. Resolved via the
+     * same Composer InstalledVersions lookup ModuleRegistry::discover()
+     * already uses to find module.json in the first place, so no new
+     * manifest field is needed just to carry this around. Returns null
+     * (silently skipped by TwigFacade) if Composer can't resolve it —
+     * e.g. a hand-built ModuleManifest in a unit test.
+     */
+    private function resolveViewsPath(): ?string
+    {
+        if (! class_exists(\Composer\InstalledVersions::class)) {
+            return null;
+        }
+
+        $installPath = \Composer\InstalledVersions::getInstallPath($this->manifest->name);
+        if ($installPath === null) {
+            return null;
+        }
+
+        return rtrim($installPath, '/') . '/views';
     }
 
     public function storage(): StorageFacade

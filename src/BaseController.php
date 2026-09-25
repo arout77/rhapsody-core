@@ -3,12 +3,12 @@ namespace Rhapsody\Core;
 
 use Rhapsody\Core\Cache;
 use Rhapsody\Core\Database;
-use Rhapsody\Core\Helpers\Recaptcha;
 use Rhapsody\Core\React\ReactIslandExtension;
 use Rhapsody\Core\React\ViteManifest;
 use Rhapsody\Core\SEO\SchemaOrg;
 use Rhapsody\Core\Session;
 use Rhapsody\Core\Twig\RoutingExtension;
+use Rhapsody\Core\View\ViewRenderer;
 use Twig\Environment;
 
 abstract class BaseController
@@ -17,10 +17,10 @@ abstract class BaseController
     protected Database $db;
     protected Cache $cache;
     protected SchemaOrg $schema;
-    protected string $appUrl;
+    protected ViewRenderer $viewRenderer;
 
     /**
-     * @param  Environment  $twig
+     * @param Environment $twig
      * @throws \Exception
      */
     public function __construct(Environment $twig)
@@ -37,14 +37,12 @@ abstract class BaseController
 
         // Safely bridge session states into the view engine context
         $this->twig->addGlobal('session', $_SESSION ?? []);
-        $this->twig->addGlobal('flash_error', $_SESSION['flash_error'] ?? null);
-        $this->twig->addGlobal('flash_success', $_SESSION['flash_success'] ?? null);
+        $this->twig->addGlobal('flash_error', $_SESSION['error'] ?? null);
+        $this->twig->addGlobal('flash_success', $_SESSION['success'] ?? null);
 
         // Fallback option using the container instance to resolve the pre-configured database singleton
         global $container;
-        /**
-         * @var \Rhapsody\Core\Container|null $container
-         */
+        /** @var \Rhapsody\Core\Container|null $container */
 
         if (isset($container) && $container->has(Database::class)) {
             // @phpstan-ignore-next-line
@@ -53,9 +51,19 @@ abstract class BaseController
             throw new \Exception("Database service has not been properly initialized inside the Service Container.");
         }
 
-        $appVersion   = FrameworkInfo::getVersion();
-        $this->appUrl = $_ENV['APP_URL'] ?? 'http://localhost';
-        $appUrl       = $this->appUrl;
+        // Prefer the container-bound singleton (shares the same Twig instance
+        // and lets module-facing renderers, e.g. TwigFacade, resolve the same
+        // service later). Fall back to constructing it directly against this
+        // controller's own $twig if the binding isn't registered yet.
+        if (isset($container) && $container->has(ViewRenderer::class)) {
+            // @phpstan-ignore-next-line
+            $this->viewRenderer = $container->resolve(ViewRenderer::class);
+        } else {
+            $this->viewRenderer = new ViewRenderer($this->twig);
+        }
+
+        $appVersion = FrameworkInfo::getVersion();
+        $appUrl     = $_ENV['APP_URL'] ?? 'http://localhost';
 
         $this->schema->add('SoftwareApplication', [
             'name'                => 'Rhapsody Framework',
@@ -84,9 +92,9 @@ abstract class BaseController
     /**
      * Renders a view file using Twig.
      *
-     * @param  string        $view  The view file to render.
-     * @param  array<string, mixed> $args Associative array of data to pass to the view.
-     * @param  array<string, mixed> $meta SEO metadata for the page (e.g., ['title' => 'My Title']).
+     * @param string $view The view file to render.
+     * @param array<string, mixed> $args Associative array of data to pass to the view.
+     * @param array<string, mixed> $meta SEO metadata for the page (e.g., ['title' => 'My Title']).
      * @return Response
      */
     protected function view(string $view, array $args = [], array $meta = []): Response
@@ -94,27 +102,19 @@ abstract class BaseController
         $defaults = [
             'title'       => 'Rhapsody - Compose your masterpiece',
             'description' => 'Rhapsody is a modern PHP framework for developers who find full-stack frameworks like Laravel too heavy for their needs, but find micro-frameworks like Slim too bare-bones.',
-            'og_image'    => $this->appUrl . '/public/img/logo.png',
-            'site_name'   => $_ENV['APP_NAME'] ?? 'Rhapsody',
         ];
-        $args['meta'] = array_merge($defaults, $meta);
 
-        // Inject engine variables cleanly prior to compilation context execution
-        $args['schema_markup'] = $this->schema->render();
-        $args['captcha_form']  = Recaptcha::render();
-
-        $output = $this->twig->render($view, $args);
-
-        $response = new Response();
-        $response->setContent($output);
-        return $response;
+        // Delegates to the shared ViewRenderer pipeline (meta-merge -> schema
+        // render -> captcha inject -> Twig render -> Response wrap). App
+        // pages always get schema + captcha, same as before this extraction.
+        return $this->viewRenderer->render($view, $args, $meta, $defaults, $this->schema, true);
     }
 
     /**
      * Creates and returns a JSON response.
      *
-     * @param  array<mixed> $data       The data to be encoded as JSON.
-     * @param  int          $statusCode The HTTP status code for the response (defaults to 200 OK).
+     * @param array<mixed> $data The data to be encoded as JSON.
+     * @param int $statusCode The HTTP status code for the response (defaults to 200 OK).
      * @return Response
      */
     protected function json(array $data, int $statusCode = 200): Response
@@ -141,18 +141,19 @@ abstract class BaseController
      *  - VITE_DEV_SERVER=true  →  proxied through the Vite dev server (HMR)
      *  - VITE_DEV_SERVER=false →  fingerprinted files from public/build/
      *
+     * @param string              $component  The component name (e.g. 'Dashboard').
      *                                         Must match the filename in resources/js/components/.
+     * @param array<string, mixed> $props      Data passed to the component as props.
+     * @param array<string, mixed> $meta       HTML <head> metadata.
      *                                         Supported keys: title, description, lang.
+     * @return Response
+     *
      * @example
      *   // In a controller action:
      *   return $this->react('Dashboard', [
      *       'user'  => $user->toArray(),
      *       'stats' => $this->getStats(),
      *   ], ['title' => 'Dashboard']);
-     * @param  string        $component The component name (e.g. 'Dashboard').
-     * @param  array<string, mixed>     $props Data passed to the component as props.
-     * @param  array<string, mixed>     $meta HTML <head> metadata.
-     * @return Response
      */
     protected function react(string $component, array $props = [], array $meta = []): Response
     {

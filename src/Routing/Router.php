@@ -3,8 +3,6 @@ namespace Rhapsody\Core\Routing;
 
 use Rhapsody\Core\Container;
 use Rhapsody\Core\Contracts\ContainerInterface;
-use Rhapsody\Core\Events\EventDispatcher;
-use Rhapsody\Core\Events\RouteNotFound;
 use Rhapsody\Core\Exceptions\HttpException;
 use Rhapsody\Core\Middleware\MiddlewareTracer;
 use Rhapsody\Core\Request;
@@ -160,7 +158,7 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
             }
         }
 
-        return self::handleNotFound($request, $container);
+        return self::handleNotFound();
     }
 
     /**
@@ -180,48 +178,35 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
             $controllerClass = $callback[0];
             $action          = $callback[1];
 
-            $controller = $container->resolve($controllerClass);
+            // $callback[0] may be a class name (resolve via container, the
+            // normal app-route case) or an already-instantiated object (the
+            // module-route case, where the provider constructs the controller
+            // itself with facade dependencies the container can't autowire).
+            $controller = is_string($controllerClass)
+                ? $container->resolve($controllerClass)
+                : $controllerClass;
+
             return $controller->{$action}($request, ...$params);
         }
 
         if ($callback instanceof \Closure) {
             $result = call_user_func($callback, $request, ...$params);
-            // If the closure already returns a Response, return it directly
             if ($result instanceof Response) {
                 return $result;
             }
-            // Otherwise, wrap it in a Response object
             $response = new Response();
             $response->setContent($result);
             return $response;
         }
 
-        return self::handleNotFound($request, $container);
+        return self::handleNotFound();
     }
 
     /**
-     * Handles the case where no route matched the request.
-     *
-     * Before giving up, this dispatches a RouteNotFound event — a
-     * StoppableEventInterface event — so a module (e.g. a redirect manager
-     * resolving an old slug) gets a chance to supply a Response of its own.
-     * If no listener does, behavior is unchanged from before: a 404
-     * HttpException is thrown for the ErrorHandler to render.
-     *
-     * @param  Request             $request
-     * @param  ContainerInterface  $container
-     * @return Response
+     * Handles the case where no route is found.
      */
-    protected static function handleNotFound(Request $request, ContainerInterface $container): Response
+    protected static function handleNotFound(): Response
     {
-        $dispatcher = $container->resolve(EventDispatcher::class);
-
-        $event = $dispatcher->dispatch(new RouteNotFound($request->getPath(), $request->getMethod()));
-
-        if ($event->getResponse() !== null) {
-            return $event->getResponse();
-        }
-
         throw new HttpException(404, 'Page not found');
     }
 
