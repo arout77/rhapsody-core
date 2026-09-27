@@ -44,6 +44,7 @@ use Rhapsody\Core\Services\NotificationService;
 use Rhapsody\Core\Services\RateLimiter;
 use Rhapsody\Core\Session;
 use Rhapsody\Core\Storage\Cookie;
+use Rhapsody\Core\Theming\ThemeValidator;
 use Rhapsody\Core\Validator;
 use Rhapsody\Core\View\ViewRenderer;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
@@ -215,6 +216,7 @@ $container->singleton(Environment::class, function (Container $c) use ($config, 
     ];
 
     $twig = new Environment($loader, $twigOptions);
+    ThemeValidator::validate($twig, $activeTheme);
 
     if (! empty($_ENV['APP_KEY'])) {
         Cookie::setEncryptionKey($_ENV['APP_KEY']);
@@ -276,7 +278,7 @@ $container->singleton(Environment::class, function (Container $c) use ($config, 
         {
             return Session::hasFlash($name);
         }
-    };
+    };;;
 
     $twig->addGlobal('flash', $flash);
 
@@ -456,7 +458,7 @@ if (PHP_SAPI !== 'cli') {
         $eagerServices = array_merge(
             $config['lazy']['eager'] ?? [],
             [
-                \Rhapsody\Core\Container::class,
+                Container::class,
                 \Rhapsody\Core\Routing\Router::class,
                 \Rhapsody\Core\Events\EventDispatcher::class,
                 \Rhapsody\Core\Request::class,
