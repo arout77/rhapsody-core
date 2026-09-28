@@ -501,4 +501,16 @@ class DocsController extends BaseController
             'canonical_url' => $request->getCanonicalUrl(),
         ]);
     }
+
+    /**
+     * Global helpers and variables
+     */
+    public function globals(Request $request): Response
+    {
+        return $this->view('@core/docs/globals.twig', [], [
+            'title'         => 'Global helpers and variables',
+            'description'   => 'Rhapsody includes some helper functions and globally accessible variables to help smooth out your workflow.',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
 }

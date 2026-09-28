@@ -28,6 +28,7 @@ Router::get('/docs/doctrine', [DocsController::class, 'doctrine']);
 Router::get('/docs/error-handling', [DocsController::class, 'errorHandling']);
 Router::get('/docs/events', [DocsController::class, 'events']);
 Router::get('/docs/file-uploader', [DocsController::class, 'fileUploader']);
+Router::get('/docs/globals', [DocsController::class, 'globals']);
 Router::get('/docs/image-processing', [DocsController::class, 'imageProcessing']);
 Router::get('/docs/installation', [DocsController::class, 'installation']);
 Router::get('/docs/logging', [DocsController::class, 'logging']);

@@ -3,20 +3,27 @@
 use Rhapsody\Core\RedirectResponse;
 
 if (! function_exists('redirect')) {
-    function redirect(string $url): RedirectResponse
+    /**
+     * @param string $url          Root-relative path ("/login") or absolute URL
+     * @param int    $redirectCode HTTP redirect status (default 302)
+     */
+    function redirect(string $url, int $redirectCode = 302): RedirectResponse
     {
-        $baseUrl = $_ENV['APP_BASE_URL'] ?? '';
-        return new RedirectResponse($baseUrl . $url);
+        // Absolute (https://...) and protocol-relative (//host) URLs pass through untouched
+        if (! preg_match('#^(?:[a-z][a-z0-9+.-]*:|//)#i', $url)) {
+            $base = rtrim($_ENV['APP_BASE_URL'] ?? '', '/');
+            $url  = $base . '/' . ltrim($url, '/');
+        }
+
+        return new RedirectResponse($url, $redirectCode);
     }
 }
-
-// --- NEW: Debugging Helpers ---
 
 if (! function_exists('dd')) {
     /**
      * Dump one or more variables and stop script execution.
      *
-     * @param mixed ...$vars
+     * @param  mixed  ...$vars
      * @return void
      */
     function dd(...$vars): void
@@ -32,7 +39,7 @@ if (! function_exists('d')) {
     /**
      * Dump one or more variables (without stopping).
      *
-     * @param mixed ...$vars
+     * @param  mixed  ...$vars
      * @return void
      */
     function d(...$vars): void

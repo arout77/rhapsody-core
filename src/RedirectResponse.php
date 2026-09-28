@@ -4,32 +4,29 @@ namespace Rhapsody\Core;
 class RedirectResponse extends Response
 {
     protected string $url;
+    protected int $redirectCode;
 
-    /**
-     * @param string $url
-     */
-    public function __construct(string $url)
+    public function __construct(string $url, int $redirectCode = 302): void
     {
-        $this->url = $url;
-        $this->setStatusCode(302); // 302 Found is a standard redirect code
+        if ($redirectCode < 300 || $redirectCode > 399) {
+            throw new \InvalidArgumentException("Invalid redirect status code: {$redirectCode}");
+        }
+
+        $this->url          = $url;
+        $this->redirectCode = $redirectCode;
+        $this->setStatusCode($redirectCode);
     }
 
-    /**
-     * Attaches a flash message to the session before redirecting.
-     */
     public function with(string $key, string $message): self
     {
         Session::flash($key, $message);
         return $this;
     }
 
-    /**
-     * Overrides the parent send method to handle the redirect.
-     */
     public function send(): void
     {
-        Session::close(); // Ensure session is saved before redirecting
-        header('Location: ' . $this->url);
+        Session::close();
+        header('Location: ' . $this->url, true, $this->redirectCode);
         exit();
     }
 }

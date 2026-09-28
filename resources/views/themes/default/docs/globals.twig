@@ -1,0 +1,198 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+
+    <h1>Helper functions and Globals</h1>
+    <p>
+        Rhapsody includes some helper functions and globally accessible variables to help smooth out your workflow.
+    </p>
+
+    <h2>Functions</h2>
+    <p>These PHP functions are available everywhere in your application: controllers, models, middleware, and so on.</p>
+
+    <h3><code class="language-php">redirect()</code></h3>
+    <p>
+        Use this function in your controllers whenever you need to redirect a request. It takes two arguments:
+        <var>$url</var> and <var>$redirectCode</var> (optional). The redirect code defaults to <code>302</code> if it isn't set.
+    </p>
+    <p>
+        <pre><code class="language-php">// In your controller file
+
+public function submitForm() {
+    //--- if form posts successfully, redirect user to some other page ---//
+    return redirect('/dashboard');
+}
+
+public function anotherExample() {
+    //--- We want to set something other than 302 ---//
+    $redirectCode = 308;
+    return redirect('/dashboard', $redirectCode);
+}</code></pre>
+    </p>
+    <p>A few things to keep in mind:</p>
+    <ul>
+        <li>
+            <strong>Return the result.</strong> <code>redirect()</code> returns a <code>RedirectResponse</code> object. The redirect is
+            sent when that response is returned from your controller.
+        </li>
+        <li>
+            <strong>Subdirectory installs are handled for you.</strong> For paths like <code>/dashboard</code>, Rhapsody prepends the
+            <code>APP_BASE_URL</code> value from your <code>.env</code> file automatically. Never include it yourself. The same code works
+            whether your site lives at the domain root or in a subdirectory.
+        </li>
+        <li>
+            <strong>Absolute URLs are left alone.</strong> <code>redirect('https://example.com/thanks')</code> is sent exactly as written.
+        </li>
+        <li>
+            <strong>The status code must be a 3xx code.</strong> Anything outside 300&ndash;399 throws an <code>InvalidArgumentException</code>.
+            The most common choices are <code>301</code> (permanent), <code>302</code> (temporary, the default),
+            <code>303</code> (see other, ideal after a form POST), <code>307</code> (temporary, keeps the request method) and
+            <code>308</code> (permanent, keeps the request method).
+        </li>
+        <li>
+            <strong>Flash a message with the redirect</strong> by chaining <code>with()</code>. See <a href="#flash">flash</a> below for
+            reading it in your templates.
+        </li>
+    </ul>
+    <p>
+        <pre><code class="language-php">return redirect('/cart/out-of-stock')->with('error', 'This item is out of stock.');</code></pre>
+    </p>
+    <p>
+        <strong>Security note:</strong> if a redirect target ever comes from user input (a <code>?redirect=</code> query parameter, for example), validate it before passing it to <code>redirect()</code>. Absolute URLs are passed through untouched, so an unchecked value can send visitors to another site.
+    </p>
+
+    <h3><code class="language-php">dump()</code>, <code class="language-php">d()</code> and <code class="language-php">dd()</code></h3>
+    <p>Debugging helpers that accept any number of variables.</p>
+    <ul>
+        <li><code>dump(...$vars)</code>: outputs each variable.</li>
+        <li><code>d(...$vars)</code>: dumps each variable and lets the script keep running.</li>
+        <li><code>dd(...$vars)</code>: dumps each variable, then <strong>stops script execution</strong> ("dump and die").</li>
+    </ul>
+    <p>
+        If the Symfony VarDumper component is installed, the output is the familiar collapsible, colorized dump. Otherwise Rhapsody falls
+        back to PHP's built-in <code>var_dump()</code>.
+    </p>
+    <p>
+        <pre><code class="language-php">$user = $this->users->find($id);
+
+d($user);                  // inspect it, then carry on
+dd($user, $request->all()); // inspect both, then halt</code></pre>
+    </p>
+    <p><strong>Note</strong> Remove these calls before deploying. They print straight to the page and <code>dd()</code> will halt the request.</p>
+
+    <hr>
+
+    <h2>Twig Globals</h2>
+    <p>
+        The following variables are registered on the Twig environment, so every template can use them without you passing them from a
+        controller.
+    </p>
+
+    <h3><code>app_url</code></h3>
+    <p>
+        The value of <code>APP_URL</code> from your <code>.env</code> file: the scheme and host only, such as <code>http://localhost</code>.
+        Empty string if it isn't set.
+    </p>
+
+    <h3><code>base_url</code></h3>
+    <p>
+        <code>APP_URL</code> and <code>APP_BASE_URL</code> joined together, giving the full URL of your installation root. On a root install
+        this is the same as <code>app_url</code>. In a subdirectory install (<code>APP_BASE_URL="/rhapsody"</code>) it becomes
+        <code>http://localhost/rhapsody</code>. Use it for links and assets so your templates work on either kind of install.
+    </p>
+    <p>
+        <pre><code class="language-twig">{% verbatim %}<link rel="stylesheet" href="{{ base_url }}/css/app.css">
+<a href="{{ base_url }}/login">Log in</a>{% endverbatim %}</code></pre>
+    </p>
+    <p>
+        <strong>Note</strong> Keep both <code>APP_URL</code> and <code>APP_BASE_URL</code> defined in your <code>.env</code> file. Leave
+        <code>APP_BASE_URL</code> blank (<code>APP_BASE_URL=""</code>) for a root install, but don't delete the line.
+    </p>
+
+    <h3><code>app_env</code></h3>
+    <p>
+        The current environment, from <code>APP_ENV</code>: <code>development</code> or <code>production</code> (the default if unset).
+        Handy for showing things only while developing.
+    </p>
+    <p>
+        <pre><code class="language-twig">{% verbatim %}{% if app_env == 'development' %}
+    <div class="dev-banner">Development mode</div>
+{% endif %}{% endverbatim %}</code></pre>
+    </p>
+
+    <h3><code>app_theme</code> and <code>APP_THEME</code></h3>
+    <p>
+        The name of the active theme, from <code>APP_THEME</code> in your <code>.env</code> file. It matches the folder name inside
+        <code>views/themes/</code>. Both names hold the same value.
+    </p>
+
+    <h3 id="auth"><code>auth</code></h3>
+    <p>Information about the current visitor's login state, with two properties:</p>
+    <ul>
+        <li><code>auth.check</code>: <code>true</code> if a user is logged in, otherwise <code>false</code>.</li>
+        <li><code>auth.user</code>: the logged-in user's record, or <code>null</code> for guests.</li>
+    </ul>
+    <p>
+        <pre><code class="language-twig">{% verbatim %}{% if auth.check %}
+    <p>Welcome back, {{ auth.user.name }}!</p>
+    <a href="{{ base_url }}/logout">Log out</a>
+{% else %}
+    <a href="{{ base_url }}/login">Log in</a>
+{% endif %}{% endverbatim %}</code></pre>
+    </p>
+    <p>
+        <code>auth</code> is lazy: the user is only loaded from the database when you actually use <code>auth.user</code>, so pages
+        that only call <code>auth.check</code> cost nothing extra. The fields available on <code>auth.user</code> depend on what your
+        <code>User</code> model returns. Each use of <code>auth.user</code> looks the user up again, so if you need it several times on
+        one page, store it once:
+    </p>
+    <p>
+        <pre><code class="language-twig">{% verbatim %}{% set user = auth.user %}
+{{ user.name }} &middot; {{ user.email }}{% endverbatim %}</code></pre>
+    </p>
+
+    <h3 id="flash"><code>flash</code></h3>
+    <p>
+        Gives templates access to one-time flash messages, such as those set with <code>redirect()->with()</code>. Read a message by
+        the key you used when setting it.
+    </p>
+    <p>
+        <pre><code class="language-php">// Controller
+return redirect('/dashboard')->with('success', 'Your profile was updated.');</code></pre>
+    </p>
+    <p>
+        <pre><code class="language-twig">{% verbatim %}{# Template #}
+{% if flash.success %}
+    <div class="alert alert-success">{{ flash.success }}</div>
+{% endif %}{% endverbatim %}</code></pre>
+    </p>
+    <p>Like <code>auth</code>, flash messages are read on demand, so there is no cost when a page doesn't use them.</p>
+
+    <hr>
+
+    <h2>Twig Functions</h2>
+    <p>Two template functions are registered alongside the globals.</p>
+
+    <h3><code>csrf_field()</code></h3>
+    <p>
+        Outputs a hidden input containing the current session's CSRF token (named <code>_token</code>). Put it inside every form that
+        submits via POST.
+    </p>
+    <p>
+        <pre><code class="language-twig">{% verbatim %}<form method="post" action="{{ base_url }}/contact">
+    {{ csrf_field() }}
+    <input type="text" name="subject">
+    <button type="submit">Send</button>
+</form>{% endverbatim %}</code></pre>
+    </p>
+
+    <h3><code>vite_assets(entry)</code></h3>
+    <p>
+        Outputs the correct <code>&lt;script&gt;</code>/<code>&lt;link&gt;</code> tags for a Vite entry point. The HTML is printed as-is, without
+        escaping. Pass the entry point name defined in your Vite configuration.
+    </p>
+    <p>
+        <pre><code class="language-twig">{% verbatim %}{{ vite_assets('resources/js/app.jsx') }}{% endverbatim %}</code></pre>
+    </p>
+
+{% endblock %}
