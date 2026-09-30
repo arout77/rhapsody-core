@@ -6,7 +6,7 @@ class RedirectResponse extends Response
     protected string $url;
     protected int $redirectCode;
 
-    public function __construct(string $url, int $redirectCode = 302): void
+    public function __construct(string $url, int $redirectCode = 302)
     {
         if ($redirectCode < 300 || $redirectCode > 399) {
             throw new \InvalidArgumentException("Invalid redirect status code: {$redirectCode}");
