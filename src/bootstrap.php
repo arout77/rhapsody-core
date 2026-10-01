@@ -4,6 +4,7 @@
 use App\Providers\EventServiceProvider;
 use Composer\InstalledVersions;
 use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Types\Type;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\ORMSetup;
 use Omnipay\Omnipay;
@@ -29,6 +30,7 @@ use Rhapsody\Core\Commands\RouteCacheCommand;
 use Rhapsody\Core\Commands\RouteClearCommand;
 use Rhapsody\Core\Commands\SkeletonSyncCommand;
 use Rhapsody\Core\Container;
+use Rhapsody\Core\Contracts\EncrypterInterface;
 use Rhapsody\Core\Contracts\PaymentGatewayInterface;
 use Rhapsody\Core\Events\EventDispatcher;
 use Rhapsody\Core\FrameworkInfo;
@@ -40,10 +42,11 @@ use Rhapsody\Core\Proxy\ContainerDecorator;
 use Rhapsody\Core\Proxy\LazyProxyFactory;
 use Rhapsody\Core\Request;
 use Rhapsody\Core\Routing\Router;
+use Rhapsody\Core\Services\Encrypter;
 use Rhapsody\Core\Services\NotificationService;
 use Rhapsody\Core\Services\RateLimiter;
+use Rhapsody\Core\Services\UrlSigner;
 use Rhapsody\Core\Session;
-use Rhapsody\Core\Storage\Cookie;
 use Rhapsody\Core\Theming\ThemeValidator;
 use Rhapsody\Core\Validator;
 use Rhapsody\Core\View\ViewRenderer;
@@ -128,6 +131,10 @@ $container->singleton(EntityManager::class, function ($container) use ($config, 
         'charset'  => 'utf8mb4',
     ];
 
+    if (! Type::hasType('encrypted')) {
+        Type::addType('encrypted', \Rhapsody\Core\Doctrine\EncryptedType::class);
+    }
+
     $connection = DriverManager::getConnection($dbParams, $doctrineConfig);
     return new EntityManager($connection, $doctrineConfig);
 });
@@ -201,11 +208,16 @@ $container->singleton(Environment::class, function (Container $c) use ($config, 
     }
 
     if (is_dir($coreViewsPath)) {
-        // Add to the 'core' namespace for @core/... references
-        $loader->addPath($coreViewsPath, 'core');
-        // Also add to the default namespace as a fallback for non-namespaced templates
+        // @core/... resolves theme -> app views -> core default,
+        // so any core template can be overridden by the active theme or app.
+        $loader->setPaths(
+            array_merge($paths, [$basePath . '/views', $coreViewsPath]),
+            'core'
+        );
+
+        // Unchanged: fallback for non-namespaced templates
         $loader->addPath($coreViewsPath);
-    };
+    }
 
     // --- TWIG CACHING ENABLED ---
     $isDevelopment = ($config['app_env'] === 'development');
@@ -218,13 +230,10 @@ $container->singleton(Environment::class, function (Container $c) use ($config, 
     $twig = new Environment($loader, $twigOptions);
     ThemeValidator::validate($twig, $activeTheme);
 
-    if (! empty($_ENV['APP_KEY'])) {
-        Cookie::setEncryptionKey($_ENV['APP_KEY']);
-    } elseif (($_ENV['APP_ENV'] ?? 'production') === 'production') {
+    if (empty($_ENV['APP_KEY']) && ($_ENV['APP_ENV'] ?? 'production') === 'production') {
         throw new \RuntimeException(
-            'APP_KEY is not set. Generate one with: php -r "echo bin2hex(random_bytes(16));" ' .
-            'and add it to your .env file. The application cannot run in production without it, ' .
-            'since it is used to encrypt cookies.'
+            'APP_KEY is not set. Generate one with: php -r "echo bin2hex(random_bytes(32));" ' .
+            'and add it to your .env file. The application cannot run in production without it.'
         );
     }
 
@@ -278,7 +287,7 @@ $container->singleton(Environment::class, function (Container $c) use ($config, 
         {
             return Session::hasFlash($name);
         }
-    };;;
+    };;;;;;;;;
 
     $twig->addGlobal('flash', $flash);
 
@@ -299,6 +308,10 @@ $container->singleton(Environment::class, function (Container $c) use ($config, 
 $container->singleton(ViewRenderer::class, function (Container $c) {
     return new ViewRenderer($c->resolve(Environment::class));
 });
+
+// --- ENCRYPTION ---
+$container->singleton(EncrypterInterface::class, fn() => Encrypter::getInstance());
+$container->singleton(UrlSigner::class, fn(Container $c) => new UrlSigner($c->resolve(EncrypterInterface::class)));
 
 // --- OTHER CORE SERVICES ---
 $container->bind(\Rhapsody\Core\Contracts\AuthenticatableInterface::class, \App\Models\User::class);

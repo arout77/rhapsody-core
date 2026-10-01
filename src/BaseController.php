@@ -20,7 +20,7 @@ abstract class BaseController
     protected ViewRenderer $viewRenderer;
 
     /**
-     * @param Environment $twig
+     * @param  Environment  $twig
      * @throws \Exception
      */
     public function __construct(Environment $twig)
@@ -42,7 +42,9 @@ abstract class BaseController
 
         // Fallback option using the container instance to resolve the pre-configured database singleton
         global $container;
-        /** @var \Rhapsody\Core\Container|null $container */
+        /**
+         * @var \Rhapsody\Core\Container|null $container
+         */
 
         if (isset($container) && $container->has(Database::class)) {
             // @phpstan-ignore-next-line
@@ -92,9 +94,9 @@ abstract class BaseController
     /**
      * Renders a view file using Twig.
      *
-     * @param string $view The view file to render.
-     * @param array<string, mixed> $args Associative array of data to pass to the view.
-     * @param array<string, mixed> $meta SEO metadata for the page (e.g., ['title' => 'My Title']).
+     * @param  string        $view  The view file to render.
+     * @param  array<string, mixed> $args Associative array of data to pass to the view.
+     * @param  array<string, mixed> $meta SEO metadata for the page (e.g., ['title' => 'My Title']).
      * @return Response
      */
     protected function view(string $view, array $args = [], array $meta = []): Response
@@ -113,8 +115,8 @@ abstract class BaseController
     /**
      * Creates and returns a JSON response.
      *
-     * @param array<mixed> $data The data to be encoded as JSON.
-     * @param int $statusCode The HTTP status code for the response (defaults to 200 OK).
+     * @param  array<mixed> $data       The data to be encoded as JSON.
+     * @param  int          $statusCode The HTTP status code for the response (defaults to 200 OK).
      * @return Response
      */
     protected function json(array $data, int $statusCode = 200): Response
@@ -141,19 +143,18 @@ abstract class BaseController
      *  - VITE_DEV_SERVER=true  →  proxied through the Vite dev server (HMR)
      *  - VITE_DEV_SERVER=false →  fingerprinted files from public/build/
      *
-     * @param string              $component  The component name (e.g. 'Dashboard').
      *                                         Must match the filename in resources/js/components/.
-     * @param array<string, mixed> $props      Data passed to the component as props.
-     * @param array<string, mixed> $meta       HTML <head> metadata.
      *                                         Supported keys: title, description, lang.
-     * @return Response
-     *
      * @example
      *   // In a controller action:
      *   return $this->react('Dashboard', [
      *       'user'  => $user->toArray(),
      *       'stats' => $this->getStats(),
      *   ], ['title' => 'Dashboard']);
+     * @param  string        $component The component name (e.g. 'Dashboard').
+     * @param  array<string, mixed>     $props Data passed to the component as props.
+     * @param  array<string, mixed>     $meta HTML <head> metadata.
+     * @return Response
      */
     protected function react(string $component, array $props = [], array $meta = []): Response
     {

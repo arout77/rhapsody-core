@@ -1,6 +1,8 @@
 <?php
 namespace Rhapsody\Core\Storage;
 
+use Rhapsody\Core\Services\Encrypter;
+
 enum SameSite: string {
     case Lax    = 'Lax';
     case Strict = 'Strict';
@@ -11,26 +13,12 @@ enum SameSite: string {
  * Secure cookie manager with encryption, SameSite, and HTTP-only support.
  * All methods are static for simplicity.
  *
- * Encryption uses AES-256-GCM (authenticated encryption — provides both
- * confidentiality and tamper-detection in one primitive, unlike plain CBC).
+ * Values are encrypted by the shared Encrypter service (AES-256-GCM). Each
+ * ciphertext is bound to its cookie name, so a valid value copied from one
+ * cookie cannot be replayed under another.
  */
 final class Cookie
 {
-    private static string $encryptionKey;
-
-    /**
-     * Explicitly set the raw source key (e.g. from bootstrap.php).
-     * The actual AES key is always derived from this via SHA-256 — see
-     * getKey() — never used directly as key material.
-     */
-    public static function setEncryptionKey(string $key): void
-    {
-        if ($key === '') {
-            return;
-        }
-        self::$encryptionKey = $key;
-    }
-
     public static function set(
         string $name,
         mixed $value,
@@ -42,7 +30,7 @@ final class Cookie
         SameSite $sameSite = SameSite::Lax,
     ): bool {
         $payload = is_string($value) ? $value : json_encode($value);
-        $payload = self::encrypt($payload);
+        $payload = Encrypter::getInstance()->encrypt($payload, self::context($name));
 
         return setcookie(
             $name,
@@ -63,17 +51,16 @@ final class Cookie
      */
     public static function get(string $name, mixed $default = null): mixed
     {
-        if (! isset($_COOKIE[$name])) {
+        // A client can send "name[]=x", which PHP turns into an array.
+        if (! isset($_COOKIE[$name]) || ! is_string($_COOKIE[$name])) {
             return $default;
         }
 
-        $raw       = $_COOKIE[$name];
-        $decrypted = self::decrypt($raw);
+        $decrypted = Encrypter::getInstance()->decrypt($_COOKIE[$name], self::context($name));
 
-        // Tampered, corrupted, or encrypted under a different/rotated key —
-        // deliberately distinct from "the stored value is an empty string",
-        // which would decrypt successfully. Treat all of these as "not
-        // present" rather than surfacing a confusing empty value.
+        // Tampered, corrupted, copied from another cookie, or encrypted under
+        // a key that is no longer configured. Deliberately distinct from an
+        // empty string, which decrypts successfully. Treated as "not present".
         if ($decrypted === null) {
             return $default;
         }
@@ -118,77 +105,18 @@ final class Cookie
     {
         $result = [];
         foreach ($_COOKIE as $name => $raw) {
-            $result[$name] = self::get($name);
+            $result[$name] = self::get((string) $name);
         }
         return $result;
     }
 
     /**
-     * Encrypt a value using APP_KEY (AES-256-GCM).
+     * The encryption context for a cookie: its name. Binding the name into
+     * the authentication tag means a ciphertext only decrypts under the
+     * cookie it was issued for.
      */
-    private static function encrypt(string $value): string
+    private static function context(string $name): string
     {
-        $key = self::getKey();
-        $iv  = random_bytes(12); // 12 bytes is the recommended/standard GCM IV length
-        $tag = '';
-
-        $encrypted = openssl_encrypt($value, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag);
-        if ($encrypted === false) {
-            throw new \RuntimeException('Failed to encrypt cookie value.');
-        }
-
-        return base64_encode($iv . $tag . $encrypted);
-    }
-
-    /**
-     * Decrypt a value using APP_KEY (AES-256-GCM). Returns null (rather
-     * than an empty string) if the payload is malformed, was tampered
-     * with, or was encrypted under a different/rotated key — GCM's
-     * built-in authentication tag makes tampering detectable, unlike
-     * plain CBC.
-     */
-    private static function decrypt(string $payload): ?string
-    {
-        $key  = self::getKey();
-        $data = base64_decode($payload, true);
-        if ($data === false || strlen($data) < 12 + 16) {
-            return null;
-        }
-
-        $iv        = substr($data, 0, 12);
-        $tag       = substr($data, 12, 16);
-        $encrypted = substr($data, 28);
-
-        $decrypted = openssl_decrypt($encrypted, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag);
-
-        // openssl_decrypt() returns false both on a wrong key AND on a
-        // failed GCM authentication check (i.e. the ciphertext was
-        // tampered with) — either way, there is no usable value.
-        return $decrypted === false ? null : $decrypted;
-    }
-
-    /**
-     * Derives the actual AES-256 key from APP_KEY (or an explicitly set
-     * source key) via SHA-256 — this both normalizes it to exactly 32
-     * bytes and avoids ever using raw secret material directly as key
-     * bytes. Throws if no key is configured at all, rather than silently
-     * falling back to a fixed default that's visible in the framework's
-     * own public source — a fallback like that provides no real security
-     * for any deployment that forgets to set APP_KEY.
-     */
-    private static function getKey(): string
-    {
-        if (! isset(self::$encryptionKey) || self::$encryptionKey === '') {
-            $key = $_ENV['APP_KEY'] ?? '';
-            if ($key === '') {
-                throw new \RuntimeException(
-                    'Cookie encryption requires APP_KEY to be set in your .env file. ' .
-                    'Generate one with: php -r "echo bin2hex(random_bytes(32));"'
-                );
-            }
-            self::$encryptionKey = $key;
-        }
-
-        return hash('sha256', self::$encryptionKey, true);
+        return 'cookie:' . $name;
     }
 }

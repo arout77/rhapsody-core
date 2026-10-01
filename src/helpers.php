@@ -19,6 +19,8 @@ if (! function_exists('redirect')) {
     }
 }
 
+// --- NEW: Debugging Helpers ---
+
 if (! function_exists('dd')) {
     /**
      * Dump one or more variables and stop script execution.

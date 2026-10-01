@@ -455,6 +455,18 @@ class DocsController extends BaseController
     }
 
     /**
+     * Shows the encryption and signing documentation.
+     */
+    public function encryption(Request $request): Response
+    {
+        return $this->view('@core/docs/encryption.twig', [], [
+            'title'         => 'Encryption & Signing – Rhapsody Documentation',
+            'description'   => 'Encrypt and sign data, create signed URLs, rotate keys, and encrypt database columns in Rhapsody.',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
+
+    /**
      * Shows the module/plugin system documentation.
      */
     public function modules(Request $request): Response
