@@ -479,6 +479,18 @@ class DocsController extends BaseController
     }
 
     /**
+     * Shows the Module UI (styling module pages) documentation.
+     */
+    public function moduleUi(Request $request): Response
+    {
+        return $this->view('@core/docs/module-ui.twig', [], [
+            'title'         => 'Module UI: Styling Module Pages – Rhapsody Documentation',
+            'description'   => 'Learn how to style module-rendered pages with the Module UI layout and rhapsody-* classes so they match any theme, and how themes can customize them.',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
+
+    /**
      * Shows the AI integration (Gemini) documentation.
      */
     public function ai(Request $request): Response

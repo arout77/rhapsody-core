@@ -193,7 +193,13 @@ class Debug
         if ($matchedRoute) {
             $callback = $matchedRoute->getCallback();
             if (is_array($callback) && count($callback) === 2) {
-                $controller          = explode('\\', $callback[0]);
+                // $callback[0] is a class-name string for a typical
+                // "Controller@method"-style route, but an already-built
+                // instance for any route registered as [$instance, 'method']
+                // (which is what a module controller needing injected
+                // facades from ModuleContext has to use). Handle both.
+                $controllerName      = is_string($callback[0]) ? $callback[0] : get_class($callback[0]);
+                $controller          = explode('\\', $controllerName);
                 $this->data['route'] = [
                     'method'     => $matchedRoute->getMethod(),
                     'path'       => $matchedRoute->getPath(),

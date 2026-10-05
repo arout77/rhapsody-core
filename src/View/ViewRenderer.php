@@ -12,8 +12,7 @@ use Twig\Environment;
  *
  * Extracted from BaseController::view() so the same pipeline can be reused
  * by module-facing rendering (TwigFacade, Phase 3+) without duplicating it.
- * BaseController::view() is now a thin caller of render() below; its
- * behavior for existing app pages is unchanged by this extraction.
+ * BaseController::view() is a thin caller of render() below.
  */
 class ViewRenderer
 {
@@ -24,6 +23,11 @@ class ViewRenderer
     /**
      * Renders a view file using Twig, with optional SEO schema markup and
      * an optional reCAPTCHA widget injected into the template context.
+     *
+     * Meta precedence (lowest to highest):
+     *   1. $metaDefaults
+     *   2. a `meta` array already present in $args
+     *   3. $meta (explicit per-call overrides)
      *
      * @param string $view The view file to render.
      * @param array<string, mixed> $args Associative array of data to pass to the view.
@@ -41,7 +45,10 @@ class ViewRenderer
         ?SchemaOrg $schema = null,
         bool $injectCaptcha = true
     ): Response {
-        $args['meta'] = array_merge($metaDefaults, $meta);
+        // Preserve a caller-supplied `meta` array instead of overwriting it.
+        $argsMeta = isset($args['meta']) && is_array($args['meta']) ? $args['meta'] : [];
+
+        $args['meta'] = array_merge($metaDefaults, $argsMeta, $meta);
 
         // Inject engine variables cleanly prior to compilation context execution
         $args['schema_markup'] = $schema !== null ? $schema->render() : '';

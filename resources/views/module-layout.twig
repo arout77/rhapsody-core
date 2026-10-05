@@ -1,0 +1,12 @@
+{% extends "layouts/main.twig" %}
+
+{% block styles %}
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ rhapsody_ui_css() }}">
+{% endblock %}
+
+{% block content %}
+    <div class="rhapsody-ui">
+        {% block module_content %}{% endblock %}
+    </div>
+{% endblock %}

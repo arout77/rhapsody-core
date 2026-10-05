@@ -1,0 +1,114 @@
+/* Rhapsody Module UI baseline v1
+   Theme-independent. Override any --rhapsody-* variable in :root. */
+
+:where(.rhapsody-ui) {
+  box-sizing: border-box;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  color: inherit;
+  font: inherit;
+  line-height: 1.5;
+}
+:where(.rhapsody-ui) *, :where(.rhapsody-ui) *::before, :where(.rhapsody-ui) *::after { box-sizing: inherit; }
+
+/* Page header */
+:where(.rhapsody-ui) .rhapsody-page-header { margin-bottom: 1.5rem; }
+:where(.rhapsody-ui) .rhapsody-page-header h1 { margin: 0 0 .25rem; font-size: 1.75rem; line-height: 1.2; }
+:where(.rhapsody-ui) .rhapsody-muted { opacity: .7; }
+
+/* Card */
+:where(.rhapsody-ui) .rhapsody-card {
+  padding: 1.25rem;
+  margin-bottom: var(--rhapsody-gap, 1rem);
+  border: 1px solid var(--rhapsody-border, color-mix(in srgb, currentColor 18%, transparent));
+  border-radius: var(--rhapsody-radius, 8px);
+  background: var(--rhapsody-surface, color-mix(in srgb, currentColor 5%, transparent));
+}
+
+/* Grid (stat tiles, card rows) */
+:where(.rhapsody-ui) .rhapsody-grid {
+  display: grid;
+  gap: var(--rhapsody-gap, 1rem);
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  margin-bottom: var(--rhapsody-gap, 1rem);
+}
+
+/* Forms */
+:where(.rhapsody-ui) .rhapsody-form { display: grid; gap: var(--rhapsody-gap, 1rem); max-width: 40rem; }
+:where(.rhapsody-ui) .rhapsody-field { display: grid; gap: .35rem; }
+:where(.rhapsody-ui) .rhapsody-label { font-weight: 600; font-size: .9rem; }
+:where(.rhapsody-ui) .rhapsody-help { font-size: .8rem; opacity: .7; }
+:where(.rhapsody-ui) .rhapsody-input,
+:where(.rhapsody-ui) .rhapsody-select,
+:where(.rhapsody-ui) .rhapsody-textarea {
+  width: 100%;
+  padding: .55rem .75rem;
+  color: inherit;
+  font: inherit;
+  background: transparent;
+  border: 1px solid var(--rhapsody-border, color-mix(in srgb, currentColor 25%, transparent));
+  border-radius: var(--rhapsody-radius, 8px);
+}
+:where(.rhapsody-ui) .rhapsody-textarea { min-height: 7rem; resize: vertical; }
+:where(.rhapsody-ui) .rhapsody-input:focus,
+:where(.rhapsody-ui) .rhapsody-select:focus,
+:where(.rhapsody-ui) .rhapsody-textarea:focus {
+  outline: 2px solid var(--rhapsody-primary, #4f46e5);
+  outline-offset: 1px;
+}
+:where(.rhapsody-ui) .rhapsody-field--error .rhapsody-input { border-color: var(--rhapsody-danger, #dc2626); }
+:where(.rhapsody-ui) .rhapsody-error { font-size: .85rem; color: var(--rhapsody-danger, #dc2626); }
+
+/* Buttons */
+:where(.rhapsody-ui) .rhapsody-btn {
+  display: inline-block;
+  padding: .55rem 1.1rem;
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  color: var(--rhapsody-primary-contrast, #fff);
+  background: var(--rhapsody-primary, #4f46e5);
+  border: 1px solid transparent;
+  border-radius: var(--rhapsody-radius, 8px);
+}
+:where(.rhapsody-ui) .rhapsody-btn:hover { filter: brightness(1.1); }
+:where(.rhapsody-ui) .rhapsody-btn--secondary {
+  color: inherit;
+  background: transparent;
+  border-color: var(--rhapsody-border, color-mix(in srgb, currentColor 25%, transparent));
+}
+:where(.rhapsody-ui) .rhapsody-btn--danger { background: var(--rhapsody-danger, #dc2626); color: #fff; }
+:where(.rhapsody-ui) .rhapsody-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+
+/* Tables (wrap in .rhapsody-table-wrap for horizontal scroll) */
+:where(.rhapsody-ui) .rhapsody-table-wrap { overflow-x: auto; }
+:where(.rhapsody-ui) .rhapsody-table { width: 100%; border-collapse: collapse; text-align: left; }
+:where(.rhapsody-ui) .rhapsody-table th,
+:where(.rhapsody-ui) .rhapsody-table td {
+  padding: .65rem .75rem;
+  border-bottom: 1px solid var(--rhapsody-border, color-mix(in srgb, currentColor 15%, transparent));
+}
+:where(.rhapsody-ui) .rhapsody-table th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; opacity: .75; }
+
+/* Alerts and badges */
+:where(.rhapsody-ui) .rhapsody-alert {
+  padding: .75rem 1rem;
+  margin-bottom: var(--rhapsody-gap, 1rem);
+  border: 1px solid var(--rhapsody-alert, var(--rhapsody-border, color-mix(in srgb, currentColor 25%, transparent)));
+  border-left-width: 4px;
+  border-radius: var(--rhapsody-radius, 8px);
+  background: color-mix(in srgb, var(--rhapsody-alert, currentColor) 10%, transparent);
+}
+:where(.rhapsody-ui) .rhapsody-alert--success { --rhapsody-alert: var(--rhapsody-success, #16a34a); }
+:where(.rhapsody-ui) .rhapsody-alert--error   { --rhapsody-alert: var(--rhapsody-danger, #dc2626); }
+:where(.rhapsody-ui) .rhapsody-badge {
+  display: inline-block;
+  padding: .1rem .55rem;
+  font-size: .75rem;
+  font-weight: 600;
+  border-radius: 999px;
+  background: var(--rhapsody-surface, color-mix(in srgb, currentColor 12%, transparent));
+}
