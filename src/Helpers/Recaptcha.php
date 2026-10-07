@@ -4,6 +4,17 @@ namespace Rhapsody\Core\Helpers;
 class Recaptcha
 {
     /**
+     * Whether reCAPTCHA is fully configured (both keys present). Callers that
+     * make the captcha optional (e.g. the Forms module) check this first:
+     * verify() returns false whenever the secret key is missing, so requiring
+     * a captcha on a site without keys would reject every visitor.
+     */
+    public static function isEnabled(): bool
+    {
+        return ! empty($_ENV['RECAPTCHA_SITE_KEY'] ?? '') && ! empty($_ENV['RECAPTCHA_SECRET_KEY'] ?? '');
+    }
+
+    /**
      * Generates the HTML script and widget for the Twig template.
      */
     public static function render(): string
@@ -46,6 +57,9 @@ class Recaptcha
                 'header'  => "Content-type: application/x-www-form-urlencoded\r\n",
                 'method'  => 'POST',
                 'content' => http_build_query($data),
+                // Without a timeout a slow Google would hold every form submission
+                // (and a PHP worker) for PHP's default of 60 seconds.
+                'timeout' => 5,
             ],
         ];
 
@@ -57,6 +71,6 @@ class Recaptcha
         }
 
         $response = json_decode($result, true);
-        return $response['success'] ?? false;
+        return ($response['success'] ?? false) === true;
     }
 }

@@ -15,6 +15,9 @@ use Rhapsody\Core\Modules\Exceptions\ManifestValidationException;
  */
 final class ModulePermissions
 {
+    /** A fully-qualified class name with at least one namespace segment, no leading backslash. */
+    private const CLASS_NAME_PATTERN = '/^[A-Za-z_]\w*(?:\\\\[A-Za-z_]\w*)+$/';
+
     /** @param array<string, array<string, mixed>> $grants capability => detail array */
     private function __construct(private readonly array $grants)
     {
@@ -50,6 +53,30 @@ final class ModulePermissions
             );
         }
 
+        // Same explicit-whitelist rule for dispatching. Each entry must be a
+        // fully-qualified, namespaced class name — no wildcards, no global-
+        // namespace classes. Whether the classes actually belong to THIS
+        // module is checked in ModuleManifest (it knows the provider
+        // namespace; this class doesn't).
+        if (isset($grants['events.dispatch'])) {
+            $dispatch = $grants['events.dispatch']['dispatch'] ?? null;
+
+            if (! is_array($dispatch) || $dispatch === []) {
+                throw new ManifestValidationException(
+                    "{$context}: \"events.dispatch\" requires a non-empty \"dispatch\" array of event class names"
+                );
+            }
+
+            foreach ($dispatch as $eventClass) {
+                if (! is_string($eventClass) || ! preg_match(self::CLASS_NAME_PATTERN, $eventClass)) {
+                    throw new ManifestValidationException(
+                        "{$context}: \"events.dispatch.dispatch\" entries must be fully-qualified, namespaced class names " .
+                        "(e.g. \"Vendor\\\\Module\\\\Events\\\\Thing\"), got " . var_export($eventClass, true)
+                    );
+                }
+            }
+        }
+
         if (isset($grants['routes.register']['prefix'])
             && ! preg_match('/^[a-z0-9\-]+$/', $grants['routes.register']['prefix'])) {
             throw new ManifestValidationException(
@@ -83,6 +110,12 @@ final class ModulePermissions
     public function grantedEvents(): array
     {
         return $this->grants['events.listen']['listen'] ?? [];
+    }
+
+    /** @return string[] fully-qualified event class names this module may dispatch (all inside its own namespace) */
+    public function dispatchableEvents(): array
+    {
+        return $this->grants['events.dispatch']['dispatch'] ?? [];
     }
 
     public function routePrefix(string $fallback): string

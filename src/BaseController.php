@@ -31,7 +31,12 @@ abstract class BaseController
 
         // Register the React island Twig functions (react_component, vite_assets, csrf_token).
         // This makes them available in every Twig template rendered by any controller.
-        $this->twig->addExtension(new ReactIslandExtension());
+        // NOTE: as of v2.2.7, this is being registered solely in bootstrap.php.
+        // Having it called in both locations started throwing "Already registered" exceptions
+        // on non-module pages. Removing it from bootstrap caused "react_component() does not exist"
+        // errors. So the solution is to keep it in bootstrap and remove this call. Leaving for
+        // historical purposes for the time being.
+        // $this->twig->addExtension(new ReactIslandExtension());
 
         $this->twig->addExtension(new RoutingExtension());
 

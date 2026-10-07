@@ -240,7 +240,9 @@ $container->singleton(Environment::class, function (Container $c) use ($config, 
     $twig->addGlobal('app_url', $_ENV['APP_URL'] ?? '');
     $twig->addGlobal('app_env', $_ENV['APP_ENV'] ?? 'production');
 
-    $twig->addExtension(new \Rhapsody\Core\React\ReactIslandExtension());
+    if (! $twig->hasExtension(\Rhapsody\Core\React\ReactIslandExtension::class)) {
+        $twig->addExtension(new \Rhapsody\Core\React\ReactIslandExtension());
+    }
 
     // Register a smart vite_assets function
     // the ['is_safe'] arg is crucial here; Twig will escape the output
@@ -287,7 +289,7 @@ $container->singleton(Environment::class, function (Container $c) use ($config, 
         {
             return Session::hasFlash($name);
         }
-    };;;;;;;;;;
+    };;;;;;;;;
 
     $twig->addGlobal('flash', $flash);
 

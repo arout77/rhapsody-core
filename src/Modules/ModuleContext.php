@@ -4,8 +4,10 @@ namespace Rhapsody\Core\Modules;
 
 use Rhapsody\Core\Contracts\ContainerInterface;
 use Rhapsody\Core\Events\EventDispatcher;
+use Rhapsody\Core\Mailer;
 use Rhapsody\Core\Modules\Facades\DatabaseFacade;
 use Rhapsody\Core\Modules\Facades\EventsFacade;
+use Rhapsody\Core\Modules\Facades\MailFacade;
 use Rhapsody\Core\Modules\Facades\RoutesFacade;
 use Rhapsody\Core\Modules\Facades\SettingsFacade;
 use Rhapsody\Core\Modules\Facades\StorageFacade;
@@ -24,6 +26,12 @@ use Twig\Environment;
  */
 final class ModuleContext
 {
+    /**
+     * Cached so the facade's per-request send cap is shared by every
+     * $context->mail() call this module makes, instead of resetting each time.
+     */
+    private ?MailFacade $mail = null;
+
     public function __construct(
         private readonly ModuleManifest $manifest,
         private readonly ContainerInterface $container,
@@ -106,6 +114,15 @@ final class ModuleContext
         return new SettingsFacade(
             $this->basePath . '/storage/modules/' . $this->manifest->slug() . '/settings.json',
             $this->manifest->permissions,
+        );
+    }
+
+    public function mail(): MailFacade
+    {
+        return $this->mail ??= new MailFacade(
+            $this->container->resolve(Mailer::class),
+            $this->manifest->permissions,
+            $this->manifest->slug(),
         );
     }
 

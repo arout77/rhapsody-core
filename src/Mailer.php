@@ -42,14 +42,27 @@ class Mailer
     }
 
     /**
+     * Whether a mail transport was set up (i.e. MAIL_HOST was provided).
+     * send() throws when this is false; callers that would rather degrade
+     * gracefully (e.g. a module showing a "mail isn't configured" notice)
+     * can check first.
+     */
+    public function isConfigured(): bool
+    {
+        return $this->mailer !== null;
+    }
+
+    /**
      * Sends an email.
-     * * @param string $to
-     * @param string $subject
-     * @param string $htmlBody
+     *
+     * @param string      $to
+     * @param string      $subject
+     * @param string      $htmlBody
      * @param string|null $plainTextBody
+     * @param string|null $replyTo        Optional Reply-To address (e.g. the visitor who filled in a contact form)
      * @throws \RuntimeException
      */
-    public function send(string $to, string $subject, string $htmlBody, ?string $plainTextBody = null): void
+    public function send(string $to, string $subject, string $htmlBody, ?string $plainTextBody = null, ?string $replyTo = null): void
     {
         if (! $this->mailer) {
             throw new \RuntimeException('Mailer not configured. Please set MAIL_HOST in .env');
@@ -66,6 +79,10 @@ class Mailer
 
         if ($plainTextBody !== null) {
             $email->text($plainTextBody);
+        }
+
+        if ($replyTo !== null && $replyTo !== '') {
+            $email->replyTo($replyTo);
         }
 
         $this->mailer->send($email);

@@ -25,13 +25,21 @@ final class ModuleManifest
     /** Closed set of capability keys a module is allowed to request. */
     public const CAPABILITIES = [
         'events.listen',
+        'events.dispatch',
         'routes.register',
         'twig.extensions',
         'twig.functions',
         'storage.access',
         'settings.manage',
         'database.access',
+        'mail.send',
     ];
+
+    /**
+     * Namespaces no module may claim when requesting events.dispatch —
+     * the framework's own and the host application's.
+     */
+    private const RESERVED_NAMESPACES = ['Rhapsody\\', 'App\\'];
 
     public const CATEGORIES = [
         'seo', 'commerce', 'content', 'analytics', 'integration',
@@ -97,6 +105,14 @@ final class ModuleManifest
 
         $permissions = ModulePermissions::fromArray($data['permissions'] ?? [], $context);
 
+        if ($permissions->can('events.dispatch')) {
+            self::assertDispatchableEventsAreOwned(
+                (string) $data['provider'],
+                $permissions->dispatchableEvents(),
+                $context
+            );
+        }
+
         return new self(
             name: $data['name'],
             version: $data['version'],
@@ -110,6 +126,49 @@ final class ModuleManifest
             settingsSchema: $data['settings_schema'] ?? [],
             raw: $data,
         );
+    }
+
+    /**
+     * The "write only inside a boundary the framework derives" rule,
+     * applied to events: a module may only dispatch event classes that
+     * live under its OWN provider's namespace. The boundary is derived
+     * from the manifest's "provider" field (never a value the module
+     * supplies separately), exactly like slug() and tablePrefix().
+     *
+     * "Arout\Forms\ModuleProvider" owns "Arout\Forms\*", so it may
+     * declare "Arout\Forms\Events\FormSubmitted" — but never a core
+     * event, another module's event, or anything in the app's namespace.
+     *
+     * @param string[] $eventClasses
+     */
+    private static function assertDispatchableEventsAreOwned(string $provider, array $eventClasses, string $context): void
+    {
+        $separator = strrpos($provider, '\\');
+        if ($separator === false || $separator === 0) {
+            throw new ManifestValidationException(
+                "{$context}: \"events.dispatch\" requires \"provider\" to be a namespaced class name, got \"{$provider}\""
+            );
+        }
+
+        $namespace = substr($provider, 0, $separator) . '\\';
+
+        foreach (self::RESERVED_NAMESPACES as $reserved) {
+            if (str_starts_with($namespace, $reserved)) {
+                throw new ManifestValidationException(
+                    "{$context}: a module whose provider lives in \"{$reserved}*\" may not request \"events.dispatch\" — " .
+                    'that namespace is reserved for the framework and the host application'
+                );
+            }
+        }
+
+        foreach ($eventClasses as $eventClass) {
+            if (! str_starts_with($eventClass, $namespace)) {
+                throw new ManifestValidationException(
+                    "{$context}: \"events.dispatch\" entry \"{$eventClass}\" is outside this module's own namespace " .
+                    "(\"{$namespace}*\", taken from its provider class). Modules may only dispatch their own events."
+                );
+            }
+        }
     }
 
     /**

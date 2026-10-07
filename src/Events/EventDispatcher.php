@@ -6,8 +6,19 @@ use Rhapsody\Core\Contracts\EventDispatcherInterface;
 
 class EventDispatcher implements EventDispatcherInterface
 {
+    /**
+     * How many dispatch() calls may be nested inside one another before we
+     * stop. Modules can now dispatch their own events, so listener A could
+     * fire an event that listener B hears, whose listener fires one A hears
+     * again. Real chains are 1-2 deep; this is only a backstop.
+     */
+    protected const MAX_DISPATCH_DEPTH = 8;
+
     /** @var array<string, array<int, string|callable>> */
     protected array $listeners = [];
+
+    /** Current nesting level of dispatch() calls. */
+    protected int $depth = 0;
 
     public function __construct(
         protected ContainerInterface $container,
@@ -39,6 +50,35 @@ class EventDispatcher implements EventDispatcherInterface
     {
         $eventClass = get_class($event);
 
+        if ($this->depth >= self::MAX_DISPATCH_DEPTH) {
+            error_log(sprintf(
+                'EventDispatcher: dispatch of "%s" skipped — nesting deeper than %d (possible listener loop)',
+                $eventClass,
+                self::MAX_DISPATCH_DEPTH
+            ));
+
+            return $event;
+        }
+
+        // An event that is already stopped (see StoppableEventInterface)
+        // shouldn't reach any listener at all.
+        if ($event instanceof StoppableEventInterface && $event->isPropagationStopped()) {
+            return $event;
+        }
+
+        $this->depth++;
+
+        try {
+            $this->notifyListeners($event, $eventClass);
+        } finally {
+            $this->depth--;
+        }
+
+        return $event;
+    }
+
+    protected function notifyListeners(object $event, string $eventClass): void
+    {
         foreach ($this->listeners[$eventClass] ?? [] as $listener) {
             try {
                 // A listener can be a container-resolvable class name (with its own
@@ -64,8 +104,13 @@ class EventDispatcher implements EventDispatcherInterface
                     $e->getMessage()
                 ));
             }
-        }
 
-        return $event;
+            // Opt-in stop-propagation: only events implementing
+            // StoppableEventInterface are ever affected; plain events keep
+            // the "every listener runs" behavior.
+            if ($event instanceof StoppableEventInterface && $event->isPropagationStopped()) {
+                break;
+            }
+        }
     }
 }

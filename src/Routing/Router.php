@@ -4,6 +4,7 @@ namespace Rhapsody\Core\Routing;
 use Rhapsody\Core\Container;
 use Rhapsody\Core\Contracts\ContainerInterface;
 use Rhapsody\Core\Exceptions\HttpException;
+use Rhapsody\Core\Middleware\AdminMiddleware;
 use Rhapsody\Core\Middleware\MiddlewareTracer;
 use Rhapsody\Core\Request;
 use Rhapsody\Core\Response;
@@ -22,6 +23,16 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
      * @var Route[]
      */
     protected static array $routes = [];
+
+    /**
+     * Route middleware aliases core provides to every application. The
+     * application's own map (setMiddlewareConfig) is consulted first, so an
+     * app that registers its own `admin` keeps using it.
+     * @var array<string, class-string>
+     */
+    protected const CORE_MIDDLEWARE = [
+        'admin' => AdminMiddleware::class,
+    ];
 
     /**
      * A map of middleware keys to their fully qualified class names.
@@ -139,17 +150,32 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
 
                 // 2. RUN ROUTE-SPECIFIC MIDDLEWARE
                 foreach ($route->getMiddleware() as $middlewareKey) {
-                    if (isset(self::$middlewareMap[$middlewareKey])) {
-                        $middlewareInstance = $container->resolve(self::$middlewareMap[$middlewareKey]);
-                        $resolvedClass      = get_class($middlewareInstance);
+                    $middlewareClass = self::resolveMiddlewareClass($middlewareKey);
 
-                        MiddlewareTracer::start($resolvedClass, 'route', $route->getPath());
-                        $response = $middlewareInstance->handle($request, $route);
-                        MiddlewareTracer::stop();
+                    // Fail closed. This used to skip an alias that wasn't in the
+                    // map, which meant a route guarded with ->middleware('admin')
+                    // (or a typo of 'auth') silently ran with NO protection on
+                    // any app that hadn't registered that alias.
+                    if ($middlewareClass === null) {
+                        throw new \RuntimeException(sprintf(
+                            'Route %s %s uses middleware "%s", which is not registered. ' .
+                            'Add it to the application\'s middleware map or remove it from the route; ' .
+                            'refusing to run the route without it.',
+                            $route->getMethod(),
+                            $route->getPath(),
+                            $middlewareKey
+                        ));
+                    }
 
-                        if ($response instanceof Response) {
-                            return $response;
-                        }
+                    $middlewareInstance = $container->resolve($middlewareClass);
+                    $resolvedClass      = get_class($middlewareInstance);
+
+                    MiddlewareTracer::start($resolvedClass, 'route', $route->getPath());
+                    $response = $middlewareInstance->handle($request, $route);
+                    MiddlewareTracer::stop();
+
+                    if ($response instanceof Response) {
+                        return $response;
                     }
                 }
 
@@ -159,6 +185,15 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
         }
 
         return self::handleNotFound();
+    }
+
+    /**
+     * Looks up a route-middleware alias: the application's map first, then
+     * the aliases core ships. Null means "not registered anywhere".
+     */
+    protected static function resolveMiddlewareClass(string $key): ?string
+    {
+        return self::$middlewareMap[$key] ?? self::CORE_MIDDLEWARE[$key] ?? null;
     }
 
     /**
