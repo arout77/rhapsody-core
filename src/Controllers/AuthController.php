@@ -7,6 +7,7 @@ use Rhapsody\Core\BaseController;
 use Rhapsody\Core\Entities\User;
 use Rhapsody\Core\Events\EventDispatcher;
 use Rhapsody\Core\Events\UserRegistered;
+use Rhapsody\Core\Helpers\Recaptcha;
 use Rhapsody\Core\Mailer;
 use Rhapsody\Core\Request;
 use Rhapsody\Core\Response;
@@ -44,8 +45,9 @@ class AuthController extends BaseController implements AuthenticatableInterface
      */
     public function showLoginForm(): Response
     {
-        // The "@core" namespace maps directly to vendor/arout/rhapsody-core/resources/views/
-        return $this->view('auth/login.twig');
+        return $this->view('auth/login.twig', [
+            'captcha_form' => Recaptcha::render(),
+        ]);
     }
 
     /**
@@ -56,6 +58,15 @@ class AuthController extends BaseController implements AuthenticatableInterface
     public function login(Request $request): Response
     {
         $data = $request->getBody();
+
+        if (Recaptcha::isEnabled()) {
+            $token = (string) $request->input('g-recaptcha-response', '');
+            $ip    = $request->getServerParams()['REMOTE_ADDR'] ?? null;
+
+            if (! Recaptcha::verify($token, $ip)) {
+                return redirect('/login')->with('error', 'Please confirm you are not a robot.');
+            }
+        }
 
         $user = $this->em->getRepository(User::class)->findOneBy(['email' => $data['email']]);
 
