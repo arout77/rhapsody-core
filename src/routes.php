@@ -3,6 +3,7 @@
 use Rhapsody\Core\Controllers\AuthController;
 use Rhapsody\Core\Controllers\DocsController;
 use Rhapsody\Core\Controllers\PaymentController;
+use Rhapsody\Core\Controllers\SocialAuthController;
 use Rhapsody\Core\Routing\Router;
 
 // Social login routes
