@@ -31,27 +31,35 @@ class Session
         }
 
         // 1. Age out old flash data from the PREVIOUS request
-        if (isset($_SESSION['_flash_old'])) {
-            foreach ($_SESSION['_flash_old'] as $key) {
-                unset($_SESSION[$key]);
+        $old = $_SESSION['_flash_old'] ?? [];
+        if (is_array($old)) {
+            foreach ($old as $key) {
+                if (is_string($key)) {
+                    unset($_SESSION[$key]);
+                }
             }
         }
 
         // 2. Mark current flashes to be deleted on the NEXT request
-        $_SESSION['_flash_old'] = isset($_SESSION['_flash_new']) ? $_SESSION['_flash_new'] : [];
+        $new                    = $_SESSION['_flash_new'] ?? [];
+        $_SESSION['_flash_old'] = is_array($new) ? $new : [];
         $_SESSION['_flash_new'] = [];
     }
 
     public static function flash(string $key, mixed $message): void
     {
-        $_SESSION[$key]           = $message;
-        $_SESSION['_flash_new'][] = $key;
+        $pending = $_SESSION['_flash_new'] ?? [];
+        $pending = is_array($pending) ? $pending : [];
+
+        $pending[]              = $key;
+        $_SESSION[$key]         = $message;
+        $_SESSION['_flash_new'] = $pending;
     }
 
     /**
      * Sets a value in the session.
      */
-    public static function set(string $key, $value): void
+    public static function set(string $key, mixed $value): void
     {
         $_SESSION[$key] = $value;
     }
@@ -59,9 +67,20 @@ class Session
     /**
      * Retrieves a value from the session by its key.
      */
-    public static function get(string $key, $default = null)
+    public static function get(string $key, mixed $default = null): mixed
     {
         return $_SESSION[$key] ?? $default;
+    }
+
+    /**
+     * Retrieves a value and removes it from the session in one step.
+     */
+    public static function pull(string $key, mixed $default = null): mixed
+    {
+        $value = $_SESSION[$key] ?? $default;
+        unset($_SESSION[$key]);
+
+        return $value;
     }
 
     /**
@@ -93,15 +112,18 @@ class Session
         // 2. Expire the session cookie in the browser.
         if (ini_get('session.use_cookies')) {
             $params = session_get_cookie_params();
-            setcookie(
-                session_name(),
-                '',
-                time() - 42000,
-                $params['path'],
-                $params['domain'],
-                $params['secure'],
-                $params['httponly']
-            );
+            $name   = session_name();
+            if ($name !== false) {
+                setcookie(
+                    $name,
+                    '',
+                    time() - 42000,
+                    $params['path'],
+                    $params['domain'],
+                    $params['secure'],
+                    $params['httponly']
+                );
+            }
         }
 
         // 3. Destroy the session on the server.
@@ -129,11 +151,11 @@ class Session
     /**
      * Retrieves a flash message and then removes it from the session.
      */
-    public static function getFlash(string $key, $default = null): ?string
+    public static function getFlash(string $key, mixed $default = null): ?string
     {
         $message = self::get($key, $default);
         self::remove($key);
-        return $message;
+        return is_scalar($message) ? (string) $message : null;
     }
 
     /**
@@ -149,11 +171,12 @@ class Session
      */
     public static function csrfToken(): string
     {
-        if (! self::has('_token')) {
+        $token = self::get('_token');
+        if (! is_string($token) || $token === '') {
             $token = bin2hex(random_bytes(32));
             self::set('_token', $token);
         }
-        return self::get('_token');
+        return $token;
     }
 
     /**
@@ -162,6 +185,8 @@ class Session
      */
     public static function verifyCsrfToken(string $token): bool
     {
-        return self::has('_token') && hash_equals(self::get('_token'), $token);
+        $stored = self::get('_token');
+
+        return is_string($stored) && $stored !== '' && hash_equals($stored, $token);
     }
 }

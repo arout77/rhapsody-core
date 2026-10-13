@@ -2,11 +2,14 @@
 namespace Rhapsody\Core;
 
 use Rhapsody\Core\Cache;
+use Rhapsody\Core\Contracts\ContainerInterface;
 use Rhapsody\Core\Database;
 use Rhapsody\Core\React\ReactIslandExtension;
 use Rhapsody\Core\React\ViteManifest;
 use Rhapsody\Core\SEO\SchemaOrg;
 use Rhapsody\Core\Session;
+use Rhapsody\Core\Support\Env;
+use Rhapsody\Core\Support\Json;
 use Rhapsody\Core\Twig\RoutingExtension;
 use Rhapsody\Core\View\ViewRenderer;
 use Twig\Environment;
@@ -47,30 +50,25 @@ abstract class BaseController
 
         // Fallback option using the container instance to resolve the pre-configured database singleton
         global $container;
-        /**
-         * @var \Rhapsody\Core\Container|null $container
-         */
 
-        if (isset($container) && $container->has(Database::class)) {
-            // @phpstan-ignore-next-line
-            $this->db = $container->resolve(Database::class);
-        } else {
+        if (! $container instanceof ContainerInterface || ! $container->has(Database::class)) {
             throw new \Exception("Database service has not been properly initialized inside the Service Container.");
         }
+
+        $this->db = $container->resolve(Database::class);
 
         // Prefer the container-bound singleton (shares the same Twig instance
         // and lets module-facing renderers, e.g. TwigFacade, resolve the same
         // service later). Fall back to constructing it directly against this
         // controller's own $twig if the binding isn't registered yet.
-        if (isset($container) && $container->has(ViewRenderer::class)) {
-            // @phpstan-ignore-next-line
+        if ($container->has(ViewRenderer::class)) {
             $this->viewRenderer = $container->resolve(ViewRenderer::class);
         } else {
             $this->viewRenderer = new ViewRenderer($this->twig);
         }
 
         $appVersion = FrameworkInfo::getVersion();
-        $appUrl     = $_ENV['APP_URL'] ?? 'http://localhost';
+        $appUrl     = Env::string('APP_URL', 'http://localhost');
 
         $this->schema->add('SoftwareApplication', [
             'name'                => 'Rhapsody Framework',
@@ -129,7 +127,7 @@ abstract class BaseController
         $response = new Response();
         $response->setStatusCode($statusCode);
         $response->setHeader('Content-Type', 'application/json');
-        $response->setContent(json_encode($data, JSON_PRETTY_PRINT));
+        $response->setContent(Json::encode($data, JSON_PRETTY_PRINT));
         return $response;
     }
 
@@ -163,12 +161,12 @@ abstract class BaseController
      */
     protected function react(string $component, array $props = [], array $meta = []): Response
     {
-        $title       = htmlspecialchars($meta['title'] ?? ($_ENV['APP_NAME'] ?? 'Rhapsody App'), ENT_QUOTES, 'UTF-8');
-        $description = htmlspecialchars($meta['description'] ?? '', ENT_QUOTES, 'UTF-8');
-        $lang        = htmlspecialchars($meta['lang'] ?? 'en', ENT_QUOTES, 'UTF-8');
+        $title       = htmlspecialchars($this->metaString($meta, 'title', Env::string('APP_NAME', 'Rhapsody App')), ENT_QUOTES, 'UTF-8');
+        $description = htmlspecialchars($this->metaString($meta, 'description'), ENT_QUOTES, 'UTF-8');
+        $lang        = htmlspecialchars($this->metaString($meta, 'lang', 'en'), ENT_QUOTES, 'UTF-8');
 
         // JSON_HEX_TAG prevents </script> injection inside the JSON block.
-        $propsJson = json_encode($props, JSON_HEX_TAG | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $propsJson = Json::encode($props, JSON_HEX_TAG | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
         // Expose the session CSRF token so React can send it on non-API POST requests.
         $csrfToken = htmlspecialchars(Session::csrfToken(), ENT_QUOTES, 'UTF-8');
@@ -208,5 +206,18 @@ abstract class BaseController
         $response = new Response();
         $response->setContent($html);
         return $response;
+    }
+
+    /**
+     * Read a string value from a meta array, falling back to $default when the
+     * key is missing or holds a non-string value.
+     *
+     * @param array<string, mixed> $meta
+     */
+    private function metaString(array $meta, string $key, string $default = ''): string
+    {
+        $value = $meta[$key] ?? null;
+
+        return is_string($value) ? $value : $default;
     }
 }

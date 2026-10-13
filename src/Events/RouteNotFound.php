@@ -1,7 +1,6 @@
 <?php
 namespace Rhapsody\Core\Events;
 
-use Rhapsody\Core\Event;
 use Rhapsody\Core\Response;
 
 /**
@@ -17,7 +16,7 @@ use Rhapsody\Core\Response;
  * return — the event falls through to the normal 404 behavior unchanged,
  * and the next listener (if any) still gets a turn.
  */
-class RouteNotFound extends Event implements StoppableEventInterface
+class RouteNotFound implements StoppableEventInterface
 {
     private ?Response $response = null;
 

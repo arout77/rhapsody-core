@@ -46,6 +46,10 @@ final class ModuleManifest
         'security', 'media', 'utility', 'other',
     ];
 
+    /**
+     * @param array<string, mixed> $settingsSchema
+     * @param array<string, mixed> $raw
+     */
     private function __construct(
         public readonly string $name,
         public readonly string $version,
@@ -67,10 +71,13 @@ final class ModuleManifest
             throw new ManifestValidationException("module.json not found at {$path}");
         }
 
-        $json = json_decode((string) file_get_contents($path), true);
-        if (! is_array($json)) {
+        $decoded = json_decode((string) file_get_contents($path), true);
+        if (! is_array($decoded)) {
             throw new ManifestValidationException("module.json at {$path} is not valid JSON");
         }
+
+        /** @var array<string, mixed> $json */
+        $json = $decoded;
 
         return self::fromArray($json, $path);
     }
@@ -78,54 +85,103 @@ final class ModuleManifest
     /** @param array<string, mixed> $data */
     public static function fromArray(array $data, string $context = 'module.json'): self
     {
-        foreach (['name', 'type', 'version', 'rhapsody_core', 'title', 'provider'] as $required) {
-            if (empty($data[$required])) {
-                throw new ManifestValidationException("{$context}: missing required field \"{$required}\"");
-            }
+        $name           = self::requiredString($data, 'name', $context);
+        $type           = self::requiredString($data, 'type', $context);
+        $version        = self::requiredString($data, 'version', $context);
+        $coreConstraint = self::requiredString($data, 'rhapsody_core', $context);
+        $title          = self::requiredString($data, 'title', $context);
+        $provider       = self::requiredString($data, 'provider', $context);
+
+        if ($type !== 'rhapsody-module') {
+            throw new ManifestValidationException("{$context}: \"type\" must be \"rhapsody-module\", got \"{$type}\"");
         }
 
-        if ($data['type'] !== 'rhapsody-module') {
-            throw new ManifestValidationException("{$context}: \"type\" must be \"rhapsody-module\", got \"{$data['type']}\"");
-        }
-
-        if (! preg_match('#^[a-z0-9\-]+/[a-z0-9\-]+$#', $data['name'])) {
+        if (! preg_match('#^[a-z0-9\-]+/[a-z0-9\-]+$#', $name)) {
             throw new ManifestValidationException("{$context}: \"name\" must look like \"vendor-slug/module-slug\"");
         }
 
-        if (! preg_match('/^\d+\.\d+\.\d+(-[\w.]+)?$/', $data['version'])) {
-            throw new ManifestValidationException("{$context}: \"version\" must be valid semver, got \"{$data['version']}\"");
+        if (! preg_match('/^\d+\.\d+\.\d+(-[\w.]+)?$/', $version)) {
+            throw new ManifestValidationException("{$context}: \"version\" must be valid semver, got \"{$version}\"");
         }
 
-        $category = $data['category'] ?? 'other';
+        $category = self::optionalString($data, 'category', 'other', $context);
         if (! in_array($category, self::CATEGORIES, true)) {
             throw new ManifestValidationException(
                 "{$context}: \"category\" must be one of: " . implode(', ', self::CATEGORIES)
             );
         }
 
-        $permissions = ModulePermissions::fromArray($data['permissions'] ?? [], $context);
+        $permissions = ModulePermissions::fromArray(self::optionalArray($data, 'permissions', $context), $context);
 
         if ($permissions->can('events.dispatch')) {
             self::assertDispatchableEventsAreOwned(
-                (string) $data['provider'],
+                $provider,
                 $permissions->dispatchableEvents(),
                 $context
             );
         }
 
         return new self(
-            name: $data['name'],
-            version: $data['version'],
-            coreConstraint: $data['rhapsody_core'],
-            title: $data['title'],
-            description: $data['description'] ?? '',
+            name: $name,
+            version: $version,
+            coreConstraint: $coreConstraint,
+            title: $title,
+            description: self::optionalString($data, 'description', '', $context),
             category: $category,
-            license: $data['license'] ?? 'proprietary',
-            provider: $data['provider'],
+            license: self::optionalString($data, 'license', 'proprietary', $context),
+            provider: $provider,
             permissions: $permissions,
-            settingsSchema: $data['settings_schema'] ?? [],
+            settingsSchema: self::optionalArray($data, 'settings_schema', $context),
             raw: $data,
         );
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private static function requiredString(array $data, string $key, string $context): string
+    {
+        $value = $data[$key] ?? null;
+
+        if ($value === null || $value === '') {
+            throw new ManifestValidationException("{$context}: missing required field \"{$key}\"");
+        }
+
+        if (! is_string($value)) {
+            throw new ManifestValidationException("{$context}: \"{$key}\" must be a string");
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private static function optionalString(array $data, string $key, string $default, string $context): string
+    {
+        $value = $data[$key] ?? $default;
+
+        if (! is_string($value)) {
+            throw new ManifestValidationException("{$context}: \"{$key}\" must be a string");
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param  array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    private static function optionalArray(array $data, string $key, string $context): array
+    {
+        $value = $data[$key] ?? [];
+
+        if (! is_array($value)) {
+            throw new ManifestValidationException("{$context}: \"{$key}\" must be an object");
+        }
+
+        /** @var array<string, mixed> $value */
+        return $value;
     }
 
     /**

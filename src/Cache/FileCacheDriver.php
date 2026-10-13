@@ -7,10 +7,13 @@ class FileCacheDriver implements CacheInterface
 {
     protected string $cachePath;
 
-    public function __construct()
+    /**
+     * @param string|null $cachePath Directory to store cache files in. Defaults
+     *                               to the downstream app's storage/cache/app folder.
+     */
+    public function __construct(?string $cachePath = null)
     {
-        // Dynamically resolve the absolute path to the downstream app's storage folder
-        $this->cachePath = Path::storage('cache/app') . DIRECTORY_SEPARATOR;
+        $this->cachePath = rtrim($cachePath ?? Path::storage('cache/app'), '/\\') . DIRECTORY_SEPARATOR;
     }
 
     /**
@@ -20,27 +23,7 @@ class FileCacheDriver implements CacheInterface
      */
     public function get(string $key, mixed $default = null): mixed
     {
-        $path = $this->cachePath . md5($key);
-        if (! file_exists($path)) {
-            return $default;
-        }
-
-        $content = file_get_contents($path);
-        if ($content === false) {
-            return $default;
-        }
-
-        $data = json_decode($content, true);
-        if (! is_array($data) || ! isset($data['expires'])) {
-            return $default;
-        }
-
-        if (time() > (int) $data['expires']) {
-            unlink($path);
-            return $default;
-        }
-
-        return $data['value'] ?? $default;
+        return $this->read($key)['value'] ?? $default;
     }
 
     /**
@@ -70,27 +53,7 @@ class FileCacheDriver implements CacheInterface
      */
     public function has(string $key): bool
     {
-        $path = $this->cachePath . md5($key);
-        if (! file_exists($path)) {
-            return false;
-        }
-
-        $content = file_get_contents($path);
-        if ($content === false) {
-            return false;
-        }
-
-        $data = json_decode($content, true);
-        if (! is_array($data) || ! isset($data['expires'])) {
-            return false;
-        }
-
-        if (time() > (int) $data['expires']) {
-            unlink($path);
-            return false;
-        }
-
-        return true;
+        return $this->read($key) !== null;
     }
 
     /**
@@ -125,5 +88,36 @@ class FileCacheDriver implements CacheInterface
         }
 
         return true;
+    }
+
+    /**
+     * Loads one cache entry. Expired entries are deleted on the way out.
+     *
+     * @return array{value: mixed, expires: int}|null Null when the entry is missing, unreadable, malformed or expired.
+     */
+    private function read(string $key): ?array
+    {
+        $path = $this->cachePath . md5($key);
+        if (! file_exists($path)) {
+            return null;
+        }
+
+        $content = file_get_contents($path);
+        if ($content === false) {
+            return null;
+        }
+
+        $data = json_decode($content, true);
+        if (! is_array($data) || ! isset($data['expires']) || ! is_numeric($data['expires'])) {
+            return null;
+        }
+
+        $expires = (int) $data['expires'];
+        if (time() > $expires) {
+            unlink($path);
+            return null;
+        }
+
+        return ['value' => $data['value'] ?? null, 'expires' => $expires];
     }
 }

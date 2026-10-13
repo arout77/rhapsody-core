@@ -65,8 +65,8 @@ class Validator
     }
 
     /**
-     * @param array<string, mixed> $data
-     * @param array<string, mixed> $rules
+     * @param array<string, mixed>  $data
+     * @param array<string, string> $rules
      */
     public function validate(array $data, array $rules): bool
     {
@@ -86,7 +86,6 @@ class Validator
 
                 $methodName = 'validate' . ucfirst($ruleName);
                 if (method_exists($this, $methodName)) {
-                    // @phpstan-ignore-next-line
                     $this->$methodName($field, $value, $ruleParam, $data);
                 }
             }
@@ -96,7 +95,7 @@ class Validator
     }
 
     /**
-     * @return array
+     * @return array<string, array<int, string>>
      */
     public function getErrors(): array
     {
@@ -144,7 +143,7 @@ class Validator
                 $this->errors[$field][] = "The {$field} must be at least {$param}.";
             }
         } else {
-            if (strlen(trim((string) $value)) < $paramValue) {
+            if (strlen(trim($this->stringify($value))) < $paramValue) {
                 $this->errors[$field][] = "The {$field} must be at least {$param} characters.";
             }
         }
@@ -169,7 +168,7 @@ class Validator
                 $this->errors[$field][] = "The {$field} must not be greater than {$param}.";
             }
         } else {
-            if (strlen(trim((string) $value)) > $paramValue) {
+            if (strlen(trim($this->stringify($value))) > $paramValue) {
                 $this->errors[$field][] = "The {$field} must not exceed {$param} characters.";
             }
         }
@@ -240,7 +239,7 @@ class Validator
      * @param string  $field
      * @param ?string $value
      * @param ?string $param
-     * @param array   $data
+     * @param array<string, mixed> $data
      */
     protected function validateConfirmed(string $field, ?string $value, ?string $param, array $data): void
     {
@@ -290,10 +289,13 @@ class Validator
      */
     protected function validateImage(string $field, mixed $value): void
     {
-        if (! empty($value) && is_array($value) && ! empty($value['tmp_name'])) {
-            if ($value['error'] !== UPLOAD_ERR_OK || ! getimagesize($value['tmp_name'])) {
-                $this->errors[$field][] = "The {$field} must be a valid image file.";
-            }
+        $tmpName = is_array($value) ? ($value['tmp_name'] ?? null) : null;
+        if (! is_array($value) || ! is_string($tmpName) || $tmpName === '') {
+            return;
+        }
+
+        if (($value['error'] ?? null) !== UPLOAD_ERR_OK || getimagesize($tmpName) === false) {
+            $this->errors[$field][] = "The {$field} must be a valid image file.";
         }
     }
 
@@ -304,12 +306,13 @@ class Validator
      */
     protected function validateMimes(string $field, mixed $value, ?string $param): void
     {
-        if (empty($param) || ! is_array($value) || empty($value['tmp_name'])) {
+        $tmpName = is_array($value) ? ($value['tmp_name'] ?? null) : null;
+        if (empty($param) || ! is_string($tmpName) || $tmpName === '') {
             return;
         }
 
         $allowedMimes = explode(',', $param);
-        $fileMimeType = mime_content_type($value['tmp_name']);
+        $fileMimeType = mime_content_type($tmpName);
 
         $allowedMimeTypes = [];
         foreach ($allowedMimes as $ext) {
@@ -336,10 +339,19 @@ class Validator
      */
     protected function validateRecaptcha(string $field, mixed $value): void
     {
-        $ipAddress = $_SERVER['REMOTE_ADDR'] ?? null;
+        $remoteAddr = $_SERVER['REMOTE_ADDR'] ?? null;
+        $ipAddress  = is_string($remoteAddr) ? $remoteAddr : null;
 
-        if (! Recaptcha::verify((string) $value, $ipAddress)) {
+        if (! Recaptcha::verify($this->stringify($value), $ipAddress)) {
             $this->errors[$field][] = "Please verify that you are not a robot.";
         }
+    }
+
+    /**
+     * Cast a scalar value to string; anything else (arrays, objects, null) becomes ''.
+     */
+    private function stringify(mixed $value): string
+    {
+        return is_scalar($value) ? (string) $value : '';
     }
 }

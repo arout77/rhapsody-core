@@ -1,8 +1,6 @@
 <?php
-
 namespace Rhapsody\Core\Events;
 
-use Rhapsody\Core\Event;
 use Rhapsody\Core\Modules\ModuleManifest;
 
 /**
@@ -13,7 +11,7 @@ use Rhapsody\Core\Modules\ModuleManifest;
  * runtime (a connection, an API key, a writable path) rather than the
  * module's own code.
  */
-final class ModuleHealthCheckFailed extends Event
+final class ModuleHealthCheckFailed
 {
     public function __construct(
         public readonly ModuleManifest $manifest,

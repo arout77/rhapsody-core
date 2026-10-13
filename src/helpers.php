@@ -11,7 +11,8 @@ if (! function_exists('redirect')) {
     {
         // Absolute (https://...) and protocol-relative (//host) URLs pass through untouched
         if (! preg_match('#^(?:[a-z][a-z0-9+.-]*:|//)#i', $url)) {
-            $base = rtrim($_ENV['APP_BASE_URL'] ?? '', '/');
+            $configured = $_ENV['APP_BASE_URL'] ?? '';
+            $base       = rtrim(is_string($configured) ? $configured : '', '/');
             $url  = $base . '/' . ltrim($url, '/');
         }
 
@@ -52,9 +53,9 @@ if (! function_exists('d')) {
     }
 }
 
-// Optional: Use Symfony VarDumper if installed (it usually is via Whoops)
+// Optional: use Symfony VarDumper when installed (composer require --dev symfony/var-dumper)
 if (! function_exists('dump') && class_exists('Symfony\Component\VarDumper\VarDumper')) {
-    function dump(...$vars)
+    function dump(mixed ...$vars): void
     {
         foreach ($vars as $var) {
             Symfony\Component\VarDumper\VarDumper::dump($var);
@@ -62,7 +63,7 @@ if (! function_exists('dump') && class_exists('Symfony\Component\VarDumper\VarDu
     }
 } elseif (! function_exists('dump')) {
     // Fallback to simple var_dump
-    function dump(...$vars)
+    function dump(mixed ...$vars): void
     {
         foreach ($vars as $var) {
             var_dump($var);

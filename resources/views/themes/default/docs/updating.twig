@@ -34,4 +34,12 @@
         After pulling the latest framework version, always run <code>php rhapsody env:sync</code>
         to add any new environment variables required by the new version.
     </p>
+
+    <hr>
+
+    <h2>Upgrade Notes</h2>
+    <h3>Custom cache drivers</h3>
+    <p>
+        If you wrote your own driver implementing <code>CacheInterface</code>, update its method signatures to match the interface: <code>get(string $key, mixed $default = null): mixed</code> and <code>put(string $key, mixed $value, int $minutes): void</code>. A driver that omits the <code>mixed</code> return type on <code>get()</code> will fail to load. See <a href="{{ base_url }}/docs/caching">Caching</a> for the full interface.
+    </p>
 {% endblock %}

@@ -3,6 +3,10 @@ namespace Rhapsody\Core;
 
 use Twig\Environment;
 
+/**
+ * @phpstan-type CssClasses array<string, string>
+ * @phpstan-type RenderOptions array{maxLinks?: int|null, cssClasses?: CssClasses, baseUrl?: string|null, showJumpMenu?: bool}
+ */
 class Pagination
 {
     protected int $totalItems;
@@ -37,6 +41,8 @@ class Pagination
      * CSS classes applied to the rendered markup. Defaults match the
      * original hardcoded render() output exactly, so calling code that
      * never touches setCssClasses() sees no visual change.
+     *
+     * @var CssClasses
      */
     protected array $cssClasses = [
         'container'  => '',
@@ -67,7 +73,6 @@ class Pagination
 
     /**
      * @param  int     $page
-     * @return mixed
      */
     private function setCurrentPage(int $page): int
     {
@@ -80,9 +85,6 @@ class Pagination
         return $page;
     }
 
-    /**
-     * @return mixed
-     */
     public function getLimit(): int
     {
         return $this->itemsPerPage;
@@ -211,6 +213,8 @@ class Pagination
      * any of: container, list, item, link, disabled, active, ellipsis,
      * jumpForm, jumpLabel, jumpMenu, jumpButton. Unspecified keys keep
      * their default value.
+     *
+     * @param CssClasses $classes
      */
     public function setCssClasses(array $classes): self
     {
@@ -255,7 +259,7 @@ class Pagination
      *  - 'baseUrl'      (string) overrides setBaseUrl() for this call
      *  - 'showJumpMenu' (bool)  overrides setShowJumpMenu() for this call
      *
-     * @param  array     $options
+     * @param  RenderOptions $options
      * @return string
      */
     public function render(array $options = []): string
@@ -354,6 +358,9 @@ class Pagination
         return $this->buildJumpMenuMarkup($this->cssClasses, $this->baseUrl);
     }
 
+    /**
+     * @param CssClasses $cssClasses
+     */
     private function buildJumpMenuMarkup(array $cssClasses, ?string $baseUrl): string
     {
         $formClass   = $cssClasses['jumpForm'];
@@ -370,6 +377,9 @@ class Pagination
 
         $hiddenInputs = '';
         foreach ($queryParams as $key => $value) {
+            if (! is_scalar($value)) {
+                continue; // nested params (e.g. filter[]=x) can't map to one hidden input
+            }
             $hiddenInputs .= "<input type='hidden' name='" . htmlspecialchars((string) $key) . "' value='" . htmlspecialchars((string) $value) . "'>";
         }
 
@@ -435,7 +445,7 @@ class Pagination
      * to strip it back out.
      *
      * @param  string      $listHtml Pre-rendered HTML for the paginated list itself
-     * @param  array       $options  Same options accepted by render() (maxLinks, cssClasses, baseUrl, showJumpMenu)
+     * @param  RenderOptions $options  Same options accepted by render() (maxLinks, cssClasses, baseUrl, showJumpMenu)
      * @return array{list: string, pagination: string, jumpMenu: string|null, currentPage: int, totalPages: int}
      */
     public function toAjaxPayload(string $listHtml, array $options = []): array

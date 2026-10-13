@@ -1,15 +1,22 @@
 <?php
 namespace Rhapsody\Core;
 
+use Rhapsody\Core\Contracts\ContainerInterface;
 use Rhapsody\Core\Exceptions\HttpException;
 use Rhapsody\Core\Helpers\Path;
 use Rhapsody\Core\Logger;
+use Rhapsody\Core\Support\Env;
 
 class ErrorHandler
 {
     private static bool $registered = false;
-    private static array $config    = [];
 
+    /** @var array<string, mixed> */
+    private static array $config = [];
+
+    /**
+     * @param array<string, mixed> $config
+     */
     public static function register(array $config): void
     {
         if (self::$registered) {
@@ -25,7 +32,10 @@ class ErrorHandler
         self::$registered = true;
     }
 
-    public static function handleError($level, $message, $file, $line)
+    /**
+     * @throws \ErrorException
+     */
+    public static function handleError(int $level, string $message, string $file, int $line): bool
     {
         if (str_contains($message, 'http_response_code()')) {
             return false;
@@ -34,6 +44,8 @@ class ErrorHandler
         if (error_reporting() & $level) {
             throw new \ErrorException($message, 0, $level, $file, $line);
         }
+
+        return true;
     }
 
     public static function handleException(\Throwable $e): void
@@ -68,7 +80,9 @@ class ErrorHandler
 
     private static function logError(\Throwable $e): void
     {
-        $logPath = self::$config['logging']['error_log_path'] ?? __DIR__ . '/../storage/logs/errors.log';
+        $logging = self::$config['logging'] ?? null;
+        $path    = is_array($logging) ? ($logging['error_log_path'] ?? null) : null;
+        $logPath = is_string($path) ? $path : __DIR__ . '/../storage/logs/errors.log';
         $logger  = new Logger($logPath);
         $logger->log(
             sprintf(
@@ -104,9 +118,10 @@ class ErrorHandler
 
         // 1. Try using the container's Twig instance (already configured)
         $twig = null;
-        if (isset($GLOBALS['container']) && $GLOBALS['container']->has(\Twig\Environment::class)) {
+        $container = $GLOBALS['container'] ?? null;
+        if ($container instanceof ContainerInterface && $container->has(\Twig\Environment::class)) {
             try {
-                $twig = $GLOBALS['container']->resolve(\Twig\Environment::class);
+                $twig = $container->resolve(\Twig\Environment::class);
             } catch (\Exception $err) {
                 error_log('Cannot resolve Twig from container: ' . $err->getMessage());
             }
@@ -144,7 +159,7 @@ class ErrorHandler
             $root . '/vendor/arout/rhapsody-core/resources/views/themes', // core fallback
         ];
 
-        $theme       = self::$config['theme'] ?? 'default';
+        $theme       = self::configString('theme', 'default');
         $loaderPaths = [];
         $parentPaths = [];
 
@@ -184,8 +199,8 @@ class ErrorHandler
         try {
             $loader = new \Twig\Loader\FilesystemLoader($loaderPaths);
             $twig   = new \Twig\Environment($loader);
-            $twig->addGlobal('base_url', $_ENV['APP_BASE_URL'] ?? '');
-            $twig->addGlobal('app_env', $_ENV['APP_ENV'] ?? 'production');
+            $twig->addGlobal('base_url', Env::string('APP_BASE_URL'));
+            $twig->addGlobal('app_env', Env::string('APP_ENV', 'production'));
             $twig->addGlobal('config', self::$config);
 
             // --- REGISTER ESSENTIAL TWIG FUNCTIONS ---
@@ -264,7 +279,7 @@ class ErrorHandler
         $bodyMessage = $statusCode === 404
             ? 'The page you requested could not be found.'
             : 'Something went wrong. Please try again later.';
-        $baseUrl = $_ENV['APP_BASE_URL'] ?? '';
+        $baseUrl = Env::string('APP_BASE_URL');
 
         echo "<!DOCTYPE html><html><head><title>{$title}</title><style>body{font-family:sans-serif;text-align:center;padding:50px;}</style></head>";
         echo "<body><h1>{$title}</h1><p>{$bodyMessage}</p>";
@@ -283,6 +298,9 @@ class ErrorHandler
      * worker is a bigger liability than under classic per-request PHP, since
      * it could end up served to whichever client happens to be connected when
      * the worker faults, not necessarily the developer debugging it.
+     *
+     * @param  array<string, mixed> $config
+     * @return array{0: int, 1: string}
      */
     public static function renderErrorContent(\Throwable $e, array $config): array
     {
@@ -295,11 +313,22 @@ class ErrorHandler
 
         $statusCode = ($e instanceof HttpException) ? $e->getStatusCode() : 500;
 
-        return [$statusCode, $content];
+        return [$statusCode, $content === false ? '' : $content];
     }
 
     private static function isDevelopment(): bool
     {
-        return (self::$config['app_env'] ?? 'production') === 'development';
+        return self::configString('app_env', 'production') === 'development';
+    }
+
+    /**
+     * Read a string value from the config, falling back to $default when the
+     * key is missing or holds a non-string value.
+     */
+    private static function configString(string $key, string $default): string
+    {
+        $value = self::$config[$key] ?? null;
+
+        return is_string($value) ? $value : $default;
     }
 }

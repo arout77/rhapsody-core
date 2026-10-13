@@ -171,7 +171,7 @@ return redirect('/dashboard')->with('success', 'Your profile was updated.');</co
     <hr>
 
     <h2>Twig Functions</h2>
-    <p>Two template functions are registered alongside the globals.</p>
+    <p>These template functions are registered alongside the globals.</p>
 
     <h3><code>csrf_field()</code></h3>
     <p>
@@ -184,6 +184,23 @@ return redirect('/dashboard')->with('success', 'Your profile was updated.');</co
     <input type="text" name="subject">
     <button type="submit">Send</button>
 </form>{% endverbatim %}</code></pre>
+    </p>
+
+    <h3><code>image_url()</code></h3>
+    <p>
+    This Twig function is used in conjunction with the <a href="{{ base_url }}/docs/image-processing">image manipulation library</a>. It builds URLs and links to images, and provides resizing, signed URLs, caching and other utilities. This is the recommended way to serve your graphic files, but requires a couple more steps than just pasting a link.
+    </p>
+    <p>
+    If you don't need any of the advanced features of the image library and just want to drop in a quick link, either use the <a href="{{ base_url }}/docs/path">Path helper</a> in your controllers, or <code>{% verbatim %}{{ base_url }}{% endverbatim %}</code> in your view files directly to link to your images.
+    </p>
+    <p>
+        <pre><code class="language-php">// In your controller. Make sure to import Rhapsody\Core\Helpers\Path
+$imgPath = Path::public('images/icons');
+$img = 'user.jpg';
+// Builds the full image url that you can then pass to your view
+$imgUrl = $imgPath . $img;</code></pre>
+        <pre><code class="language-twig">// Or, link to the same image directly in your view file
+&lt;img src="{% verbatim %}{{ base_url }}{% endverbatim %}/public/images/icons/user.jpg"></code></pre>
     </p>
 
     <h3><code>vite_assets(entry)</code></h3>

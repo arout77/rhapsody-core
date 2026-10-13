@@ -47,6 +47,7 @@ use Rhapsody\Core\Services\NotificationService;
 use Rhapsody\Core\Services\RateLimiter;
 use Rhapsody\Core\Services\UrlSigner;
 use Rhapsody\Core\Session;
+use Rhapsody\Core\Support\Env;
 use Rhapsody\Core\Theming\ThemeValidator;
 use Rhapsody\Core\Validator;
 use Rhapsody\Core\View\ViewRenderer;
@@ -82,6 +83,11 @@ $config = require $configPath;
 $container->bind('config', function () use ($config) {
     return $config;
 });
+
+$container->singleton(
+    \Rhapsody\Core\Support\Config::class,
+    fn ($c) => new \Rhapsody\Core\Support\Config($c->get('config'))
+);
 
 // The framework version shown in the debug toolbar and available to CLI
 // commands via $config['app_version'] — same source as the update-check
@@ -124,10 +130,10 @@ $container->singleton(EntityManager::class, function ($container) use ($config, 
 
     $dbParams = [
         'driver'   => 'pdo_mysql',
-        'host'     => $_ENV['DB_HOST'],
-        'user'     => $_ENV['DB_USER'],
-        'password' => $_ENV['DB_PASS'],
-        'dbname'   => $_ENV['DB_NAME'],
+        'host'     => Env::string('DB_HOST'),
+        'user'     => Env::string('DB_USER'),
+        'password' => Env::string('DB_PASS'),
+        'dbname'   => Env::string('DB_NAME'),
         'charset'  => 'utf8mb4',
     ];
 
@@ -274,22 +280,22 @@ $container->singleton(Environment::class, function (Container $c) use ($config, 
         }
     };
     $twig->addGlobal('auth', $auth);
-    $twig->addGlobal('base_url', $_ENV['APP_URL'] . $_ENV['APP_BASE_URL']);
-    $twig->addGlobal('APP_THEME', $_ENV['APP_THEME']);
-    $twig->addGlobal('app_theme', $_ENV['APP_THEME']);
+    $twig->addGlobal('base_url', Env::string('APP_URL') . Env::string('APP_BASE_URL'));
+    $twig->addGlobal('APP_THEME', Env::string('APP_THEME', 'default'));
+    $twig->addGlobal('app_theme', Env::string('APP_THEME', 'default'));
     $twig->addExtension(new \Rhapsody\Core\Twig\StorageExtension());
 
     // Lazy‑loaded flash messages
     $flash = new class {
-        public function __get($name)
+        public function __get(string $name): mixed
         {
             return Session::getFlash($name);
         }
-        public function __isset($name)
+        public function __isset(string $name): bool
         {
             return Session::hasFlash($name);
         }
-    };;;;;;;;;
+    };
 
     $twig->addGlobal('flash', $flash);
 
@@ -320,19 +326,22 @@ $container->bind(\Rhapsody\Core\Contracts\AuthenticatableInterface::class, \App\
 $container->bind(PaymentGatewayInterface::class, function () use ($config) {
     $gatewayType = $config['payment']['gateway'] ?? 'Stripe';
     $currency    = $config['payment']['currency'] ?? 'USD';
-
-    $gateway = Omnipay::create($gatewayType);
-    if (! $gateway) {
-        throw new \RuntimeException("Unsupported payment gateway: \"{$gatewayType}\". Check the PAYMENT_GATEWAY env variable.");
+    
+    try {
+        $gateway = Omnipay::create($gatewayType);
+    } catch (\Throwable $e) {
+        throw new \RuntimeException("Unsupported payment gateway: \"{$gatewayType}\". Check the PAYMENT_GATEWAY env variable.", 0, $e);
     }
 
     // Configure API keys based on the driver
     if ($gatewayType === 'Stripe') {
-        $gateway->setApiKey($_ENV['STRIPE_SECRET_KEY'] ?? '');
+        $gateway->initialize(['apiKey' => $_ENV['STRIPE_SECRET_KEY'] ?? '']);
     } elseif ($gatewayType === 'PayPal_Rest') {
-        $gateway->setClientId($_ENV['PAYPAL_CLIENT_ID'] ?? '');
-        $gateway->setSecret($_ENV['PAYPAL_SECRET'] ?? '');
-        $gateway->setTestMode(filter_var($_ENV['PAYPAL_TEST_MODE'] ?? true, FILTER_VALIDATE_BOOLEAN));
+        $gateway->initialize([
+            'clientId' => $_ENV['PAYPAL_CLIENT_ID'] ?? '',
+            'secret'   => $_ENV['PAYPAL_SECRET'] ?? '',
+            'testMode' => filter_var($_ENV['PAYPAL_TEST_MODE'] ?? true, FILTER_VALIDATE_BOOLEAN),
+        ]);
     }
 
     return new OmnipayGateway($gateway, $currency);
@@ -423,7 +432,7 @@ $container->bind(MakeReactCommand::class, function () use ($basePath) {
     return new MakeReactCommand($basePath);
 });
 
-$container->bind(\Rhapsody\Core\Commands\BuildProxiesCommand::class, function ($c) use ($basePath) {
+$container->bind(\Rhapsody\Core\Commands\BuildProxiesCommand::class, function ($c) {
     return new \Rhapsody\Core\Commands\BuildProxiesCommand;
 });
 
@@ -462,8 +471,8 @@ $moduleRegistry->bootAll();
 // STEP 2.7: LAZY LOADING DECORATOR (web only)
 // =========================================================================
 
-// Only apply lazy loading for web requests (not CLI)
-if (PHP_SAPI !== 'cli') {
+// Web SAPI and RoadRunner workers (CLI, but serving HTTP per request).
+if (PHP_SAPI !== 'cli' || (defined('RHAPSODY_HTTP_WORKER') && RHAPSODY_HTTP_WORKER)) {
     $lazyEnabled = filter_var(
         $_ENV['LAZY_LOADING_ENABLED'] ?? $config['lazy']['enabled'] ?? true,
         FILTER_VALIDATE_BOOLEAN

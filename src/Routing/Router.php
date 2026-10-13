@@ -1,7 +1,6 @@
 <?php
 namespace Rhapsody\Core\Routing;
 
-use Rhapsody\Core\Container;
 use Rhapsody\Core\Contracts\ContainerInterface;
 use Rhapsody\Core\Exceptions\HttpException;
 use Rhapsody\Core\Middleware\AdminMiddleware;
@@ -36,13 +35,13 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
 
     /**
      * A map of middleware keys to their fully qualified class names.
-     * @var array
+     * @var array<string, class-string>
      */
     protected static array $middlewareMap = [];
 
     /**
      * Global middleware runs on every matched request.
-     * @var array
+     * @var list<class-string>
      */
     protected static array $globalMiddleware = [];
 
@@ -52,12 +51,17 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
      */
     protected static ?Route $matchedRoute = null;
 
-    protected static array $namedRoutes = []; // static, not instance
+    /**
+     * Named routes, keyed by name. Static so every Router instance and the
+     * static helpers share one registry.
+     * @var array<string, Route>
+     */
+    protected static array $namedRoutes = [];
 
     /**
      * Set the middleware configuration from the application.
      *
-     * @param array $config Associative array with 'global' and 'map' keys.
+     * @param array{global?: list<class-string>, map?: array<string, class-string>} $config The application's middleware configuration.
      */
     public static function setMiddlewareConfig(array $config): void
     {
@@ -87,7 +91,7 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
     public function registerNamedRoute(Route $route): void
     {
         if ($name = $route->getName()) {
-            $this->namedRoutes[$name] = $route;
+            self::addNamedRoute($name, $route);
         }
     }
 
@@ -116,7 +120,7 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
      * executing global and route-specific middleware, and returning a Response.
      *
      * @param  Request    $request
-     * @param  Container  $container
+     * @param  ContainerInterface $container
      * @return Response
      */
     public static function dispatch(Request $request, ContainerInterface $container): Response
@@ -134,16 +138,11 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
 
                 // 1. RUN GLOBAL MIDDLEWARE
                 foreach (self::$globalMiddleware as $middlewareClass) {
-                    $middlewareInstance = $container->resolve($middlewareClass);
-                    $resolvedClass      = get_class($middlewareInstance);
-
-                    MiddlewareTracer::start($resolvedClass, 'global');
-                    $response = $middlewareInstance->handle($request, $route);
-                    MiddlewareTracer::stop();
+                    $response = self::runMiddleware($container, $middlewareClass, $request, $route, 'global');
 
                     // A middleware that returns a Response wants to short-circuit
                     // the request (e.g. rate-limited, blocked, forbidden).
-                    if ($response instanceof Response) {
+                    if ($response !== null) {
                         return $response;
                     }
                 }
@@ -167,14 +166,9 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
                         ));
                     }
 
-                    $middlewareInstance = $container->resolve($middlewareClass);
-                    $resolvedClass      = get_class($middlewareInstance);
+                    $response = self::runMiddleware($container, $middlewareClass, $request, $route, 'route');
 
-                    MiddlewareTracer::start($resolvedClass, 'route', $route->getPath());
-                    $response = $middlewareInstance->handle($request, $route);
-                    MiddlewareTracer::stop();
-
-                    if ($response instanceof Response) {
+                    if ($response !== null) {
                         return $response;
                     }
                 }
@@ -185,6 +179,40 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
         }
 
         return self::handleNotFound();
+    }
+
+    /**
+     * Resolves a middleware from the container and runs its handle() method.
+     *
+     * Middleware classes are duck-typed (no shared interface), so the
+     * handle() contract is verified here once instead of at every call site.
+     *
+     * @param  'global'|'route' $scope Which stack the middleware belongs to (for the debug toolbar).
+     * @return Response|null    The short-circuit Response, or null to continue the request.
+     */
+    protected static function runMiddleware(
+        ContainerInterface $container,
+        string $middlewareClass,
+        Request $request,
+        Route $route,
+        string $scope
+    ): ?Response {
+        $middleware = $container->resolve($middlewareClass);
+
+        if (! is_object($middleware) || ! method_exists($middleware, 'handle')) {
+            throw new \RuntimeException(sprintf('Middleware "%s" must define a handle() method.', $middlewareClass));
+        }
+
+        if ($scope === 'route') {
+            MiddlewareTracer::start($middleware::class, 'route', $route->getPath());
+        } else {
+            MiddlewareTracer::start($middleware::class, 'global');
+        }
+
+        $response = $middleware->handle($request, $route);
+        MiddlewareTracer::stop();
+
+        return $response instanceof Response ? $response : null;
     }
 
     /**
@@ -201,7 +229,7 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
      *
      * @param  Route      $route
      * @param  Request    $request
-     * @param  Container  $container The application's service container.
+     * @param  ContainerInterface $container The application's service container.
      * @return Response
      */
     protected static function execute(Route $route, Request $request, ContainerInterface $container): Response
@@ -270,6 +298,8 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
 
     /**
      * Returns all registered routes.
+     *
+     * @return array<int, Route>
      */
     public static function getRoutes(): array
     {
@@ -278,6 +308,8 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
 
     /**
      * Sets the route collection (useful for caching).
+     *
+     * @param array<int, Route> $routes
      */
     public static function setRoutes(array $routes): void
     {
@@ -293,7 +325,7 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
      * Generate a URL from a named route.
      *
      * @param  string     $name   The route name.
-     * @param  array      $params Parameters to replace in the path (e.g., ['id' => 123]).
+     * @param  array<string, string|int> $params Parameters to replace in the path (e.g., ['id' => 123]).
      * @throws \Exception If the route name is not found.
      * @return string
      */
@@ -318,7 +350,9 @@ class Router implements \Rhapsody\Core\Contracts\RouterInterface
         }
 
         // Prepend base path if defined and not already present
-        $basePath = $_ENV['APP_URL'] . $_ENV['APP_BASE_URL'];
+        $appUrl   = $_ENV['APP_URL'] ?? '';
+        $baseUrl  = $_ENV['APP_BASE_URL'] ?? '';
+        $basePath = (is_string($appUrl) ? $appUrl : '') . (is_string($baseUrl) ? $baseUrl : '');
         if ($basePath && strpos($path, $basePath) !== 0) {
             $path = rtrim($basePath, '/') . '/' . ltrim($path, '/');
         }

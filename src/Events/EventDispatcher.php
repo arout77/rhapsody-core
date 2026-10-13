@@ -14,10 +14,14 @@ class EventDispatcher implements EventDispatcherInterface
      */
     protected const MAX_DISPATCH_DEPTH = 8;
 
-    /** @var array<string, array<int, string|callable>> */
+    /**
+     * @var array<string, array<int, string|callable>>
+     */
     protected array $listeners = [];
 
-    /** Current nesting level of dispatch() calls. */
+    /**
+     * Current nesting level of dispatch() calls.
+     */
     protected int $depth = 0;
 
     public function __construct(

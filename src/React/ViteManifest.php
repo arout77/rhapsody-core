@@ -1,7 +1,7 @@
 <?php
 namespace Rhapsody\Core\React;
 
-use Rhapsody\Core\Helpers\Path;
+use Rhapsody\Core\Support\Fs;
 
 /**
  * ViteManifest
@@ -11,10 +11,12 @@ use Rhapsody\Core\Helpers\Path;
  * In development (VITE_DEV_SERVER=true) all assets are served by the Vite
  * dev server with full HMR support.  In production, asset URLs are resolved
  * from the manifest.json Vite writes into public/build/.
+ *
+ * @phpstan-type ViteChunk array{file: string, css?: list<string>, imports?: list<string>}
  */
 class ViteManifest
 {
-    /** @var array<string, mixed>|null Cached manifest data */
+    /** @var array<string, ViteChunk>|null Cached manifest data */
     private static ?array $manifest = null;
 
     /**
@@ -39,7 +41,7 @@ class ViteManifest
      * Resolve the public URL of a single asset in production.
      *
      * @param string $entry The entry key as it appears in manifest.json.
-     * @return string Absolute public path (e.g. "/build/assets/app-DsRmGxyz.js")
+     * @return string Public URL (APP_URL + APP_BASE_URL + "/public/build/assets/app-DsRmGxyz.js")
      * @throws \RuntimeException if the manifest or the entry cannot be found.
      */
     public static function asset(string $entry): string
@@ -53,7 +55,7 @@ class ViteManifest
             );
         }
 
-        return self::getBasePath() . '/public/build/' . $manifest[$entry]['file'];
+        return self::buildUrl($manifest[$entry]['file']);
     }
 
     // -------------------------------------------------------------------------
@@ -96,26 +98,25 @@ class ViteManifest
             );
         }
 
-        $chunk    = $manifest[$entry];
-        $tags     = '';
-        $basePath = Path::root();
+        $chunk = $manifest[$entry];
+        $tags  = '';
 
         // CSS files generated for this entry
         foreach ($chunk['css'] ?? [] as $css) {
-            $url   = htmlspecialchars($basePath . '/public/build/' . $css, ENT_QUOTES, 'UTF-8');
+            $url   = htmlspecialchars(self::buildUrl($css), ENT_QUOTES, 'UTF-8');
             $tags .= '<link rel="stylesheet" href="' . $url . '">' . "\n    ";
         }
 
         // Import-mapped preload hints for better LCP
         foreach ($chunk['imports'] ?? [] as $importKey) {
             if (isset($manifest[$importKey]['file'])) {
-                $url   = htmlspecialchars($_ENV['APP_URL'] . $_ENV['APP_BASE_URL'] . '/public/build/' . $manifest[$importKey]['file'], ENT_QUOTES, 'UTF-8');
+                $url   = htmlspecialchars(self::buildUrl($manifest[$importKey]['file']), ENT_QUOTES, 'UTF-8');
                 $tags .= '<link rel="modulepreload" href="' . $url . '">' . "\n    ";
             }
         }
 
         // The main entry script
-        $src  = htmlspecialchars($_ENV['APP_URL'] . $_ENV['APP_BASE_URL'] . '/public/build/' . $chunk['file'], ENT_QUOTES, 'UTF-8');
+        $src  = htmlspecialchars(self::buildUrl($chunk['file']), ENT_QUOTES, 'UTF-8');
         $tags .= '<script type="module" src="' . $src . '"></script>';
 
         return $tags;
@@ -128,7 +129,7 @@ class ViteManifest
      * Older Vite 4 builds write to public/build/manifest.json.
      * We check both to stay compatible.
      *
-     * @return array<string, mixed>
+     * @return array<string, ViteChunk>
      * @throws \RuntimeException
      */
     private static function load(): array
@@ -137,7 +138,10 @@ class ViteManifest
             return self::$manifest;
         }
 
-        $root = self::env('APP_BASE_PATH') ?: ($_ENV['APP_BASE_PATH'] ?? getcwd());
+        $root = self::env('APP_BASE_PATH');
+        if ($root === false || $root === '') {
+            $root = Fs::cwd();
+        }
 
         // Vite 5 path (preferred)
         $v5Path = $root . '/public/build/.vite/manifest.json';
@@ -154,12 +158,13 @@ class ViteManifest
             );
         }
 
-        $data = json_decode((string) file_get_contents($path), true);
+        $data = json_decode(Fs::read($path), true);
 
         if (! is_array($data)) {
             throw new \RuntimeException("[Rhapsody/React] Failed to parse Vite manifest at {$path}.");
         }
 
+        /** @var array<string, ViteChunk> $data */
         self::$manifest = $data;
         return self::$manifest;
     }
@@ -171,16 +176,11 @@ class ViteManifest
     }
 
     /**
-     * Get the base path from environment (APP_BASE_URL) for subdirectory deployments.
+     * Public URL of a file inside public/build/ (APP_URL + APP_BASE_URL + path).
      */
-    private static function getBasePath(): string
+    private static function buildUrl(string $file): string
     {
-        $base = Path::root();
-        // Ensure it starts with / and ends without /
-        if (! empty($base) && $base !== '/') {
-            return rtrim($base, '/');
-        }
-        return '';
+        return (string) self::env('APP_URL') . (string) self::env('APP_BASE_URL') . '/public/build/' . $file;
     }
 
     /**
@@ -188,6 +188,8 @@ class ViteManifest
      */
     private static function env(string $key): string | false
     {
-        return $_ENV[$key] ?? getenv($key);
+        $value = $_ENV[$key] ?? getenv($key);
+
+        return is_string($value) ? $value : false;
     }
 }

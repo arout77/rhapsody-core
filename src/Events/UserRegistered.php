@@ -2,7 +2,7 @@
 namespace Rhapsody\Core\Events;
 
 use Rhapsody\Core\Entities\User;
-use Rhapsody\Core\Event;
+use Rhapsody\Core\Events\Event;
 
 /**
  * This event is dispatched when a new user successfully registers.

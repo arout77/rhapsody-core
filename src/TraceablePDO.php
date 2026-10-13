@@ -5,13 +5,14 @@ use PDO;
 
 class TraceablePDO extends PDO
 {
+    /** @var list<array<string, mixed>> */
     private static array $log = [];
 
     /**
      * @param string $dsn
-     * @param string $username
-     * @param nullstring $password
-     * @param array $options
+     * @param string|null $username
+     * @param string|null $password
+     * @param array<int, mixed>|null $options
      */
     public function __construct(string $dsn, ?string $username = null, ?string $password = null, ?array $options = null)
     {
@@ -20,9 +21,8 @@ class TraceablePDO extends PDO
 
     /**
      * @param string $query
-     * @param int $fetchMode
-     * @param null $fetch_mode_args
-     * @return mixed
+     * @param int|null $fetchMode
+     * @param mixed ...$fetch_mode_args
      */
     public function query(string $query, ?int $fetchMode = null, ...$fetch_mode_args): \PDOStatement  | false
     {
@@ -42,8 +42,7 @@ class TraceablePDO extends PDO
 
     /**
      * @param string $query
-     * @param array $options
-     * @return mixed
+     * @param array<int, mixed> $options
      */
     public function prepare(string $query, array $options = []): \PDOStatement  | false
     {
@@ -61,11 +60,17 @@ class TraceablePDO extends PDO
         return $statement;
     }
 
+    /**
+     * @return list<array<string, mixed>>
+     */
     public static function getQueryLog(): array
     {
         return self::$log;
     }
 
+    /**
+     * @return array{file: string, line: int}|null
+     */
     private function findQueryCaller(): ?array
     {
         $trace       = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
@@ -91,7 +96,7 @@ class TraceablePDO extends PDO
             // The first file that is not a core DB class is our caller
             return [
                 'file' => str_replace(str_replace('\\', '/', $projectRoot) . '/', '', $file),
-                'line' => $entry['line'],
+                'line' => $entry['line'] ?? 0,
             ];
         }
         return null;

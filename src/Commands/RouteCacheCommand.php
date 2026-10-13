@@ -8,8 +8,6 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class RouteCacheCommand extends Command
 {
-    protected static $defaultName = 'route:cache';
-
     public function __construct(protected string $basePath)
     {
         parent::__construct();

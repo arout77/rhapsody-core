@@ -7,12 +7,13 @@ use Rhapsody\Core\BaseController;
 use Rhapsody\Core\Entities\User;
 use Rhapsody\Core\Events\EventDispatcher;
 use Rhapsody\Core\Events\UserRegistered;
-use Rhapsody\Core\Helpers\Recaptcha;
 use Rhapsody\Core\Mailer;
 use Rhapsody\Core\Request;
 use Rhapsody\Core\Response;
 use Rhapsody\Core\Session;
 use Rhapsody\Core\Validator;
+use Rhapsody\Core\Helpers\Recaptcha;
+use Rhapsody\Core\Support\Env;
 use Twig\Environment;
 
 class AuthController extends BaseController implements AuthenticatableInterface
@@ -57,20 +58,19 @@ class AuthController extends BaseController implements AuthenticatableInterface
      */
     public function login(Request $request): Response
     {
-        $data = $request->getBody();
-
         if (Recaptcha::isEnabled()) {
-            $token = (string) $request->input('g-recaptcha-response', '');
-            $ip    = $request->getServerParams()['REMOTE_ADDR'] ?? null;
+            $token      = $request->string('g-recaptcha-response');
+            $remoteAddr = $request->getServerParams()['REMOTE_ADDR'] ?? null;
+            $ip         = is_string($remoteAddr) ? $remoteAddr : null;
 
             if (! Recaptcha::verify($token, $ip)) {
                 return redirect('/login')->with('error', 'Please confirm you are not a robot.');
             }
         }
 
-        $user = $this->em->getRepository(User::class)->findOneBy(['email' => $data['email']]);
+        $user = $this->em->getRepository(User::class)->findOneBy(['email' => $request->string('email')]);
 
-        if ($user && password_verify($data['password'], $user->getPassword())) {
+        if ($user && password_verify($request->string('password'), $user->getPassword())) {
             Session::regenerate();
             Session::set('user_id', $user->getUserId());
             Session::set('user_name', $user->getName());
@@ -107,10 +107,10 @@ class AuthController extends BaseController implements AuthenticatableInterface
         if ($this->validator->validate($data, $rules)) {
             // Create a new User entity
             $user = new User();
-            $user->setName($data['name']);
-            $user->setEmail($data['email']);
+            $user->setName($request->string('name'));
+            $user->setEmail($request->string('email'));
             // Password is encrypted in entity
-            $user->setPassword($data['password']);
+            $user->setPassword($request->string('password'));
 
             try {
                 // Tell Doctrine to save the user
@@ -177,7 +177,7 @@ class AuthController extends BaseController implements AuthenticatableInterface
             ]);
         }
 
-        $email = $data['email'];
+        $email = $request->string('email');
         $user  = $this->em->getRepository(User::class)->findOneBy(['email' => $email]);
 
         // Only actually send/store a token if the account exists, but always
@@ -200,8 +200,8 @@ class AuthController extends BaseController implements AuthenticatableInterface
                 [$email, $hashedToken]
             );
 
-            $resetUrl = rtrim($_ENV['APP_URL'] ?? '', '/')
-                . ($_ENV['APP_BASE_URL'] ?? '')
+            $resetUrl = rtrim(Env::string('APP_URL'), '/')
+                . Env::string('APP_BASE_URL')
                 . '/reset-password/' . $rawToken;
 
             try {
@@ -252,11 +252,12 @@ class AuthController extends BaseController implements AuthenticatableInterface
         if (! $this->validator->validate($data, $rules)) {
             return $this->view('auth/reset-password.twig', [
                 'errors' => $this->validator->getErrors(),
-                'token'  => $data['token'] ?? '',
+                'token'  => $request->string('token'),
             ]);
         }
 
-        $hashedToken = hash('sha256', $data['token']);
+        $token       = $request->string('token');
+        $hashedToken = hash('sha256', $token);
         $conn        = $this->em->getConnection();
 
         $resetRow = $conn->fetchAssociative(
@@ -267,7 +268,7 @@ class AuthController extends BaseController implements AuthenticatableInterface
         if (! $resetRow) {
             return $this->view('auth/reset-password.twig', [
                 'errors' => ['token' => ['This password reset link is invalid or has expired. Please request a new one.']],
-                'token'  => $data['token'],
+                'token'  => $token,
             ]);
         }
 
@@ -279,7 +280,7 @@ class AuthController extends BaseController implements AuthenticatableInterface
             return redirect('/forgot-password')->with('error', 'We could not find an account for this reset link.');
         }
 
-        $user->setPassword($data['password']);
+        $user->setPassword($request->string('password'));
         $this->em->flush();
 
         // Invalidate the token (and any others for this email) now that it's used.

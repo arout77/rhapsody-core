@@ -11,7 +11,7 @@ interface ListenerInterface
     /**
      * Handle the event.
      *
-     * @param Event $event The event object containing relevant data.
+     * @param  Event  $event The event object containing relevant data.
      * @return void
      */
     public function handle(Event $event): void;

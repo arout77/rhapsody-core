@@ -5,12 +5,16 @@ class Route
 {
     protected string $method;
     protected string $path;
-    protected $callback;
+    protected mixed $callback;
+
+    /** @var list<string> */
     protected array $middleware = [];
-    protected array $params     = [];
+
+    /** @var array<int|string, string> */
+    protected array $params = [];
     protected ?string $name     = null;
 
-    public function __construct(string $method, string $path, $callback)
+    public function __construct(string $method, string $path, mixed $callback)
     {
         $this->method   = $method;
         $this->path     = $path;
@@ -27,16 +31,18 @@ class Route
         return $this->path;
     }
 
-    public function getCallback()
+    public function getCallback(): mixed
     {
         return $this->callback;
     }
 
+    /** @return list<string> */
     public function getMiddleware(): array
     {
         return $this->middleware;
     }
 
+    /** @return array<int|string, string> */
     public function getParams(): array
     {
         return $this->params;
@@ -48,6 +54,7 @@ class Route
         return $this;
     }
 
+    /** @param array<int|string, string> $params */
     public function setParams(array $params): self
     {
         $this->params = $params;

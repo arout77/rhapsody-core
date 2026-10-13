@@ -5,6 +5,9 @@ use PHPUnit\Framework\Assert;
 
 class TestResponse
 {
+    /**
+     * @param array<string, mixed> $headers
+     */
     public function __construct(
         public readonly int $status,
         public readonly string $content,

@@ -23,11 +23,12 @@ class Toolbar
             // Also compute N+1 count (optional, but helps the panel)
             $sqlCounts = [];
             foreach ($this->data['queries'] as &$q) {
-                $sql = $q['sql'] ?? '';
+                $rawSql = $q['sql'] ?? '';
+                $sql    = is_string($rawSql) ? $rawSql : '';
                 // Same normalization as Debug::end(), so both panels agree.
-                $normalized               = preg_replace('/\b\d+\b/', '?', $sql);
-                $normalized               = preg_replace("/'[^']*'/", '?', $normalized);
-                $normalized               = preg_replace('/\s+/', ' ', $normalized);
+                $normalized               = preg_replace('/\b\d+\b/', '?', $sql) ?? $sql;
+                $normalized               = preg_replace("/'[^']*'/", '?', $normalized) ?? $normalized;
+                $normalized               = preg_replace('/\s+/', ' ', $normalized) ?? $normalized;
                 $sqlCounts[$normalized][] = &$q;
             }
             unset($q);
@@ -96,10 +97,11 @@ class Toolbar
             $requestHtml .= '<tr><td class="label">Controller</td><td class="value">' . htmlspecialchars($routeData['controller'] ?? 'N/A', ENT_QUOTES, 'UTF-8') . '</td></tr>';
             $requestHtml .= '<tr><td class="label">Action</td><td class="value">' . htmlspecialchars($routeData['action'] ?? 'N/A', ENT_QUOTES, 'UTF-8') . '</td></tr>';
             if (! empty($routeData['params'])) {
-                $params   = is_array($routeData['params']) ? $routeData['params'] : json_decode($routeData['params'], true);
-                $paramStr = '';
-                foreach ($params as $key => $val) {
-                    $paramStr .= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') . ': <span class="text-cyan-300">' . htmlspecialchars($val, ENT_QUOTES, 'UTF-8') . '</span> ';
+                $rawParams = $routeData['params'];
+                $params    = is_array($rawParams) ? $rawParams : (is_string($rawParams) ? json_decode($rawParams, true) : []);
+                $paramStr  = '';
+                foreach (is_array($params) ? $params : [] as $key => $val) {
+                    $paramStr .= htmlspecialchars((string) $key, ENT_QUOTES, 'UTF-8') . ': <span class="text-cyan-300">' . htmlspecialchars(is_scalar($val) ? (string) $val : '', ENT_QUOTES, 'UTF-8') . '</span> ';
                 }
                 $requestHtml .= '<tr><td class="label">Parameters</td><td class="value">' . $paramStr . '</td></tr>';
             }
@@ -150,7 +152,7 @@ class Toolbar
             $decoded      = json_decode($body, true);
             if (json_last_error() === JSON_ERROR_NONE && $decoded !== null) {
                 $pretty       = json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-                $requestHtml .= '<pre class="bg-gray-900 text-gray-300 p-3 rounded border border-gray-700 text-sm font-mono">' . htmlspecialchars($pretty, ENT_QUOTES, 'UTF-8') . '</pre>';
+                $requestHtml .= '<pre class="bg-gray-900 text-gray-300 p-3 rounded border border-gray-700 text-sm font-mono">' . htmlspecialchars((string) $pretty, ENT_QUOTES, 'UTF-8') . '</pre>';
             } else {
                 $requestHtml .= '<pre class="bg-gray-900 text-gray-300 p-3 rounded border border-gray-700 text-sm font-mono">' . htmlspecialchars($body, ENT_QUOTES, 'UTF-8') . '</pre>';
             }
@@ -412,7 +414,7 @@ HTML;
     /**
      * Format a session value for display (strings, arrays, objects).
      */
-    private function formatSessionValue($value): string
+    private function formatSessionValue(mixed $value): string
     {
         if (is_array($value)) {
             if (empty($value)) {
@@ -434,7 +436,7 @@ HTML;
         if (is_object($value)) {
             return '<span class="text-yellow-400">' . get_class($value) . ' object</span>';
         }
-        return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+        return htmlspecialchars(is_scalar($value) ? (string) $value : '', ENT_QUOTES, 'UTF-8');
     }
 
     /**
@@ -449,7 +451,7 @@ HTML;
         $html = '';
         foreach ($queries as $query) {
             $sql         = htmlspecialchars($query['sql'], ENT_QUOTES, 'UTF-8');
-            $params      = isset($query['params']) ? htmlspecialchars(json_encode($query['params']), ENT_QUOTES, 'UTF-8') : '';
+            $params      = isset($query['params']) ? htmlspecialchars((string) json_encode($query['params']), ENT_QUOTES, 'UTF-8') : '';
             $time        = isset($query['executionMS']) ? round($query['executionMS'] * 1000, 2) : '0';
             $caller      = isset($query['caller']['file']) ? $query['caller']['file'] . ':' . ($query['caller']['line'] ?? '-') : 'N/A';
             $isNPlusOne  = isset($query['is_n_plus_1']) && $query['is_n_plus_1'];
@@ -603,7 +605,7 @@ HTML;
     /**
      * Format an environment variable value, masking sensitive keys.
      */
-    private function formatEnvValue(string $key, $value): string
+    private function formatEnvValue(string $key, mixed $value): string
     {
         $sensitivePatterns = [
             'PASSWORD', 'SECRET', 'KEY', 'TOKEN', 'SALT', 'HASH',
@@ -635,7 +637,7 @@ HTML;
             return '<span class="text-gray-400">(array)</span>';
         }
 
-        return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+        return htmlspecialchars(is_scalar($value) ? (string) $value : '', ENT_QUOTES, 'UTF-8');
     }
 
     /**

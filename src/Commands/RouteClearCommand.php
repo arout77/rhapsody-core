@@ -7,18 +7,13 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class RouteClearCommand extends Command
 {
-    /**
-     * @var string
-     */
-    protected static $defaultName = 'route:clear';
-
     protected function configure(): void
     {
         $this->setName('route:clear')->setDescription('Remove the route cache file.');
     }
 
     /**
-     * @param InputInterface $input
+     * @param InputInterface  $input
      * @param OutputInterface $output
      */
     protected function execute(InputInterface $input, OutputInterface $output): int

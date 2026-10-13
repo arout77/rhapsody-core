@@ -1,9 +1,7 @@
 <?php
 namespace Rhapsody\Core\Events;
 
-use Rhapsody\Core\Events\Event;
-
-class PaymentSucceededEvent extends Event
+class PaymentSucceededEvent
 {
     public function __construct(
         public readonly string $transactionId,

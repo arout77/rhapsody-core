@@ -306,8 +306,10 @@ class Container implements ContainerInterface
      *
      * Alias for resolve().
      *
-     * @param  string $id The abstract name to resolve
-     * @return mixed  The resolved instance
+     * @template T of object
+     *
+     * @param  class-string<T>|string $id The abstract name to resolve
+     * @return ($id is class-string<T> ? T : mixed) The resolved instance
      */
     public function get(string $id): mixed
     {
@@ -323,6 +325,17 @@ class Container implements ContainerInterface
     public function has(string $abstract): bool
     {
         return isset($this->bindings[$abstract]);
+    }
+
+    /**
+     * Lists every abstract name currently bound in the container, without
+     * exposing the binding closures themselves.
+     *
+     * @return list<string>
+     */
+    public function boundAbstracts(): array
+    {
+        return array_keys($this->bindings);
     }
 
     /**
@@ -348,9 +361,11 @@ class Container implements ContainerInterface
      * $userService = $container->resolve(UserService::class);
      * // UserService dependencies: LoggerInterface, UserRepositoryInterface
      * // Both are resolved recursively
-     * @param  string     $abstract The class/abstract name to resolve
+     * @template T of object
+     *
+     * @param  class-string<T>|string $abstract The class/abstract name to resolve
      * @throws \Exception If circular dependency, non-instantiable class, or unresolvable parameter
-     * @return mixed      The resolved instance
+     * @return ($abstract is class-string<T> ? T : mixed) The resolved instance
      */
     public function resolve(string $abstract): mixed
     {
@@ -402,7 +417,9 @@ class Container implements ContainerInterface
 
         try {
             // --- Reflection-based instantiation ---
-            $reflector = new ReflectionClass($abstract);
+            /** @var class-string $class */
+            $class     = $abstract;
+            $reflector = new ReflectionClass($class);
             if (! $reflector->isInstantiable()) {
                 throw new \Exception("Class {$abstract} is not instantiable.");
             }
@@ -456,14 +473,14 @@ class Container implements ContainerInterface
      * // Returns: [Logger instance, Config instance, false]
      * @param  array<ReflectionParameter> $parameters The constructor parameters
      * @throws \Exception                 If a parameter cannot be resolved
-     * @return array                      Resolved dependency instances
+     * @return list<mixed>                 Resolved dependency instances
      */
     protected function resolveDependencies(array $parameters): array
     {
         $dependencies = [];
         foreach ($parameters as $parameter) {
             $type = $parameter->getType();
-            if ($type && ! $type->isBuiltin()) {
+            if ($type instanceof \ReflectionNamedType && ! $type->isBuiltin()) {
                 // Type is a class/interface → resolve it
                 $dependencies[] = $this->resolve($type->getName());
             } elseif ($parameter->isDefaultValueAvailable()) {

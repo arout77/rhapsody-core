@@ -15,6 +15,12 @@ class OmnipayGateway implements PaymentGatewayInterface
         $this->defaultCurrency = $defaultCurrency;
     }
 
+    /**
+     * @param  float|int|string     $amount        Amount in the gateway's major currency unit.
+     * @param  string               $paymentMethod Payment token / method identifier.
+     * @param  array<string, mixed> $options
+     * @return array<string, mixed>
+     */
     public function charge($amount, $paymentMethod, array $options = []): array
     {
         $currency = $options['currency'] ?? $this->defaultCurrency;
@@ -57,14 +63,38 @@ class OmnipayGateway implements PaymentGatewayInterface
         ];
     }
 
+    /**
+     * @param  array<string, mixed> $data
+     * @throws \BadMethodCallException If the configured gateway has no customer support.
+     * @throws \RuntimeException       If the gateway returns no customer reference.
+     */
     public function createCustomer(array $data): string
     {
-        // Logic to create a customer via Omnipay (e.g., Stripe/PayPal)
-        $response = $this->gateway->createCustomer($data)->send();
+        // Customer management isn't part of Omnipay's GatewayInterface; only
+        // some drivers (e.g. Stripe) implement it.
+        if (! method_exists($this->gateway, 'createCustomer')) {
+            throw new \BadMethodCallException(sprintf(
+                'Gateway "%s" does not support customer creation.',
+                $this->gateway->getName()
+            ));
+        }
 
-        return $response->getCustomerReference();
+        /** @var \Omnipay\Common\Message\RequestInterface $request */
+        $request  = $this->gateway->createCustomer($data);
+        $response = $request->send();
+
+        $reference = method_exists($response, 'getCustomerReference') ? $response->getCustomerReference() : null;
+        if (! is_string($reference) || $reference === '') {
+            throw new \RuntimeException('The payment gateway did not return a customer reference.');
+        }
+
+        return $reference;
     }
 
+    /**
+     * @param  float|int|string|null $amount Null refunds the full amount.
+     * @return array<string, mixed>
+     */
     public function refund(string $transactionId, $amount = null): array
     {
         $params = ['transactionReference' => $transactionId];

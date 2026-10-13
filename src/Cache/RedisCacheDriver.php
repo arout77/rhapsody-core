@@ -10,15 +10,10 @@ class RedisCacheDriver implements CacheInterface
      */
     public function __construct(protected RedisClient $redis)
     {}
-    /**
-     * @param string $key
-     * @param $default
-     * @return mixed
-     */
-    public function get(string $key, $default = null)
+    public function get(string $key, mixed $default = null): mixed
     {
         $value = $this->redis->get($key);
-        if ($value === null || $value === false) {
+        if ($value === null) {
             return $default;
         }
         $decoded = json_decode($value, true);
@@ -26,13 +21,11 @@ class RedisCacheDriver implements CacheInterface
     }
 
     /**
-     * @param string $key
-     * @param $value
-     * @param int $minutes
+     * @throws \JsonException If the value cannot be JSON-encoded.
      */
-    public function put(string $key, $value, int $minutes): void
+    public function put(string $key, mixed $value, int $minutes): void
     {
-        $this->redis->setex($key, $minutes * 60, json_encode($value));
+        $this->redis->setex($key, $minutes * 60, json_encode($value, JSON_THROW_ON_ERROR));
     }
 
     /**

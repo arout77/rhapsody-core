@@ -30,7 +30,7 @@ class BaseAiController extends BaseController
 
     public function generate(Request $request): Response
     {
-        $prompt = trim((string) $request->input('prompt'));
+        $prompt = trim($request->string('prompt'));
         if ($prompt === '') {
             return $this->json(['error' => 'A "prompt" is required.'], 400);
         }
@@ -53,27 +53,31 @@ class BaseAiController extends BaseController
 
     public function chat(Request $request): Response
     {
-        $messages = $request->input('messages');
+        $messages = $request->array('messages');
 
-        if (! is_array($messages) || empty($messages)) {
+        if (empty($messages)) {
             return $this->json(['error' => 'A non-empty "messages" array is required.'], 400);
         }
 
+        $normalized = [];
         foreach ($messages as $message) {
-            $role    = $message['role'] ?? null;
-            $content = trim((string) ($message['content'] ?? ''));
+            $role       = is_array($message) ? ($message['role'] ?? null) : null;
+            $rawContent = is_array($message) ? ($message['content'] ?? '') : '';
+            $content    = is_scalar($rawContent) ? trim((string) $rawContent) : '';
 
-            if (! in_array($role, ['user', 'assistant'], true) || $content === '') {
+            if (($role !== 'user' && $role !== 'assistant') || $content === '') {
                 return $this->json([
                     'error' => 'Each message must have a "role" of "user" or "assistant" and non-empty "content".',
                 ], 400);
             }
+
+            $normalized[] = ['role' => $role, 'content' => $content];
         }
 
         $options = $this->extractOptions($request);
 
         try {
-            $response = $this->ai->generateChatContent($messages, $options);
+            $response = $this->ai->generateChatContent($normalized, $options);
         } catch (AiException $e) {
             return $this->respondToAiException($e);
         }
@@ -87,14 +91,30 @@ class BaseAiController extends BaseController
     }
 
     /**
-     * @return array<string, mixed>
+     * Pull the supported generation options out of the request. Numeric strings
+     * (as sent by HTML forms) are converted; anything invalid is dropped.
+     *
+     * @return array{temperature?: float|int, max_tokens?: int}
      */
     protected function extractOptions(Request $request): array
     {
-        return array_filter([
-            'temperature' => $request->input('temperature'),
-            'max_tokens'  => $request->input('max_tokens'),
-        ], fn ($v) => $v !== null);
+        $options = [];
+
+        $temperature = $request->input('temperature');
+        if (is_int($temperature) || is_float($temperature)) {
+            $options['temperature'] = $temperature;
+        } elseif (is_string($temperature) && is_numeric($temperature)) {
+            $options['temperature'] = (float) $temperature;
+        }
+
+        $maxTokens = $request->input('max_tokens');
+        if (is_int($maxTokens)) {
+            $options['max_tokens'] = $maxTokens;
+        } elseif (is_string($maxTokens) && filter_var($maxTokens, FILTER_VALIDATE_INT) !== false) {
+            $options['max_tokens'] = (int) $maxTokens;
+        }
+
+        return $options;
     }
 
     protected function respondToAiException(AiException $e): Response

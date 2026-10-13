@@ -9,19 +9,25 @@ class Database
 {
     private static ?Database $instance = null;
     private ?PDO $connection           = null;
-    private array $config;
 
+    /** @var array<mixed> */
+    private array $dbConfig;
+
+    /**
+     * @param array<string, mixed> $config
+     */
     private function __construct(array $config)
     {
         // Maintain config validation to match your environment configuration structure.
         // Note: we validate eagerly (fail fast on obviously missing config) but we do
         // NOT open the actual PDO connection here — that's deferred to getConnection()
         // so that pages/requests which never touch the database don't require one.
-        if (empty($config['database'])) {
+        $database = $config['database'] ?? null;
+        if (! is_array($database) || $database === []) {
             throw new Exception("Database configuration parameters are missing. Enter your credentials in <root directory> .env file");
         }
 
-        $this->config = $config;
+        $this->dbConfig = $database;
     }
 
     /**
@@ -29,16 +35,16 @@ class Database
      */
     private function connect(): PDO
     {
-        $dbConfig = $this->config['database'];
+        $dbConfig = $this->dbConfig;
 
         // Detect the target driver, defaulting to 'mysql' to ensure backward compatibility
-        $driver = $dbConfig['driver'] ?? 'mysql';
+        $driver = self::option($dbConfig, 'driver', 'mysql');
 
         // Dynamically build the driver-specific connection string (DSN)
         $dsn = $this->buildDsn($dbConfig, $driver);
 
-        $username = $dbConfig['user'] ?? null;
-        $password = $dbConfig['password'] ?? null;
+        $username = self::nullableOption($dbConfig, 'user');
+        $password = self::nullableOption($dbConfig, 'password');
 
         // Instantiate the native PDO instance
         return new TraceablePDO($dsn, $username, $password, [
@@ -50,24 +56,24 @@ class Database
     /**
      * Builds a PDO-compatible Data Source Name (DSN) string based on the selected driver.
      *
-     * @param  array       $dbConfig
-     * @param  string      $driver
+     * @param  array<mixed> $dbConfig
+     * @param  string       $driver
      * @throws Exception
      * @return string
      */
     private function buildDsn(array $dbConfig, string $driver): string
     {
-        $host    = $dbConfig['host'] ?? '127.0.0.1';
-        $dbname  = $dbConfig['dbname'] ?? '';
-        $charset = $dbConfig['charset'] ?? 'utf8mb4';
+        $host    = self::option($dbConfig, 'host', '127.0.0.1');
+        $dbname  = self::option($dbConfig, 'dbname', '');
+        $charset = self::option($dbConfig, 'charset', 'utf8mb4');
 
         switch (strtolower($driver)) {
             case 'mysql':
-                $port = $dbConfig['port'] ?? '3306';
+                $port = self::option($dbConfig, 'port', '3306');
                 return sprintf("mysql:host=%s;port=%s;dbname=%s;charset=%s", $host, $port, $dbname, $charset);
 
             case 'pgsql':
-                $port = $dbConfig['port'] ?? '5432';
+                $port = self::option($dbConfig, 'port', '5432');
                 return sprintf("pgsql:host=%s;port=%s;dbname=%s;options='--client_encoding=%s'", $host, $port, $dbname, $charset);
 
             case 'sqlite':
@@ -75,7 +81,7 @@ class Database
                 return sprintf("sqlite:%s", $dbname);
 
             case 'sqlsrv':
-                $port = $dbConfig['port'] ?? '1433';
+                $port = self::option($dbConfig, 'port', '1433');
                 return sprintf("sqlsrv:Server=%s,%s;Database=%s", $host, $port, $dbname);
 
             default:
@@ -85,6 +91,9 @@ class Database
 
     /**
      * Returns the global Singleton instance of the Database.
+     */
+    /**
+     * @param array<string, mixed> $config
      */
     public static function getInstance(array $config = []): Database
     {
@@ -104,6 +113,30 @@ class Database
         }
 
         return $this->connection;
+    }
+
+    /**
+     * Read a scalar config value as a string, or $default when missing/non-scalar.
+     *
+     * @param array<mixed> $config
+     */
+    private static function option(array $config, string $key, string $default): string
+    {
+        $value = $config[$key] ?? null;
+
+        return is_string($value) || is_int($value) ? (string) $value : $default;
+    }
+
+    /**
+     * Like option(), but null when the value is missing/non-scalar.
+     *
+     * @param array<mixed> $config
+     */
+    private static function nullableOption(array $config, string $key): ?string
+    {
+        $value = $config[$key] ?? null;
+
+        return is_string($value) || is_int($value) ? (string) $value : null;
     }
 
     // Protect the Singleton instance against cloning and unserialization lifecycle disruptions

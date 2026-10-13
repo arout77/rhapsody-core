@@ -54,6 +54,7 @@ final class DatabaseFacade
      * (e.g. a stacked statement), is rejected before it reaches the
      * database at all.
      *
+     * @param array<int|string, mixed> $params
      * @return array<int, array<string, mixed>>
      */
     public function query(string $sql, array $params = []): array
@@ -71,7 +72,13 @@ final class DatabaseFacade
     // Raw SQL — structured CRUD (own tables only for writes)
     // ---------------------------------------------------------------
 
-    /** Read helper for any table — not scoped to the module's own prefix. */
+    /**
+     * Read helper for any table — not scoped to the module's own prefix.
+     *
+     * @param array<string, mixed> $where
+     * @param list<string> $columns
+     * @return array<int, array<string, mixed>>
+     */
     public function select(string $table, array $where = [], array $columns = ['*']): array
     {
         $this->assertAllowed();
@@ -86,6 +93,7 @@ final class DatabaseFacade
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /** @param array<string, mixed> $data */
     public function insert(string $table, array $data): int
     {
         $this->assertAllowed();
@@ -104,6 +112,10 @@ final class DatabaseFacade
         return (int) $this->connection->lastInsertId();
     }
 
+    /**
+     * @param array<string, mixed> $data
+     * @param array<string, mixed> $where
+     */
     public function update(string $table, array $data, array $where): int
     {
         $this->assertAllowed();
@@ -131,6 +143,7 @@ final class DatabaseFacade
         return $stmt->rowCount();
     }
 
+    /** @param array<string, mixed> $where */
     public function delete(string $table, array $where): int
     {
         $this->assertAllowed();
@@ -180,6 +193,11 @@ final class DatabaseFacade
     // Doctrine — read (any entity)
     // ---------------------------------------------------------------
 
+    /**
+     * @template T of object
+     * @param class-string<T> $entityClass
+     * @return T|null
+     */
     public function find(string $entityClass, mixed $id): ?object
     {
         $this->assertAllowed();
@@ -187,6 +205,12 @@ final class DatabaseFacade
         return $this->entityManager->find($entityClass, $id);
     }
 
+    /**
+     * @template T of object
+     * @param class-string<T> $entityClass
+     * @param array<string, mixed> $criteria
+     * @return list<T>
+     */
     public function findBy(string $entityClass, array $criteria): array
     {
         $this->assertAllowed();
@@ -278,7 +302,10 @@ final class DatabaseFacade
         throw new ModulePermissionException('migrate() could not determine the target table name from the given SQL.');
     }
 
-    /** @return array{0: string, 1: array<string, mixed>} */
+    /**
+     * @param array<string, mixed> $where
+     * @return array{0: string, 1: array<string, mixed>}
+     */
     private function buildWhere(array $where, string $paramPrefix = ''): array
     {
         if (empty($where)) {

@@ -45,12 +45,7 @@ class Cache
         self::$misses = 0;
     }
 
-    /**
-     * @param string $key
-     * @param $default
-     * @return mixed
-     */
-    public function get(string $key, $default = null)
+    public function get(string $key, mixed $default = null): mixed
     {
         $value = $this->driver->get($key, $default);
 
@@ -64,6 +59,9 @@ class Cache
         return $value;
     }
 
+    /**
+     * @return array{hits: int, misses: int, ratio: float|int}
+     */
     public static function getStats(): array
     {
         return [
@@ -75,12 +73,7 @@ class Cache
         ];
     }
 
-    /**
-     * @param string $key
-     * @param $value
-     * @param int $minutes
-     */
-    public function put(string $key, $value, int $minutes): void
+    public function put(string $key, mixed $value, int $minutes): void
     {
         $this->driver->put($key, $value, $minutes);
     }
@@ -88,7 +81,7 @@ class Cache
     /**
      * Alias for put()
      */
-    public function set(string $key, $value, int $minutes): void
+    public function set(string $key, mixed $value, int $minutes): void
     {
         $this->put($key, $value, $minutes);
     }

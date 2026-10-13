@@ -1,7 +1,8 @@
 <?php
-
 namespace Rhapsody\Core\Commands;
 
+use Rhapsody\Core\Commands\Concerns\ReadsInput;
+use Rhapsody\Core\Support\Fs;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -25,7 +26,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 class MakeReactCommand extends Command
 {
-    protected static $defaultName = 'make:react';
+    use ReadsInput;
 
     public function __construct(protected string $basePath)
     {
@@ -52,18 +53,18 @@ class MakeReactCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $name = trim((string) $input->getArgument('name'), '/\\');
+        $name = trim($this->stringArgument($input, 'name'), '/\\');
 
         // Normalise directory separators
         $name = str_replace('\\', '/', $name);
 
         // Split into optional sub-directory path + the bare component name
         $parts         = explode('/', $name);
-        $componentName = array_pop($parts);          // e.g. "ProfileCard"
-        $subDir        = implode('/', $parts);        // e.g. "Users" (may be empty)
+        $componentName = array_pop($parts);    // e.g. "ProfileCard"
+        $subDir        = implode('/', $parts); // e.g. "Users" (may be empty)
 
         // Enforce PascalCase (React component names must start with an uppercase letter)
-        if (!preg_match('/^[A-Z][A-Za-z0-9]*$/', $componentName)) {
+        if (! preg_match('/^[A-Z][A-Za-z0-9]*$/', $componentName)) {
             $output->writeln(
                 "<error>Component names must be PascalCase (e.g. Dashboard, UserProfile).</error>"
             );
@@ -77,7 +78,7 @@ class MakeReactCommand extends Command
         // Detect the stub
         $stubPath = dirname(__DIR__, 2) . '/resources/stubs/react-component.stub';
 
-        if (!file_exists($stubPath)) {
+        if (! file_exists($stubPath)) {
             $output->writeln('<error>React component stub not found at: ' . $stubPath . '</error>');
             $output->writeln('<comment>Re-run "php rhapsody react:install" to restore framework stubs.</comment>');
             return Command::FAILURE;
@@ -88,12 +89,12 @@ class MakeReactCommand extends Command
             return Command::FAILURE;
         }
 
-        if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
+        if (! is_dir($dir) && ! mkdir($dir, 0755, true)) {
             $output->writeln("<error>Could not create directory:</error> {$dir}");
             return Command::FAILURE;
         }
 
-        $stub    = (string) file_get_contents($stubPath);
+        $stub    = Fs::read($stubPath);
         $content = str_replace('{{ componentname }}', $componentName, $stub);
 
         if (file_put_contents($filepath, $content) === false) {

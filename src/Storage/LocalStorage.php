@@ -20,7 +20,7 @@ final class LocalStorage
             // by default — addslashes() alone does NOT escape '</script>',
             // which would otherwise let $value close the wrapping <script>
             // tag early and inject arbitrary markup/script.
-            : "'" . str_replace('/', '\/', addslashes((string) $value)) . "'";
+            : "'" . str_replace('/', '\/', addslashes(self::scalarToString($value))) . "'";
 
         return self::wrapScript("localStorage.setItem({$jsKey}, {$jsValue});");
     }
@@ -68,6 +68,22 @@ final class LocalStorage
     public static function clear(): string
     {
         return self::wrapScript('localStorage.clear();');
+    }
+
+    /**
+     * Cast a scalar/Stringable to string for the raw (non-JSON) path.
+     *
+     * @throws \InvalidArgumentException For arrays, objects and null
+     */
+    private static function scalarToString(mixed $value): string
+    {
+        if (is_scalar($value) || $value instanceof \Stringable) {
+            return (string) $value;
+        }
+
+        throw new \InvalidArgumentException(
+            'LocalStorage::set() with $jsonEncode = false requires a scalar or Stringable value.'
+        );
     }
 
     /**

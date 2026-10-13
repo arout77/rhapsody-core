@@ -14,7 +14,7 @@ class Response
 
     /**
      * A key-value array of HTTP headers.
-     * @var array
+     * @var array<string, string>
      */
     protected array $headers = [];
 
@@ -23,6 +23,16 @@ class Response
      * @var string
      */
     protected string $content = '';
+
+    /**
+     * @param array<string, string> $headers
+     */
+    public function __construct(string $content = '', int $statusCode = 200, array $headers = [])
+    {
+        $this->content    = $content;
+        $this->statusCode = $statusCode;
+        $this->headers    = $headers;
+    }
 
     /**
      * Sets the HTTP status code for the response.
@@ -85,7 +95,7 @@ class Response
     /**
      * Gets all headers set for the response.
      *
-     * @return array
+     * @return array<string, string>
      */
     public function getHeaders(): array
     {

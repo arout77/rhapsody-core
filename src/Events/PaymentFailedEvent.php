@@ -1,9 +1,7 @@
 <?php
 namespace Rhapsody\Core\Events;
 
-use Rhapsody\Core\Events\Event;
-
-class PaymentFailedEvent extends Event
+class PaymentFailedEvent
 {
     public function __construct(
         public readonly string $message,

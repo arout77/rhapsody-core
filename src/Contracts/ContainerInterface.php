@@ -27,9 +27,11 @@ interface ContainerInterface
     /**
      * Finds an entry of the container by its identifier and returns it.
      *
-     * @param  string       $id
+     * @template T of object
+     *
+     * @param  class-string<T>|string $id
      * @throws \Exception
-     * @return mixed
+     * @return ($id is class-string<T> ? T : mixed)
      */
     public function get(string $id): mixed;
 
@@ -44,9 +46,14 @@ interface ContainerInterface
     /**
      * Resolves a class from the container, automatically injecting dependencies.
      *
-     * @param  string       $abstract
+     * Passing a class or interface name (Foo::class) returns that type;
+     * passing any other string (an alias such as 'config') returns mixed.
+     *
+     * @template T of object
+     *
+     * @param  class-string<T>|string $abstract
      * @throws \Exception
-     * @return mixed
+     * @return ($abstract is class-string<T> ? T : mixed)
      */
     public function resolve(string $abstract): mixed;
 

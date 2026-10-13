@@ -4,6 +4,7 @@ namespace Rhapsody\Core\Commands;
 use Rhapsody\Core\Cache;
 use Rhapsody\Core\Mailer;
 use Rhapsody\Core\Services\NotificationService;
+use Rhapsody\Core\Support\Env;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -20,8 +21,9 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 class CheckVersionCommand extends Command
 {
-    protected static $defaultName = 'app:check-version';
-
+    /**
+     * @param array<string, mixed> $config
+     */
     public function __construct(
         protected array $config,
         protected Mailer $mailer,
@@ -58,10 +60,13 @@ class CheckVersionCommand extends Command
         return Command::SUCCESS;
     }
 
+    /**
+     * @param array{current: string, latest: string, url: string} $update
+     */
     private function notifyByEmail(array $update, OutputInterface $output): void
     {
-        $to = $_ENV['MAIL_ADMIN_EMAIL'] ?? null;
-        if (! $to) {
+        $to = Env::string('MAIL_ADMIN_EMAIL');
+        if ($to === '') {
             $output->writeln('<comment>MAIL_ADMIN_EMAIL is not set in your .env file — skipping email notification.</comment>');
             return;
         }
@@ -80,11 +85,11 @@ class CheckVersionCommand extends Command
                 . "<p>View it on Packagist: <a href=\"{$update['url']}\">{$update['url']}</a></p>";
 
             $this->mailer->send($to, $subject, $htmlBody);
-            $this->cache->put($notificationCacheKey, true, 43200); // 30 days
+            $this->cache->put($notificationCacheKey, true, 2592000); // 30 days
             $output->writeln("<info>Email notification sent successfully to {$to}.</info>");
         } catch (\Throwable $e) {
             error_log('CheckVersionCommand Mailer Error: ' . $e->getMessage());
-            $output->writeln("<e>Failed to send email. Check your server's error log for details.</e>");
+            $output->writeln("<error>Failed to send email. Check your server's error log for details.</error>");
         }
     }
 }

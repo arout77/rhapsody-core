@@ -26,8 +26,6 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 class ReactInstallCommand extends Command
 {
-    protected static $defaultName = 'react:install';
-
     public function __construct(protected string $basePath)
     {
         parent::__construct();

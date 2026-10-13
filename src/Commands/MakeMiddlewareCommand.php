@@ -1,6 +1,8 @@
 <?php
 namespace Rhapsody\Core\Commands;
 
+use Rhapsody\Core\Commands\Concerns\ReadsInput;
+use Rhapsody\Core\Support\Fs;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -8,7 +10,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class MakeMiddlewareCommand extends Command
 {
-    protected static $defaultName = 'make:middleware';
+    use ReadsInput;
 
     // Inject the application root base path context
     public function __construct(protected string $basePath)
@@ -26,7 +28,7 @@ class MakeMiddlewareCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $name           = $input->getArgument('name');
+        $name           = $this->stringArgument($input, 'name');
         $middlewareName = str_ends_with($name, 'Middleware') ? $name : $name . 'Middleware';
 
         // Direct target files out into the app workspace directory
@@ -51,7 +53,7 @@ class MakeMiddlewareCommand extends Command
             return Command::FAILURE;
         }
 
-        $stub = file_get_contents($stubPath);
+        $stub = Fs::read($stubPath);
         $stub = str_replace('{{ classname }}', $middlewareName, $stub);
 
         if (! is_dir($directory)) {

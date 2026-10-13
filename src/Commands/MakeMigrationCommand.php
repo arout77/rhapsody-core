@@ -9,11 +9,6 @@ use Symfony\Component\Process\Process;
 
 class MakeMigrationCommand extends Command
 {
-    /**
-     * @var string
-     */
-    protected static $defaultName = 'make:migration';
-
     protected function configure(): void
     {
         $this
@@ -23,7 +18,7 @@ class MakeMigrationCommand extends Command
     }
 
     /**
-     * @param InputInterface $input
+     * @param InputInterface  $input
      * @param OutputInterface $output
      */
     protected function execute(InputInterface $input, OutputInterface $output): int

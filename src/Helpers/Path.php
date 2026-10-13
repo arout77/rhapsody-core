@@ -13,8 +13,8 @@ class Path
             $base = ROOT_DIR;
         } else {
             // Fallback: assume this file is in vendor/arout/rhapsody-core/src/Helpers/
-            // Go up 4 levels to reach the project root.
-            $base = dirname(__DIR__, 4);
+            // Go up 5 levels (Helpers → src → rhapsody-core → arout → vendor → project root).
+            $base = dirname(__DIR__, 5);
         }
 
         // Normalize any forward or backward slashes to the OS's native separator
@@ -40,7 +40,7 @@ class Path
     }
 
     /**
-     * Get the absolute path to the public web root directory.
+     * Get the absolute path to the public directory.
      */
     public static function public(string $path = ''): string
     {
@@ -60,7 +60,7 @@ class Path
      */
     public static function cache(string $path = ''): string
     {
-        return self::storage('framework/cache/' . ltrim($path, '/\\'));
+        return self::storage('cache/' . ltrim($path, '/\\'));
     }
 
     /**
@@ -84,7 +84,7 @@ class Path
      */
     public static function views(string $path = ''): string
     {
-        return self::resources('views/' . ltrim($path, '/\\'));
+        return self::root('views/' . ltrim($path, '/\\'));
     }
 
     /**

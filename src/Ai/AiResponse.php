@@ -15,9 +15,16 @@ use Rhapsody\Core\Ai\Exceptions\AiException;
  * truncated or blocked response means for their use case (e.g. "let the
  * user know it was cut off and offer to continue") rather than having that
  * decision made for them via a thrown exception.
+ *
+ * @phpstan-type GeminiPayload array{candidates?: list<array{content?: array{parts?: list<array{text?: string}>}, finishReason?: string}>, promptFeedback?: array{blockReason?: string}, usageMetadata?: array{promptTokenCount?: int, candidatesTokenCount?: int, totalTokenCount?: int}}
+ * @phpstan-type Usage array{prompt_tokens: int, completion_tokens: int, total_tokens: int}
  */
 final class AiResponse
 {
+    /**
+     * @param Usage $usage
+     * @param array<string, mixed> $raw
+     */
     public function __construct(
         private readonly string $text,
         private readonly ?string $finishReason,
@@ -26,6 +33,9 @@ final class AiResponse
     ) {
     }
 
+    /**
+     * @param GeminiPayload|null $data
+     */
     public static function fromGeminiPayload(?array $data): self
     {
         if ($data === null) {
@@ -61,6 +71,10 @@ final class AiResponse
         );
     }
 
+    /**
+     * @param GeminiPayload $data
+     * @return Usage
+     */
     private static function extractUsage(array $data): array
     {
         $meta = $data['usageMetadata'] ?? [];
@@ -102,7 +116,7 @@ final class AiResponse
     }
 
     /**
-     * @return array{prompt_tokens: int, completion_tokens: int, total_tokens: int}
+     * @return Usage
      */
     public function getUsage(): array
     {
@@ -112,6 +126,8 @@ final class AiResponse
     /**
      * Escape hatch: the full decoded provider payload, for anything this
      * value object doesn't expose directly.
+     *
+     * @return array<string, mixed>
      */
     public function getRaw(): array
     {

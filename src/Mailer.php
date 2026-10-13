@@ -1,6 +1,7 @@
 <?php
 namespace Rhapsody\Core;
 
+use Rhapsody\Core\Support\Config;
 use Symfony\Component\Mailer\Mailer as SymfonyMailer;
 use Symfony\Component\Mailer\Transport;
 use Symfony\Component\Mime\Address;
@@ -30,11 +31,12 @@ class Mailer
             return;
         }
 
-        $transportStr = $mailConfig['transport'] ?? 'smtp';
-        $username     = rawurlencode($mailConfig['username'] ?? '');
-        $password     = rawurlencode($mailConfig['password'] ?? '');
-        $host         = $mailConfig['host'];
-        $port         = $mailConfig['port'] ?? 25;
+        $settings     = new Config($mailConfig);
+        $transportStr = $settings->string('transport', 'smtp');
+        $username     = rawurlencode($settings->string('username', ''));
+        $password     = rawurlencode($settings->string('password', ''));
+        $host         = $settings->string('host');
+        $port         = $settings->int('port', 25);
 
         $dsn          = "{$transportStr}://{$username}:{$password}@{$host}:{$port}";
         $transport    = Transport::fromDsn($dsn);
@@ -68,8 +70,9 @@ class Mailer
             throw new \RuntimeException('Mailer not configured. Please set MAIL_HOST in .env');
         }
 
-        $fromAddress = (string) ($this->mailConfig['from_address'] ?? 'hello@example.com');
-        $fromName    = (string) ($this->mailConfig['from_name'] ?? 'Example');
+        $settings    = new Config($this->mailConfig);
+        $fromAddress = $settings->string('from_address', 'hello@example.com');
+        $fromName    = $settings->string('from_name', 'Example');
 
         $email = (new Email())
             ->from(new Address($fromAddress, $fromName))

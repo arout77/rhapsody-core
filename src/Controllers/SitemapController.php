@@ -4,6 +4,7 @@ namespace App\Controllers;
 use App\Models\User;
 use Rhapsody\Core\BaseController;
 use Rhapsody\Core\Response;
+use Rhapsody\Core\Support\Env;
 use Twig\Environment;
 
 class SitemapController extends BaseController
@@ -19,14 +20,11 @@ class SitemapController extends BaseController
         parent::__construct($twig);
     }
 
-    /**
-     * @return mixed
-     */
     public function generate(): Response
     {
         $users = $this->userModel->findAll();
 
-        $baseUrl = $_ENV['APP_URL'] . ($_ENV['APP_BASE_URL'] ?? '');
+        $baseUrl = Env::string('APP_URL') . Env::string('APP_BASE_URL');
 
         // Render a Twig template that is formatted as XML
         $xmlContent = $this->twig->render('sitemap.xml.twig', [

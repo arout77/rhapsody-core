@@ -11,9 +11,13 @@ class QueryLogger implements SQLLogger
 {
     private static ?self $instance = null; // <-- ADD THIS
 
-    public array $queries      = [];
-    public array $fingerprints = []; // Track counts per SQL structure
-    private float $start_time  = 0;
+    /** @var list<array<string, mixed>> */
+    public array $queries = [];
+
+    /** @var array<string, int> Track counts per SQL structure */
+    public array $fingerprints = [];
+
+    private float $start_time = 0;
 
     public static function getInstance(): self
     {
@@ -25,13 +29,13 @@ class QueryLogger implements SQLLogger
 
     /**
      * @param string     $sql
-     * @param array|null $params
-     * @param array|null $types
+     * @param array<int|string, mixed>|null $params
+     * @param array<int|string, mixed>|null $types
      */
     public function startQuery($sql, ?array $params = null, ?array $types = null)
     {
         // Simple normalization: replace numeric/string literals with '?'
-        $fingerprint = preg_replace("/\b(\d+|'[^']+')\b/", '?', $sql);
+        $fingerprint = preg_replace("/\b(\d+|'[^']+')\b/", '?', $sql) ?? $sql;
 
         $this->fingerprints[$fingerprint] = ($this->fingerprints[$fingerprint] ?? 0) + 1;
         $this->start_time                 = microtime(true);
@@ -56,6 +60,8 @@ class QueryLogger implements SQLLogger
 
     /**
      * Finds the file and line that initiated the query.
+     *
+     * @return array{file: string, line: int}|null
      */
     private function findQueryCaller(): ?array
     {
@@ -84,7 +90,7 @@ class QueryLogger implements SQLLogger
 
             return [
                 'file' => str_replace(str_replace('\\', '/', $projectRoot) . '/', '', $file),
-                'line' => $entry['line'],
+                'line' => $entry['line'] ?? 0,
             ];
         }
         return null;

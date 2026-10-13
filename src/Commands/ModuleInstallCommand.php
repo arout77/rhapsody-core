@@ -2,6 +2,7 @@
 
 namespace Rhapsody\Core\Commands;
 
+use Rhapsody\Core\Commands\Concerns\ReadsInput;
 use Rhapsody\Core\Modules\ModuleRegistry;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -12,6 +13,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 #[AsCommand(name: 'module:install', description: "Run a module's install() hook and activate it.")]
 class ModuleInstallCommand extends Command
 {
+    use ReadsInput;
+
     public function __construct(protected ModuleRegistry $registry)
     {
         parent::__construct();
@@ -24,7 +27,7 @@ class ModuleInstallCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $name = $input->getArgument('name');
+        $name = $this->stringArgument($input, 'name');
 
         try {
             $this->registry->install($name);

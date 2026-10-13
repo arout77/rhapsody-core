@@ -1,8 +1,6 @@
 <?php
-
 namespace Rhapsody\Core\Events;
 
-use Rhapsody\Core\Event;
 use Rhapsody\Core\Modules\ModuleManifest;
 
 /**
@@ -14,7 +12,7 @@ use Rhapsody\Core\Modules\ModuleManifest;
  * webhook, whatever) can also react, without ModuleRegistry needing to
  * know anything about how that notification happens.
  */
-final class ModuleBootFailed extends Event
+final class ModuleBootFailed
 {
     public const PHASE_COMPATIBILITY       = 'compatibility';
     public const PHASE_PROVIDER            = 'provider';

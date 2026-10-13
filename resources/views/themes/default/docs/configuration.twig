@@ -27,6 +27,20 @@
         The <code>.env</code> file contains sensitive or environment‑specific data. Never commit it to version control. Use <code>.env.example</code> as a template.
     </p>
 
+    <h3>Reading Environment Values</h3>
+    <p>
+        Environment variables are always strings, and PHP types <code>$_ENV</code> loosely. The <code>Rhapsody\Core\Support\Env</code> class reads a variable and converts it to the type you want, falling back to a default when the variable is unset (or can't be converted):
+    </p>
+    <pre><code class="language-php">use Rhapsody\Core\Support\Env;
+
+$name    = Env::string('APP_NAME', 'Rhapsody');   // string
+$timeout = Env::int('GEMINI_TIMEOUT', 60);        // int; non-numeric values fall back to the default
+$debug   = Env::bool('APP_DEBUG', false);         // bool
+$raw     = Env::get('SOME_KEY');                  // ?string, null when unset</code></pre>
+    <p>
+        <code>Env::bool()</code> treats <code>true</code>, <code>1</code>, <code>yes</code> and <code>on</code> as true, and <code>false</code>, <code>0</code>, <code>no</code> and <code>off</code> as false (case-insensitive). Any other value returns the default.
+    </p>
+
     <hr>
 
     <h2>View File Hierarchy & Theme System</h2>

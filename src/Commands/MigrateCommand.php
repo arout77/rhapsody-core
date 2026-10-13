@@ -4,6 +4,7 @@ namespace Rhapsody\Core\Commands;
 use Exception;
 use PDO;
 use Rhapsody\Core\Database;
+use Rhapsody\Core\Support\Fs;
 
 class MigrateCommand
 {
@@ -27,7 +28,7 @@ class MigrateCommand
 
     /**
      * Automatically called by the refactored CLI dynamic runner
-     * @param array $args Remaining command line arguments
+     * @param list<string> $args Remaining command line arguments
      */
     public function execute(array $args): void
     {
@@ -48,7 +49,7 @@ class MigrateCommand
         $this->ensureMigrationTableExists($connection);
 
         // 3. Scan directory for migration files (*.sql or *.php)
-        $files = glob($migrationsDir . '/*.{sql,php}', GLOB_BRACE);
+        $files = Fs::glob($migrationsDir . '/*.{sql,php}', GLOB_BRACE);
 
         if (empty($files)) {
             echo "[\033[33mNotice\033[0m] No migration files found in /database/migrations.\n\n";
@@ -68,7 +69,7 @@ class MigrateCommand
             $migrationName = basename($file);
 
             // Skip if already executed
-            if (in_array($migrationName, $executed)) {
+            if (in_array($migrationName, $executed, true)) {
                 continue;
             }
 
@@ -82,7 +83,7 @@ class MigrateCommand
 
                 if ($ext === 'sql') {
                     // Execute raw SQL file structures
-                    $sql = file_get_contents($file);
+                    $sql = Fs::read($file);
                     if (trim($sql) !== '') {
                         $connection->exec($sql);
                     }
@@ -133,10 +134,19 @@ class MigrateCommand
 
     /**
      * Fetches array lists of previously loaded migrations.
+     *
+     * @return list<string>
      */
     private function getExecutedMigrations(PDO $connection): array
     {
         $stmt = $connection->query("SELECT migration FROM migrations");
-        return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        if ($stmt === false) {
+            throw new \RuntimeException('Unable to read the migrations table.');
+        }
+
+        /** @var list<string> $names */
+        $names = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+        return $names;
     }
 }

@@ -12,10 +12,6 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 class BuildProxiesCommand extends Command
 {
-    protected static $defaultName = 'build:proxies';
-
-    private string $basePath;
-
     protected function configure(): void
     {
         $this
@@ -26,7 +22,7 @@ class BuildProxiesCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         global $container;
-        if (! isset($container) || ! $container instanceof Container) {
+        if (! $container instanceof Container) {
             $output->writeln('<error>Container not found. Ensure bootstrap.php has been loaded.</error>');
             return Command::FAILURE;
         }
@@ -41,15 +37,9 @@ class BuildProxiesCommand extends Command
 
         $factory = new LazyProxyFactory($container, $proxyCacheDir);
 
-        // Get all bound abstract names from the container's bindings.
-        $reflection   = new \ReflectionClass($container);
-        $bindingsProp = $reflection->getProperty('bindings');
-        $bindingsProp->setAccessible(true);
-        $bindings = $bindingsProp->getValue($container);
-
         $count = 0;
-        foreach ($bindings as $abstract => $concrete) {
-            if (! is_string($abstract) || ! (class_exists($abstract) || interface_exists($abstract))) {
+        foreach ($container->boundAbstracts() as $abstract) {
+            if (! class_exists($abstract) && ! interface_exists($abstract)) {
                 continue;
             }
 
@@ -64,42 +54,5 @@ class BuildProxiesCommand extends Command
 
         $output->writeln("<info>Done. Generated $count proxies.</info>");
         return Command::SUCCESS;
-    }
-
-    /**
-     * Load the container from the core bootstrap.
-     * This mimics the logic in index.php.
-     */
-    private function loadContainer(): ?Container
-    {
-        // Define ROOT_DIR if not defined.
-        if (! defined('ROOT_DIR')) {
-            define('ROOT_DIR', $this->basePath);
-        }
-
-        // Load environment variables.
-        $rootPath = ROOT_DIR;
-        $dotenv   = \Dotenv\Dotenv::createImmutable($rootPath);
-        $dotenv->load();
-
-        // Include the core bootstrap and return the container.
-        $bootstrapPath = ROOT_DIR . '/vendor/arout/rhapsody-core/src/bootstrap.php';
-        if (! file_exists($bootstrapPath)) {
-            return null;
-        }
-
-        // The bootstrap returns the container.
-        $container = require $bootstrapPath;
-        if ($container instanceof Container) {
-            return $container;
-        }
-
-        // Fallback: check global.
-        global $container;
-        if (isset($container) && $container instanceof Container) {
-            return $container;
-        }
-
-        return null;
     }
 }

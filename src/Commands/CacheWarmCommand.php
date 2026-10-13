@@ -2,6 +2,7 @@
 namespace Rhapsody\Core\Commands;
 
 use Dotenv\Dotenv;
+use Rhapsody\Core\Contracts\ContainerInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -11,8 +12,6 @@ use Twig\Loader\FilesystemLoader;
 
 class CacheWarmCommand extends Command
 {
-    protected static $defaultName = 'app:cache-warm';
-
     protected function configure(): void
     {
         $this
@@ -67,7 +66,7 @@ class CacheWarmCommand extends Command
         }
 
         $rootPath    = $this->getProjectRoot($output);
-        $activeTheme = $this->getConfig('theme', 'default', $rootPath);
+        $activeTheme = $this->getActiveTheme($rootPath);
 
         // YOUR VIEW PATHS (preserved)
         $viewPaths = [
@@ -124,6 +123,9 @@ class CacheWarmCommand extends Command
         return Command::SUCCESS;
     }
 
+    /**
+     * @return list<string>
+     */
     private function findTwigFiles(string $dir): array
     {
         $files    = [];
@@ -131,8 +133,12 @@ class CacheWarmCommand extends Command
             new \RecursiveDirectoryIterator($dir, \RecursiveDirectoryIterator::SKIP_DOTS)
         );
         foreach ($iterator as $file) {
+            /** @var \SplFileInfo $file */
             if ($file->isFile() && $file->getExtension() === 'twig') {
-                $files[] = $file->getRealPath();
+                $realPath = $file->getRealPath();
+                if ($realPath !== false) {
+                    $files[] = $realPath;
+                }
             }
         }
         return $files;
@@ -140,28 +146,31 @@ class CacheWarmCommand extends Command
 
     private function getTwigFromContainer(OutputInterface $output): ?Environment
     {
-        if (isset($GLOBALS['container']) && $GLOBALS['container']->has(Environment::class)) {
-            return $GLOBALS['container']->resolve(Environment::class);
+        $container = $GLOBALS['container'] ?? null;
+        if ($container instanceof ContainerInterface && $container->has(Environment::class)) {
+            return $container->resolve(Environment::class);
         }
 
         $rootPath = $this->getProjectRoot($output);
         if (file_exists($rootPath . '/bootstrap.php')) {
             $container = require $rootPath . '/bootstrap.php';
-            if ($container->has(Environment::class)) {
+            if ($container instanceof ContainerInterface && $container->has(Environment::class)) {
                 return $container->resolve(Environment::class);
             }
         }
         return null;
     }
 
-    private function getConfig(string $key, $default, string $rootPath)
+    private function getActiveTheme(string $rootPath): string
     {
         $configFile = $rootPath . '/config/config.php'; // YOUR FIX – config inside config/
         if (! file_exists($configFile)) {
-            return $default;
+            return 'default';
         }
         $config = require $configFile;
-        return $config[$key] ?? $default;
+        $theme  = is_array($config) ? ($config['theme'] ?? null) : null;
+
+        return is_string($theme) && $theme !== '' ? $theme : 'default';
     }
 
     private function getProjectRoot(OutputInterface $output): string

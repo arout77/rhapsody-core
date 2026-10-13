@@ -1,9 +1,8 @@
 <?php
-
 namespace Rhapsody\Core\Modules\Facades;
 
 use Rhapsody\Core\Contracts\EventDispatcherInterface;
-use Rhapsody\Core\Event;
+use Rhapsody\Core\Events\Event;
 use Rhapsody\Core\Modules\Exceptions\ModulePermissionException;
 use Rhapsody\Core\Modules\ModulePermissions;
 
@@ -28,7 +27,9 @@ final class EventsFacade
     ) {
     }
 
-    /** @param string|callable $listener */
+    /**
+     * @param string|callable $listener
+     */
     public function listen(string $eventClass, $listener): void
     {
         if (! $this->permissions->can('events.listen')) {

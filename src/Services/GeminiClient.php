@@ -18,11 +18,16 @@ use Rhapsody\Core\Contracts\AiClientInterface;
  * AiClientInterface. Auth is a single API key (GEMINI_API_KEY), not the
  * GCP-project/service-account flow Vertex AI uses — that's a deliberately
  * different, heavier integration this class does not attempt.
+ *
+ * @phpstan-import-type GeminiPayload from AiResponse
  */
 class GeminiClient implements AiClientInterface
 {
     private const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/';
 
+    /**
+     * @param array{api_key?: string, model?: string, temperature?: float|int, max_tokens?: int, timeout?: float|int, connect_timeout?: float|int} $config
+     */
     public function __construct(
         private readonly ClientInterface $http,
         private readonly array $config
@@ -105,6 +110,10 @@ class GeminiClient implements AiClientInterface
             throw new AiException('Gemini returned a response that could not be parsed as JSON.');
         }
 
+        // Trust boundary: the provider's JSON is shaped by Google, not by us.
+        // AiResponse reads every key defensively (?? defaults), so a missing
+        // or reshaped field degrades gracefully rather than fataling.
+        /** @var GeminiPayload $data */
         return AiResponse::fromGeminiPayload($data);
     }
 
@@ -130,7 +139,11 @@ class GeminiClient implements AiClientInterface
 
         $status  = $response->getStatusCode();
         $decoded = json_decode((string) $response->getBody(), true);
-        $message = $decoded['error']['message'] ?? $e->getMessage();
+        $decoded = is_array($decoded) ? $decoded : null;
+
+        $error      = is_array($decoded) ? ($decoded['error'] ?? null) : null;
+        $apiMessage = is_array($error) ? ($error['message'] ?? null) : null;
+        $message    = is_string($apiMessage) ? $apiMessage : $e->getMessage();
 
         if ($this->isModelUnavailableError($decoded, $message)) {
             return new AiModelUnavailableException($message, model: $model, previous: $e);
@@ -160,10 +173,13 @@ class GeminiClient implements AiClientInterface
      * for this same underlying situation ("is not found for API version",
      * "is no longer available to new users"), so relying on exact wording
      * alone is fragile.
+     *
+     * @param array<mixed>|null $decoded
      */
     private function isModelUnavailableError(?array $decoded, string $message): bool
     {
-        $status = $decoded['error']['status'] ?? null;
+        $error  = $decoded['error'] ?? null;
+        $status = is_array($error) ? ($error['status'] ?? null) : null;
         $lower  = strtolower($message);
 
         if ($status === 'NOT_FOUND' && str_contains($lower, 'model')) {

@@ -1,14 +1,13 @@
 <?php
 namespace Rhapsody\Core\Commands;
 
+use Rhapsody\Core\Support\Fs;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class EnvSyncCommand extends Command
 {
-    protected static $defaultName = 'env:sync';
-
     // Inject the real application base directory root path context
     public function __construct(protected string $basePath)
     {
@@ -23,7 +22,7 @@ class EnvSyncCommand extends Command
     }
 
     /**
-     * @param InputInterface $input
+     * @param InputInterface  $input
      * @param OutputInterface $output
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -64,7 +63,7 @@ class EnvSyncCommand extends Command
         }
 
         // Append the missing keys to the end of the .env file
-        file_put_contents($envPath, $contentToAppend, FILE_APPEND);
+        Fs::write($envPath, $contentToAppend, FILE_APPEND);
 
         $output->writeln("\n<info>Successfully synced .env file. Please review and set the new values.</info>");
         return Command::SUCCESS;
@@ -72,12 +71,13 @@ class EnvSyncCommand extends Command
 
     /**
      * Parses a .env file and returns an associative array of keys and values.
+     *
+     * @return array<string, string>
      */
     private function getKeysFromFile(string $path): array
     {
-        $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        $keys  = [];
-        foreach ($lines as $line) {
+        $keys = [];
+        foreach (Fs::lines($path) as $line) {
             // Ignore comments
             if (str_starts_with(trim($line), '#')) {
                 continue;

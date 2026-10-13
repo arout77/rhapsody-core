@@ -137,7 +137,9 @@ echo $pagination->render();</code></pre>
     <p>
         It works with no JavaScript — a <strong>Go</strong> button submits a standard GET form that preserves every
         other current query parameter as hidden inputs — and progressively enhances to jump immediately on
-        <code>&lt;select&gt;</code> change when JavaScript is available. To place the menu somewhere other than
+        <code>&lt;select&gt;</code> change when JavaScript is available. Only simple (string or numeric) query
+        parameters are carried over; nested array parameters such as <code>?filter[]=x</code> are skipped because
+        they can't be represented by a single hidden input. To place the menu somewhere other than
         right after the nav, call <code>renderJumpMenu()</code> on its own instead of passing <code>showJumpMenu</code>
         to <code>render()</code>:
     </p>

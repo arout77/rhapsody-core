@@ -14,6 +14,7 @@ use Rhapsody\Core\Routing\Route;
 class Debug
 {
     private static ?self $instance = null;
+    /** @var array<string, mixed> */
     private array $data            = [];
     private float $startTime;
     private int $startMemory;
@@ -34,22 +35,19 @@ class Debug
      */
     private function getMemoryLimitBytes(): int
     {
-        $limit = ini_get('memory_limit');
+        $limit = trim((string) ini_get('memory_limit'));
         if ($limit === '-1') {
             return -1; // Unlimited
         }
 
-        $val  = trim($limit);
-        $last = strtolower($val[strlen($val) - 1]);
-        $val  = (int) $val;
+        $bytes = (int) $limit;
 
-        switch ($last) {
-            case 'g':$val *= 1024;
-            case 'm':$val *= 1024;
-            case 'k':$val *= 1024;
-        }
-
-        return $val;
+        return match (strtolower(substr($limit, -1))) {
+            'g'     => $bytes * 1024 ** 3,
+            'm'     => $bytes * 1024 ** 2,
+            'k'     => $bytes * 1024,
+            default => $bytes,
+        };
     }
 
     /**
@@ -58,6 +56,7 @@ class Debug
      */
     public function start(): void
     {
+        $this->data                = [];
         $this->startTime           = microtime(true);
         $this->startMemory         = memory_get_usage();
         $this->data['php_version'] = phpversion();
@@ -72,10 +71,10 @@ class Debug
     /**
      * Gathers final data points at the end of the request.
      *
-     * @param Response           $response
-     * @param array              $config
-     * @param ContainerInterface $container
-     * @param Route|null         $matchedRoute
+     * @param Response             $response
+     * @param array<string, mixed> $config
+     * @param ContainerInterface   $container
+     * @param Route|null           $matchedRoute
      */
     public function end(Response $response, array $config, ContainerInterface $container, ?Route $matchedRoute = null): void
     {
@@ -86,65 +85,61 @@ class Debug
         $this->data['session']        = $_SESSION ?? [];
 
         // --- Enhanced HTTP Request data ---
+        $https       = self::serverString('HTTPS');
+        $requestTime = $_SERVER['REQUEST_TIME'] ?? null;
+        $requestUri  = self::serverString('REQUEST_URI', '/');
+
         $this->data['request'] = [
-            'method'     => $_SERVER['REQUEST_METHOD'] ?? 'GET',
-            'uri'        => $_SERVER['REQUEST_URI'] ?? '/',
-            'full_url'   => (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . ($_SERVER['REQUEST_URI'] ?? '/'),
-            'ip'         => $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1',
-            'timestamp'  => date('Y-m-d H:i:s', $_SERVER['REQUEST_TIME'] ?? time()),
+            'method'     => self::serverString('REQUEST_METHOD', 'GET'),
+            'uri'        => $requestUri,
+            'full_url'   => ($https !== '' && $https !== 'off' ? 'https' : 'http') . '://' . self::serverString('HTTP_HOST', 'localhost') . $requestUri,
+            'ip'         => self::serverString('REMOTE_ADDR', '127.0.0.1'),
+            'timestamp'  => date('Y-m-d H:i:s', is_int($requestTime) ? $requestTime : time()),
             'headers'    => getallheaders() ?: [],
-            'query'      => $_GET ?? [],
+            'query'      => $_GET,
             'body'       => file_get_contents('php://input') ?: null,
             'middleware' => $matchedRoute ? $matchedRoute->getMiddleware() : [],
         ];
 
         // Environment variables (collect for Environment tab)
-        $this->data['env'] = $_ENV ?? [];
+        $this->data['env'] = $_ENV;
 
-        // Get QueryLogger singleton
-        $queryLogger = QueryLogger::getInstance();
-
-        $doctrineQueries       = $queryLogger ? $queryLogger->queries : [];
-        $pdoQueries            = TraceablePDO::getQueryLog();
-        $this->data['queries'] = array_merge($doctrineQueries, $pdoQueries);
+        $stackQueries = [];
 
         // Also get Doctrine DebugStack if available (for backward compatibility)
         if ($container->has(DebugStack::class)) {
             $stack = $container->resolve(DebugStack::class);
-            if (! empty($stack->queries)) {
-                $this->data['queries'] = array_merge($this->data['queries'], $stack->queries);
+            if ($stack instanceof DebugStack) {
+                $stackQueries = $stack->queries;
             }
         }
 
-        // --- FIX: Ensure queries is an array and set total count ---
-        if (! isset($this->data['queries']) || ! is_array($this->data['queries'])) {
-            $this->data['queries'] = [];
-        }
-        $this->data['total_queries'] = count($this->data['queries']);
+        /** @var list<array<string, mixed>> $queries */
+        $queries = array_merge(
+            QueryLogger::getInstance()->queries,
+            TraceablePDO::getQueryLog(),
+            $stackQueries
+        );
 
-        // --- FIX: Detect N+1 queries (if not already flagged) ---
-        $sqlCounts = [];
-        foreach ($this->data['queries'] as &$q) {
-            $sql = $q['sql'] ?? '';
-            // Normalize: replace integers and quoted strings with '?'
-            $normalized               = preg_replace('/\b\d+\b/', '?', $sql);
-            $normalized               = preg_replace("/'[^']*'/", '?', $normalized);
-            $normalized               = preg_replace('/\s+/', ' ', $normalized);
-            $sqlCounts[$normalized][] = &$q;
+        // Detect N+1 queries: group by normalized SQL, flag any shape seen more than 3 times
+        $groups = [];
+        foreach ($queries as $index => $query) {
+            $sql                                  = $query['sql'] ?? '';
+            $groups[self::normalizeSql(is_string($sql) ? $sql : '')][] = $index;
         }
-        unset($q);
 
         $nPlusOneAlerts = [];
-        foreach ($sqlCounts as $normalized => $queries) {
-            if (count($queries) > 3) {
-                foreach ($queries as &$q) {
-                    $q['is_n_plus_1'] = true;
-                    $nPlusOneAlerts[] = $q;
+        foreach ($groups as $indexes) {
+            if (count($indexes) > 3) {
+                foreach ($indexes as $index) {
+                    $queries[$index]['is_n_plus_1'] = true;
+                    $nPlusOneAlerts[]               = $queries[$index];
                 }
-                unset($q);
             }
         }
 
+        $this->data['queries']           = $queries;
+        $this->data['total_queries']     = count($queries);
         $this->data['n_plus_one_alerts'] = $nPlusOneAlerts;
         $this->data['n_plus_1_count']    = count($nPlusOneAlerts);
 
@@ -158,8 +153,8 @@ class Debug
         $this->data['container_trace'] = Container::getTrace();
 
         // Logs
-        $phpLogger          = new Logger($config['logging']['php_error_log_path'] ?? '');
-        $apacheLogger       = new Logger($config['logging']['apache_error_log_path'] ?? '');
+        $phpLogger          = new Logger(self::logPath($config, 'php_error_log_path'));
+        $apacheLogger       = new Logger(self::logPath($config, 'apache_error_log_path'));
         $this->data['logs'] = [
             'php'    => $phpLogger->read(50),
             'apache' => $apacheLogger->read(50),
@@ -198,13 +193,14 @@ class Debug
                 // instance for any route registered as [$instance, 'method']
                 // (which is what a module controller needing injected
                 // facades from ModuleContext has to use). Handle both.
-                $controllerName      = is_string($callback[0]) ? $callback[0] : get_class($callback[0]);
+                $handler             = $callback[0] ?? null;
+                $controllerName      = is_object($handler) ? $handler::class : (is_string($handler) ? $handler : '');
                 $controller          = explode('\\', $controllerName);
                 $this->data['route'] = [
                     'method'     => $matchedRoute->getMethod(),
                     'path'       => $matchedRoute->getPath(),
                     'controller' => end($controller),
-                    'action'     => $callback[1],
+                    'action'     => $callback[1] ?? null,
                 ];
                 // Optionally, capture route parameters
                 $params = $matchedRoute->getParams();
@@ -216,7 +212,7 @@ class Debug
     }
 
     /**
-     * @return array
+     * @return array<string, mixed>
      */
     public function getData(): array
     {
@@ -224,17 +220,37 @@ class Debug
     }
 
     /**
-     * Reads the last 50 lines of a log file.
+     * Read a $_SERVER value as a string, falling back to $default when the
+     * key is missing or holds a non-string value.
      */
-    private function readLogFile(string $path): string
+    private static function serverString(string $key, string $default = ''): string
     {
-        if (empty($path) || ! file_exists($path) || ! is_readable($path)) {
-            return "Log file not found or not readable at: " . htmlspecialchars($path);
-        }
-        $file = new \SplFileObject($path, 'r');
-        $file->seek(PHP_INT_MAX);
-        $last_line = $file->key();
-        $lines     = new \LimitIterator($file, ($last_line > 50 ? $last_line - 50 : 0), $last_line);
-        return htmlspecialchars(implode("", iterator_to_array($lines)), ENT_QUOTES, 'UTF-8');
+        $value = $_SERVER[$key] ?? null;
+
+        return is_string($value) ? $value : $default;
+    }
+
+    /**
+     * Read a path from the config's "logging" section, or '' when it isn't set.
+     *
+     * @param array<string, mixed> $config
+     */
+    private static function logPath(array $config, string $key): string
+    {
+        $logging = $config['logging'] ?? null;
+        $path    = is_array($logging) ? ($logging[$key] ?? null) : null;
+
+        return is_string($path) ? $path : '';
+    }
+
+    /**
+     * Collapse literals and whitespace so structurally identical queries compare equal.
+     */
+    private static function normalizeSql(string $sql): string
+    {
+        $sql = preg_replace('/\b\d+\b/', '?', $sql) ?? $sql;
+        $sql = preg_replace("/'[^']*'/", '?', $sql) ?? $sql;
+
+        return preg_replace('/\s+/', ' ', $sql) ?? $sql;
     }
 }

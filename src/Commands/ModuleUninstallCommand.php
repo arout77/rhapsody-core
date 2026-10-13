@@ -2,6 +2,7 @@
 
 namespace Rhapsody\Core\Commands;
 
+use Rhapsody\Core\Commands\Concerns\ReadsInput;
 use Rhapsody\Core\Modules\ModuleRegistry;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -13,6 +14,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 #[AsCommand(name: 'module:uninstall', description: "Run a module's uninstall() hook and deactivate it.")]
 class ModuleUninstallCommand extends Command
 {
+    use ReadsInput;
+
     public function __construct(protected ModuleRegistry $registry)
     {
         parent::__construct();
@@ -26,7 +29,7 @@ class ModuleUninstallCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $name = $input->getArgument('name');
+        $name = $this->stringArgument($input, 'name');
 
         if (! $input->getOption('force')) {
             $output->write("This runs \"{$name}\"'s uninstall() hook, which may delete its data. Continue? [y/N] ");

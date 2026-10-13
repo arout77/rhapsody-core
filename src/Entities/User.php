@@ -31,33 +31,21 @@ class User
 
     // --- Getters and Setters ---
 
-    /**
-     * @return mixed
-     */
     public function getUserId(): string
     {
         return $this->user_id;
     }
 
-    /**
-     * @return mixed
-     */
     public function getName(): string
     {
         return $this->name;
     }
 
-    /**
-     * @param string $name
-     */
     public function setName(string $name): void
     {
         $this->name = $name;
     }
 
-    /**
-     * @return mixed
-     */
     public function getEmail(): string
     {
         return $this->email;
@@ -71,9 +59,6 @@ class User
         $this->email = $email;
     }
 
-    /**
-     * @return mixed
-     */
     public function getPassword(): string
     {
         return $this->password;
@@ -85,5 +70,10 @@ class User
     public function setPassword(string $password): void
     {
         $this->password = password_hash($password, PASSWORD_BCRYPT);
+    }
+
+    public function getCreatedAt(): \DateTime
+    {
+        return $this->created_at;
     }
 }
