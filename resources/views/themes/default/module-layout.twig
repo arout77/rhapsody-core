@@ -1,0 +1,35 @@
+{#
+  @core/module-layout.twig
+
+  Base layout for pages rendered by modules. Extends the active theme's
+  layouts/main.twig, so the theme's navigation, footer and head tags are kept,
+  and adds the baseline module UI stylesheet plus a .rhapsody-ui wrapper.
+
+  Usage in a module view:
+      {% extends "@core/module-layout.twig" %}
+      {% block module_content %} ... {% endblock %}
+
+  Only the theme's required blocks (styles, content, scripts) are used, so no
+  theme changes are needed. The stylesheet and the small inset helper script
+  are inlined via source() (read as-is, not parsed as Twig). The helper keeps
+  content clear of fixed top bars and side menus of any size. Modules and
+  themes only depend on this template, so serving the assets as cached files
+  later is a change in this one place.
+#}
+{% extends "layouts/main.twig" %}
+
+{% block styles %}
+    {{ parent() }}
+    <style id="rhapsody-ui-css">{{ source('@core/partials/rhapsody-ui.css')|raw }}</style>
+{% endblock %}
+
+{% block scripts %}
+    {{ parent() }}
+    <script>{{ source('@core/partials/rhapsody-ui.js')|raw }}</script>
+{% endblock %}
+
+{% block content %}
+    <div class="rhapsody-ui">
+        {% block module_content %}{% endblock %}
+    </div>
+{% endblock %}

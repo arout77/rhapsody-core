@@ -1,0 +1,278 @@
+/* ==========================================================================
+   Rhapsody Module UI — baseline stylesheet, v1
+   --------------------------------------------------------------------------
+   Gives module-rendered pages (admin dashboards, forms, tables) a sensible,
+   theme-independent look. Loaded by @core/module-layout.twig and scoped to
+   .rhapsody-ui, so it never touches the surrounding theme.
+
+   Design rules
+   - Colors are derived from currentColor, so the same CSS works on light and
+     dark themes without knowing the palette.
+   - Every selector is wrapped in :where(.rhapsody-ui), so specificity stays at
+     a single class. Element resets in a theme (button { ... }) lose to it;
+     a theme or module can still override any rule with one class.
+   - No @layer on purpose: unlayered theme CSS would beat layered CSS
+     regardless of specificity and defeat the baseline.
+
+   Themes may customise by setting any of these in :root (all optional):
+     --rhapsody-primary            accent / primary button colour
+     --rhapsody-primary-contrast   text colour on the primary colour
+     --rhapsody-danger  --rhapsody-success  --rhapsody-warning
+     --rhapsody-radius             corner radius
+     --rhapsody-gap                spacing between blocks
+     --rhapsody-border             border colour
+     --rhapsody-surface            card / badge background
+     --rhapsody-inset-top          extra space reserved above the content (px/rem)
+     --rhapsody-inset-left         extra space reserved on the left (e.g. a sidebar)
+     --rhapsody-inset-right        extra space reserved on the right
+
+   Fixed navigation: rhapsody-ui.js measures fixed/absolute menus that overlap
+   the module content (top bars, left/right side menus) and sets --_inset-*
+   on .rhapsody-ui automatically. The --rhapsody-inset-* variables above are an
+   optional theme-side override; the larger of the two values wins.
+   ========================================================================== */
+
+:where(.rhapsody-ui) {
+  /* Private tokens (--_*) resolve the public --rhapsody-* values with fallbacks.
+     Declared under other names so a theme's :root values are never overridden. */
+  --_primary: var(--rhapsody-primary, #4f46e5);
+  --_on-primary: var(--rhapsody-primary-contrast, #fff);
+  --_danger: var(--rhapsody-danger, #dc2626);
+  --_success: var(--rhapsody-success, #16a34a);
+  --_warning: var(--rhapsody-warning, #d97706);
+  --_radius: var(--rhapsody-radius, 0.5rem);
+  --_gap: var(--rhapsody-gap, 1rem);
+  --_border: var(--rhapsody-border, color-mix(in oklab, currentColor 22%, transparent));
+  --_surface: var(--rhapsody-surface, color-mix(in oklab, currentColor 6%, transparent));
+
+  box-sizing: border-box;
+  max-inline-size: 72rem;
+  margin-inline: auto;
+  /* Insets are physical (left/right) because they come from measuring where a
+     menu sits on screen, so the padding uses physical properties too. */
+  padding-top: max(2rem, calc(max(var(--_inset-top, 0px), var(--rhapsody-inset-top, 0px)) + 1.5rem));
+  padding-bottom: 2rem;
+  padding-left: max(1rem, calc(max(var(--_inset-left, 0px), var(--rhapsody-inset-left, 0px)) + 1rem));
+  padding-right: max(1rem, calc(max(var(--_inset-right, 0px), var(--rhapsody-inset-right, 0px)) + 1rem));
+  color: inherit;
+  font: inherit;
+  line-height: 1.5;
+  accent-color: var(--_primary);
+
+  *, *::before, *::after {
+    box-sizing: inherit;
+  }
+
+  /* ---- Typography ---- */
+  .rhapsody-page-header {
+    margin-block-end: 1.5rem;
+  }
+  .rhapsody-title {
+    margin: 0 0 0.25rem;
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  .rhapsody-section-title {
+    margin: 2rem 0 0.75rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .rhapsody-muted {
+    opacity: 0.7;
+  }
+  .rhapsody-list {
+    margin-block: 0 var(--_gap);
+    padding-inline-start: 1.25rem;
+    list-style: disc;
+  }
+  code {
+    padding: 0.1em 0.35em;
+    font-size: 0.9em;
+    background: var(--_surface);
+    border-radius: calc(var(--_radius) / 2);
+  }
+
+  /* ---- Layout blocks ---- */
+  .rhapsody-card {
+    padding: 1.25rem;
+    margin-block-end: var(--_gap);
+    border: 1px solid var(--_border);
+    border-radius: var(--_radius);
+    background: var(--_surface);
+  }
+  .rhapsody-grid {
+    display: grid;
+    gap: var(--_gap);
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    margin-block-end: var(--_gap);
+  }
+
+  /* ---- Forms ---- */
+  .rhapsody-form {
+    display: grid;
+    gap: var(--_gap);
+    max-inline-size: 40rem;
+  }
+  .rhapsody-form--inline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    max-inline-size: none;
+
+    .rhapsody-input {
+      inline-size: auto;
+      flex: 1 1 12rem;
+    }
+    .rhapsody-select {
+      inline-size: auto;
+    }
+  }
+  .rhapsody-field {
+    display: grid;
+    gap: 0.35rem;
+  }
+  .rhapsody-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  .rhapsody-help {
+    font-size: 0.8rem;
+    opacity: 0.7;
+  }
+  .rhapsody-input,
+  .rhapsody-select,
+  .rhapsody-textarea {
+    inline-size: 100%;
+    padding: 0.55rem 0.75rem;
+    color: inherit;
+    font: inherit;
+    background: transparent;
+    border: 1px solid var(--_border);
+    border-radius: var(--_radius);
+
+    &:focus-visible {
+      outline: 2px solid var(--_primary);
+      outline-offset: 1px;
+    }
+  }
+  .rhapsody-textarea {
+    min-block-size: 7rem;
+    resize: vertical;
+  }
+  /* Native dropdown lists ignore the transparent background; keep them readable
+     on dark themes that don't declare color-scheme. */
+  option {
+    color: CanvasText;
+    background: Canvas;
+  }
+  .rhapsody-field--error .rhapsody-input,
+  .rhapsody-field--error .rhapsody-select,
+  .rhapsody-field--error .rhapsody-textarea {
+    border-color: var(--_danger);
+  }
+  .rhapsody-error {
+    font-size: 0.85rem;
+    color: var(--_danger);
+  }
+
+  /* ---- Buttons ---- */
+  .rhapsody-btn {
+    display: inline-block;
+    padding: 0.55rem 1.1rem;
+    color: var(--_on-primary);
+    font: inherit;
+    font-weight: 600;
+    line-height: 1.2;
+    text-decoration: none;
+    cursor: pointer;
+    background: var(--_primary);
+    border: 1px solid transparent;
+    border-radius: var(--_radius);
+
+    &:hover {
+      filter: brightness(1.1);
+    }
+    &:focus-visible {
+      outline: 2px solid var(--_primary);
+      outline-offset: 2px;
+    }
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+  }
+  .rhapsody-btn--secondary {
+    color: inherit;
+    background: transparent;
+    border-color: var(--_border);
+  }
+  .rhapsody-btn--danger {
+    color: #fff;
+    background: var(--_danger);
+  }
+  .rhapsody-btn--sm {
+    padding: 0.3rem 0.7rem;
+    font-size: 0.85rem;
+  }
+  .rhapsody-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  /* ---- Tables (wrap in .rhapsody-table-wrap so wide tables scroll) ---- */
+  .rhapsody-table-wrap {
+    margin-block: var(--_gap);
+    overflow-x: auto;
+  }
+  .rhapsody-table {
+    inline-size: 100%;
+    border-collapse: collapse;
+    text-align: start;
+
+    th, td {
+      padding: 0.65rem 0.75rem;
+      text-align: start;
+      vertical-align: middle;
+      border-block-end: 1px solid var(--_border);
+    }
+    th {
+      font-size: 0.8rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      opacity: 0.75;
+    }
+  }
+  /* Highlight a cell that needs attention. Tint + weight, not text colour, so
+     it stays legible on any background and isn't colour-only. */
+  .rhapsody-warn {
+    font-weight: 600;
+    background: color-mix(in oklab, var(--_warning) 22%, transparent);
+  }
+
+  /* ---- Alerts & badges ---- */
+  .rhapsody-alert {
+    --_alert: var(--_border);
+    padding: 0.75rem 1rem;
+    margin-block-end: var(--_gap);
+    border: 1px solid var(--_alert);
+    border-inline-start-width: 4px;
+    border-radius: var(--_radius);
+    background: color-mix(in oklab, var(--_alert) 12%, transparent);
+  }
+  .rhapsody-alert--info    { --_alert: var(--_primary); }
+  .rhapsody-alert--success { --_alert: var(--_success); }
+  .rhapsody-alert--warning { --_alert: var(--_warning); }
+  .rhapsody-alert--error   { --_alert: var(--_danger); }
+  .rhapsody-badge {
+    display: inline-block;
+    padding: 0.1rem 0.55rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: var(--_surface);
+    border-radius: 999px;
+  }
+}

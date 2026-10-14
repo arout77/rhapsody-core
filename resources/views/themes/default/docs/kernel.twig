@@ -1,0 +1,81 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+<h1>Kernel & Request Lifecycle</h1>
+<p>
+    The <code>Kernel</code> is the core of Rhapsody's request handling. It orchestrates
+    the entire request lifecycle from receiving a <code>Request</code> to returning a <code>Response</code>.
+</p>
+
+<h2>Kernel Responsibilities</h2>
+<ul>
+    <li><strong>Handling</strong> – Routes the request and executes middleware.</li>
+    <li><strong>Termination</strong> – Performs post-response tasks like injecting the debug toolbar.</li>
+</ul>
+
+<h2>The Handle Phase</h2>
+<p>
+    <code>Kernel::handle()</code> is a pure function: Request in, Response out.
+    It delegates to <code>Router::dispatch()</code> and normalizes 404/500 status codes
+    into <code>HttpException</code> for consistent error handling.
+</p>
+<pre><code class="language-php">$response = $kernel->handle($request);</code></pre>
+
+<h2>The Terminate Phase</h2>
+<p>
+    <code>Kernel::terminate()</code> performs post-response tasks that don't affect
+    the meaning of the response:
+</p>
+<ul>
+    <li>Injects the development debug toolbar.</li>
+    <li>Adds framework update notifications.</li>
+</ul>
+<p>
+    This method is safe to skip entirely (e.g., in production, or for non-HTML responses).
+</p>
+
+<h2>Error Handling</h2>
+<p>
+    <code>HttpException</code> is intentionally allowed to propagate out of <code>handle()</code>
+    uncaught. The global <code>ErrorHandler</code> (registered in <code>index.php</code>)
+    owns turning it into a rendered error page.
+</p>
+
+<h2>Example Usage</h2>
+<pre><code class="language-php">use Rhapsody\Core\Kernel;
+use Rhapsody\Core\Request;
+
+$kernel = new Kernel($container, $config);
+$request = new Request();
+
+try {
+    $response = $kernel->handle($request);
+    $response = $kernel->terminate($request, $response);
+    $response->send();
+} catch (HttpException $e) {
+    // ErrorHandler handles this globally
+    throw $e;
+}</code></pre>
+
+<h2>Testing</h2>
+<p>
+    The pure nature of <code>Kernel::handle()</code> makes it easy to test:
+</p>
+<pre><code class="language-php">$kernel = new Kernel($container, $config);
+$request = new Request();
+
+$response = $kernel->handle($request);
+$this->assertEquals(200, $response->getStatusCode());</code></pre>
+
+<h2>Request Lifecycle Summary</h2>
+<ol>
+    <li>Environment loaded (<code>.env</code>)</li>
+    <li>Error handler registered</li>
+    <li>Session started</li>
+    <li>Container built</li>
+    <li>Routes loaded</li>
+    <li><strong>Kernel::handle()</strong> – middleware & controller executed</li>
+    <li><strong>Kernel::terminate()</strong> – debug toolbar & banners injected</li>
+    <li>Response sent to client</li>
+</ol>
+{% endblock %}

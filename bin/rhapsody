@@ -1,0 +1,257 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * Rhapsody Framework CLI Runner Engine
+ * Path: vendor/arout/rhapsody-core/bin/rhapsody
+ */
+
+$basePath = getcwd();
+$autoloader = $basePath . '/vendor/autoload.php';
+
+if (!file_exists($autoloader)) {
+    echo "[\033[31mError\033[0m] Composer autoloader not found. Run 'composer install' from the application root.\n";
+    exit(1);
+}
+
+require_once $autoloader;
+
+if (!defined('ROOT_DIR')) {
+    define('ROOT_DIR', $basePath);
+}
+
+// 1. Load the Application's Bootstrap Environment safely
+$bootstrapPath = $basePath . '/vendor/arout/rhapsody-core/src/bootstrap.php';
+$container = null;
+
+if (file_exists($bootstrapPath)) {
+    $container = require $bootstrapPath;
+}
+
+if (!$container instanceof \Rhapsody\Core\Container) {
+    echo "[\033[31mError\033[0m] Container instance could not be resolved from bootstrap.php.\n";
+    exit(1);
+}
+
+// 2. Parse incoming CLI arguments
+$args = $argv;
+array_shift($args); // Remove the script name itself (rhapsody)
+$commandName = $args[0] ?? 'help';
+
+$commandRegistry = [];
+
+// -------------------------------------------------------------------------
+// COMMAND DISCOVERY STRATEGY
+// -------------------------------------------------------------------------
+
+// Strategy 1: Auto-discover commands from the core Commands directory
+// This ensures new commands are automatically available when the core updates
+$coreCommandsPath = __DIR__ . '/../src/Commands';
+
+if (is_dir($coreCommandsPath)) {
+    foreach (glob($coreCommandsPath . '/*.php') as $file) {
+        $className = 'Rhapsody\\Core\\Commands\\' . basename($file, '.php');
+        
+        // Skip abstract classes or interfaces
+        if (!class_exists($className)) {
+            fwrite(STDERR, "[\033[33mWarning\033[0m] {$file} did not resolve to class \"{$className}\" " .
+                "(check the class name/namespace exactly match the filename) — skipped.\n");
+            continue;
+        }
+        
+        try {
+            $reflection = new \ReflectionClass($className);
+            if ($reflection->isAbstract() || $reflection->isInterface()) {
+                continue;
+            }
+            
+            $commandInstance = $container->resolve($className);
+            
+            // Handle both Symfony Console commands and Rhapsody-style commands
+            if ($commandInstance instanceof \Symfony\Component\Console\Command\Command) {
+                $signature = $commandInstance->getName();
+                $description = $commandInstance->getDescription() ?: 'No description available';
+                
+                if ($signature) {
+                    $commandRegistry[$signature] = [
+                        'instance'    => $commandInstance,
+                        'description' => $description,
+                        'type'        => 'symfony'
+                    ];
+                } else {
+                    fwrite(STDERR, "[\033[33mWarning\033[0m] {$className} resolved but has no command name " .
+                        "(pass one to parent::__construct(), use #[AsCommand], or call \$this->setName() in configure()) — skipped.\n");
+                }
+            } elseif (property_exists($commandInstance, 'signature')) {
+                $signature = $commandInstance->signature;
+                $description = property_exists($commandInstance, 'description') 
+                    ? $commandInstance->description 
+                    : 'No description available';
+                
+                $commandRegistry[$signature] = [
+                    'instance'    => $commandInstance,
+                    'description' => $description,
+                    'type'        => 'rhapsody'
+                ];
+            }
+        } catch (\Throwable $e) {
+            // Surfaced instead of silently skipped — a command failing to
+            // resolve (e.g. a constructor dependency that isn't bound in
+            // the container) used to be indistinguishable from a command
+            // that simply doesn't exist.
+            fwrite(STDERR, "[\033[31mWarning\033[0m] Could not load command \"{$className}\": " .
+                $e->getMessage() . "\n");
+            continue;
+        }
+    }
+}
+
+// Strategy 2: Also load user-defined commands from app/Commands (if they exist)
+$appCommandsPath = $basePath . '/app/Commands';
+if (is_dir($appCommandsPath)) {
+    foreach (glob($appCommandsPath . '/*.php') as $file) {
+        $className = 'App\\Commands\\' . basename($file, '.php');
+        
+        if (!class_exists($className)) {
+            continue;
+        }
+        
+        try {
+            $reflection = new \ReflectionClass($className);
+            if ($reflection->isAbstract() || $reflection->isInterface()) {
+                continue;
+            }
+            
+            $commandInstance = $container->resolve($className);
+            
+            if ($commandInstance instanceof \Symfony\Component\Console\Command\Command) {
+                $signature = $commandInstance->getName();
+                $description = $commandInstance->getDescription() ?: 'No description available';
+                
+                if ($signature) {
+                    $commandRegistry[$signature] = [
+                        'instance'    => $commandInstance,
+                        'description' => $description,
+                        'type'        => 'symfony'
+                    ];
+                }
+            } elseif (property_exists($commandInstance, 'signature')) {
+                $signature = $commandInstance->signature;
+                $description = property_exists($commandInstance, 'description') 
+                    ? $commandInstance->description 
+                    : 'No description available';
+                
+                $commandRegistry[$signature] = [
+                    'instance'    => $commandInstance,
+                    'description' => $description,
+                    'type'        => 'rhapsody'
+                ];
+            }
+        } catch (\Throwable $e) {
+            fwrite(STDERR, "[\033[31mWarning\033[0m] Could not load command \"{$className}\": " .
+                $e->getMessage() . "\n");
+            continue;
+        }
+    }
+}
+
+// -------------------------------------------------------------------------
+// Strategy 3: Fallback to config.php commands (backward compatibility)
+$config = $container->has('config') ? $container->resolve('config') : [];
+$configCommands = $config['commands'] ?? [];
+
+foreach ($configCommands as $commandClass) {
+    // Skip if already registered via auto-discovery
+    $className = is_string($commandClass) ? $commandClass : get_class($commandClass);
+    $alreadyRegistered = false;
+    
+    foreach ($commandRegistry as $registered) {
+        if (get_class($registered['instance']) === $className) {
+            $alreadyRegistered = true;
+            break;
+        }
+    }
+    
+    if ($alreadyRegistered) {
+        continue;
+    }
+    
+    try {
+        $commandInstance = $container->resolve($commandClass);
+        
+        if ($commandInstance instanceof \Symfony\Component\Console\Command\Command) {
+            $signature = $commandInstance->getName();
+            $description = $commandInstance->getDescription() ?: 'No description available';
+            
+            if ($signature) {
+                $commandRegistry[$signature] = [
+                    'instance'    => $commandInstance,
+                    'description' => $description,
+                    'type'        => 'symfony'
+                ];
+            }
+        } elseif (property_exists($commandInstance, 'signature')) {
+            $signature = $commandInstance->signature;
+            $description = property_exists($commandInstance, 'description') 
+                ? $commandInstance->description 
+                : 'No description available';
+            
+            $commandRegistry[$signature] = [
+                'instance'    => $commandInstance,
+                'description' => $description,
+                'type'        => 'rhapsody'
+            ];
+        }
+    } catch (\Throwable $e) {
+        if ($commandName === 'help' || $commandName === '--help') {
+            echo "[\033[33mContainer Warning\033[0m] Failed to resolve '{$commandClass}': " . $e->getMessage() . "\n";
+        }
+        continue;
+    }
+}
+
+// 3. Execution & Help Display Router
+if ($commandName === 'help' || $commandName === '--help' || !isset($commandRegistry[$commandName])) {
+    echo "\n\033[34mRhapsody Framework\033[0m CLI Engine\n";
+    echo "----------------------------------------\n";
+    echo "Available Commands:\n";
+    
+    if (empty($commandRegistry)) {
+        echo "  \033[31mNo commands could be resolved.\033[0m\n";
+    } else {
+        // Sort commands alphabetically for better readability
+        ksort($commandRegistry);
+        
+        foreach ($commandRegistry as $signature => $meta) {
+            echo sprintf("  \033[32m%-25s\033[0m %s\n", $signature, $meta['description']);
+        }
+    }
+    echo "\n";
+    exit(0);
+}
+
+// 4. Dynamic Router Pipeline Handshake
+try {
+    $matched = $commandRegistry[$commandName];
+    
+    if ($matched['type'] === 'rhapsody') {
+        // Custom internal command processing requires the shifted arguments array
+        $matched['instance']->execute($args);
+    } else {
+        // Symfony expects element 0 to be the script name, and element 1 to be the FIRST actual argument
+        // We strip out the command name ('make:controller', 'cache:clear') so Symfony doesn't parse it as data
+        $symfonyArgs = $argv; 
+        
+        // Remove the command name element (index 1) safely while preserving index 0
+        array_splice($symfonyArgs, 1, 1); 
+        
+        $input = new \Symfony\Component\Console\Input\ArgvInput($symfonyArgs);
+        $output = new \Symfony\Component\Console\Output\ConsoleOutput();
+        
+        // Execute the Symfony command lifecycle safely
+        $matched['instance']->run($input, $output);
+    }
+} catch (\Throwable $e) {
+    echo "[\033[31mRuntime Error\033[0m] " . $e->getMessage() . "\n";
+    exit(1);
+}

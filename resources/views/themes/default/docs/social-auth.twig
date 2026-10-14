@@ -1,0 +1,67 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>Social Authentication (OAuth)</h1>
+    <p>
+        Rhapsody provides a built‑in <code>SocialAuthController</code> that handles authentication through
+        <strong>Google</strong> and <strong>Facebook</strong> using the <code>league/oauth2-client</code> packages.
+    </p>
+
+    <h2>Installation</h2>
+    <p>
+        The required packages are already included in the core if you installed via Composer.
+        If you're upgrading, run:
+    </p>
+    <pre><code class="language-bash">composer require league/oauth2-client league/oauth2-google league/oauth2-facebook</code></pre>
+
+    <h2>Configuration</h2>
+    <p>
+        Add the following environment variables to your <code>.env</code> file:
+    </p>
+    <pre><code class="language-env">APP_URL=http://localhost/rhapsody-dev   # (adjust to your base URL)
+
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+GOOGLE_REDIRECT_URI=http://localhost/rhapsody-dev/auth/callback/google
+
+FACEBOOK_APP_ID=your_facebook_app_id
+FACEBOOK_APP_SECRET=your_facebook_app_secret
+FACEBOOK_REDIRECT_URI=http://localhost/rhapsody-dev/auth/callback/facebook</code></pre>
+    <p>
+        The redirect URIs must match exactly what you have registered in the Google and Facebook developer consoles.
+    </p>
+
+    <h2>Routes</h2>
+    <p>
+        Add these routes to your <code>routes/web.php</code> file:
+    </p>
+    <pre><code class="language-php">use Rhapsody\Core\Controllers\SocialAuthController;
+
+Router::get('/auth/redirect/{provider}', [SocialAuthController::class, 'redirectToProvider'])->name('auth.redirect');
+Router::get('/auth/callback/{provider}', [SocialAuthController::class, 'handleProviderCallback']);</code></pre>
+    <p>
+        The <code>redirectToProvider</code> method sends the user to the chosen provider's authorization page,
+        and <code>handleProviderCallback</code> handles the callback, creating or logging in the user.
+    </p>
+
+    <h2>Using in Views</h2>
+    <p>
+        In your login view, you can generate the provider links using the named route:
+    </p>
+    <pre><code class="language-twig">&lt;a href="&lcub;&lcub; route('auth.redirect', {provider: 'google'}) }}"&gt;Login with Google&lt;/a&gt;
+&lt;a href="&lcub;&lcub; route('auth.redirect', {provider: 'facebook'}) }}"&gt;Login with Facebook&lt;/a&gt;</code></pre>
+
+    <h2>Customizing the User Model</h2>
+    <p>
+        The controller uses <code>App\Models\User</code> by default. If you're using a different model,
+        you can override the <code>handleProviderCallback</code> method or extend the controller.
+    </p>
+
+    <h2>Adding More Providers</h2>
+    <p>
+        To add other providers (e.g., GitHub, Twitter), you'll need to install their respective OAuth2 packages,
+        add a new case to the <code>getProvider()</code> method in <code>SocialAuthController</code>, and
+        update your routes accordingly.
+    </p>
+
+{% endblock %}

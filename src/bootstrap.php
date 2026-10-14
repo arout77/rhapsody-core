@@ -1,0 +1,562 @@
+<?php
+
+// bootstrap.php
+use App\Providers\EventServiceProvider;
+use Composer\InstalledVersions;
+use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Types\Type;
+use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\ORMSetup;
+use Omnipay\Omnipay;
+use Predis\Client as RedisClient;
+use Rhapsody\Core\Cache;
+use Rhapsody\Core\Cache\CacheInterface;
+use Rhapsody\Core\Cache\FileCacheDriver;
+use Rhapsody\Core\Cache\RedisCacheDriver;
+use Rhapsody\Core\Commands\CacheClearCommand;
+use Rhapsody\Core\Commands\CacheWarmCommand;
+use Rhapsody\Core\Commands\CheckVersionCommand;
+use Rhapsody\Core\Commands\EnvSyncCommand;
+use Rhapsody\Core\Commands\MakeControllerCommand;
+use Rhapsody\Core\Commands\MakeEventCommand;
+use Rhapsody\Core\Commands\MakeListenerCommand;
+use Rhapsody\Core\Commands\MakeMiddlewareCommand;
+use Rhapsody\Core\Commands\MakeMigrationCommand;
+use Rhapsody\Core\Commands\MakeModelCommand;
+use Rhapsody\Core\Commands\MakeReactCommand;
+use Rhapsody\Core\Commands\MigrateCommand;
+use Rhapsody\Core\Commands\ReactInstallCommand;
+use Rhapsody\Core\Commands\RouteCacheCommand;
+use Rhapsody\Core\Commands\RouteClearCommand;
+use Rhapsody\Core\Commands\SkeletonSyncCommand;
+use Rhapsody\Core\Container;
+use Rhapsody\Core\Contracts\EncrypterInterface;
+use Rhapsody\Core\Contracts\PaymentGatewayInterface;
+use Rhapsody\Core\Events\EventDispatcher;
+use Rhapsody\Core\FrameworkInfo;
+use Rhapsody\Core\Helpers\OmnipayGateway;
+use Rhapsody\Core\Helpers\Path;
+use Rhapsody\Core\Mailer;
+use Rhapsody\Core\Middleware\DdosMiddleware;
+use Rhapsody\Core\Proxy\ContainerDecorator;
+use Rhapsody\Core\Proxy\LazyProxyFactory;
+use Rhapsody\Core\Request;
+use Rhapsody\Core\Routing\Router;
+use Rhapsody\Core\Services\Encrypter;
+use Rhapsody\Core\Services\NotificationService;
+use Rhapsody\Core\Services\RateLimiter;
+use Rhapsody\Core\Services\UrlSigner;
+use Rhapsody\Core\Session;
+use Rhapsody\Core\Support\Env;
+use Rhapsody\Core\Theming\ThemeValidator;
+use Rhapsody\Core\Validator;
+use Rhapsody\Core\View\ViewRenderer;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
+use Symfony\Component\Cache\Adapter\FilesystemAdapter;
+use Twig\Environment;
+use Twig\Loader\FilesystemLoader;
+
+// =========================================================================
+// STEP 1: INITIAL ENVIRONMENT & SYSTEM LAYOUT CONFIGURATION
+// =========================================================================
+
+// 1. Establish the explicit runtime application path base directory context Safely
+$basePath = Path::root();
+
+$envFile = $basePath . '/.env';
+if (file_exists($basePath . '/.env')) {
+    $dotenv = Dotenv\Dotenv::createImmutable($basePath);
+    $dotenv->load();
+}
+// 2. Create a new Service Container instance and assign it to global scope
+global $container;
+$container = new Container();
+$container->instance(\Rhapsody\Core\Contracts\ContainerInterface::class, $container);
+$configPath = $basePath . '/config/config.php';
+
+if (! file_exists($configPath)) {
+    throw new \Exception("Configuration file missing at expected target: " . $configPath);
+}
+
+// Expecting config.php to return its configuration array
+$config = require $configPath;
+$container->bind('config', function () use ($config) {
+    return $config;
+});
+
+$container->singleton(
+    \Rhapsody\Core\Support\Config::class,
+    fn($c) => new \Rhapsody\Core\Support\Config($c->get('config'))
+);
+
+// The framework version shown in the debug toolbar and available to CLI
+// commands via $config['app_version'] — same source as the update-check
+// banner (see NotificationService), so both stay in sync automatically.
+$config['app_version'] = FrameworkInfo::getVersion();
+
+// =========================================================================
+// STEP 2: SERVICE REGISTRATION (Register bindings into container memory)
+// =========================================================================
+
+// --- DDOS Middleware ---
+// Bind RateLimiter as a singleton (manual caching)
+$container->singleton(RateLimiter::class, function ($container) use ($config) {
+    return new RateLimiter(Cache::getInstance(), $config);
+});
+
+// Bind DdosMiddleware with its dependencies
+$container->bind(DdosMiddleware::class, function ($container) use ($config) {
+    return new DdosMiddleware(
+        $container->resolve(RateLimiter::class),
+        $config
+    );
+});
+
+// --- EVENT DISPATCHER BINDING ---
+$container->singleton(EventDispatcher::class, function (Container $c) {
+    $eventServiceProvider = new EventServiceProvider();
+    return new EventDispatcher($c, $eventServiceProvider->getListeners());
+});
+
+// --- DOCTRINE ENTITY MANAGER BINDING ---
+$container->singleton(EntityManager::class, function ($container) use ($config, $basePath) {
+    $paths     = [$basePath . '/app/Entities'];
+    $isDevMode = ($config['app_env'] ?? 'production') === 'development';
+
+    $cache          = $isDevMode ? new ArrayAdapter() : new FilesystemAdapter('', 0, $basePath . '/storage/cache/doctrine');
+    $sqlLogger      = \Rhapsody\Core\QueryLogger::getInstance();
+    $doctrineConfig = ORMSetup::createAttributeMetadataConfiguration($paths, $isDevMode, null, $cache);
+    $doctrineConfig->setSQLLogger($sqlLogger);
+
+    $dbParams = [
+        'driver'   => 'pdo_mysql',
+        'host'     => Env::string('DB_HOST'),
+        'user'     => Env::string('DB_USER'),
+        'password' => Env::string('DB_PASS'),
+        'dbname'   => Env::string('DB_NAME'),
+        'charset'  => 'utf8mb4',
+    ];
+
+    if (! Type::hasType('encrypted')) {
+        Type::addType('encrypted', \Rhapsody\Core\Doctrine\EncryptedType::class);
+    }
+
+    $connection = DriverManager::getConnection($dbParams, $doctrineConfig);
+    return new EntityManager($connection, $doctrineConfig);
+});
+
+// --- CACHE SYSTEM BINDING ---
+$container->singleton(CacheInterface::class, function () use ($config, $basePath) {
+    if ($config['cache']['driver'] === 'redis') {
+        $redisClient = new RedisClient([
+            'scheme'   => 'tcp',
+            'host'     => $config['redis']['host'],
+            'port'     => $config['redis']['port'],
+            'password' => $config['redis']['password'] ?: null,
+        ]);
+        return new RedisCacheDriver($redisClient);
+    }
+    // Inject the decoupled runtime directory path into your File Cache Driver
+    return new FileCacheDriver($basePath . '/storage/cache/app');
+});
+
+$container->singleton(Cache::class, function (Container $c) {
+    return new Cache($c->resolve(CacheInterface::class));
+});
+
+// Make Cache statically accessible (same pattern as Database::getInstance())
+Cache::setInstance($container->resolve(Cache::class));
+
+// --- CORE PACKAGE DATABASE SINGLETON BINDING ---
+$container->singleton(\Rhapsody\Core\Database::class, function () use ($config) {
+    if (empty($config)) {
+        throw new \Exception("The global \$config array is empty during Container service compilation.");
+    }
+
+    // Securely forward the configurations down to your core package class initialization method
+    return \Rhapsody\Core\Database::getInstance($config);
+});
+
+// --- TWIG BINDING ---
+$container->singleton(Environment::class, function (Container $c) use ($config, $basePath) {
+    $activeTheme = $config['theme'] ?? 'default';
+    $paths       = [];
+
+    // The active theme path is always the first priority.
+    $activeThemePath = $basePath . '/views/themes/' . $activeTheme;
+    if (is_dir($activeThemePath)) {
+        $paths[] = $activeThemePath;
+    }
+
+    // If the active theme is not the default, add the default theme as a fallback.
+    $defaultThemePath = $basePath . '/views/themes/default';
+    if ($activeTheme !== 'default' && is_dir($defaultThemePath)) {
+        $paths[] = $defaultThemePath;
+    }
+
+    // If for some reason no paths were added (e.g., bad config), fallback to default.
+    if (empty($paths) && is_dir($defaultThemePath)) {
+        $paths[] = $defaultThemePath;
+    }
+
+    if (empty($paths)) {
+        throw new \Exception("No valid theme directory found. Please check your configuration.");
+    }
+
+    $loader = new FilesystemLoader($paths);
+    // App views take priority
+    $loader->addPath($basePath . '/views');
+
+    // Register core views under a specific namespace safely
+    $coreViewsPath = $basePath . '/vendor/arout/rhapsody-core/resources/views/themes/default';
+    if (! is_dir($coreViewsPath)) {
+        $coreViewsPath = $basePath . '/vendor/arout/rhapsody-core/views/themes/default';
+    }
+
+    if (is_dir($coreViewsPath)) {
+        // @core/... resolves theme -> app views -> core default,
+        // so any core template can be overridden by the active theme or app.
+        $loader->setPaths(
+            array_merge($paths, [$basePath . '/views', $coreViewsPath]),
+            'core'
+        );
+
+        // Unchanged: fallback for non-namespaced templates
+        $loader->addPath($coreViewsPath);
+    }
+
+    // --- TWIG CACHING ENABLED ---
+    $isDevelopment = ($config['app_env'] === 'development');
+    $twigOptions   = [
+        'debug'       => $isDevelopment,
+        'cache'       => $basePath . '/storage/cache/twig',
+        'auto_reload' => $isDevelopment,
+    ];
+
+    $twig = new Environment($loader, $twigOptions);
+    ThemeValidator::validate($twig, $activeTheme);
+
+    if (empty($_ENV['APP_KEY']) && ($_ENV['APP_ENV'] ?? 'production') === 'production') {
+        throw new \RuntimeException(
+            'APP_KEY is not set. Generate one with: php -r "echo bin2hex(random_bytes(32));" ' .
+            'and add it to your .env file. The application cannot run in production without it.'
+        );
+    }
+
+    $twig->addGlobal('app_url', $_ENV['APP_URL'] ?? '');
+    $twig->addGlobal('app_env', $_ENV['APP_ENV'] ?? 'production');
+
+    if (! $twig->hasExtension(\Rhapsody\Core\React\ReactIslandExtension::class)) {
+        $twig->addExtension(new \Rhapsody\Core\React\ReactIslandExtension());
+    }
+
+    // Register a smart vite_assets function
+    // the ['is_safe'] arg is crucial here; Twig will escape the output
+    // and just print the HTML to screen without it.
+    $twig->addFunction(new \Twig\TwigFunction('vite_assets', function ($entry) {
+        return \Rhapsody\Core\React\ViteManifest::tags($entry);
+    }, ['is_safe' => ['html']]));
+
+    // Auth lazy object
+    $auth = new class($c)
+    {
+        public function __construct(private Container $container)
+        {}
+
+        public function __get(string $name): mixed
+        {
+            return match ($name) {
+                'check' => Session::has('user_id'),
+                'user'  => $this->currentUser(),
+                default => null,
+            };
+        }
+
+        private function currentUser(): mixed
+        {
+            $uid = Session::get('user_id');
+
+            if (! is_string($uid) && ! is_int($uid)) {
+                return null;
+            }
+
+            return $this->container->resolve(\App\Models\User::class)->getUserById((string) $uid);
+        }
+
+        public function __isset(string $name): bool
+        {
+            return in_array($name, ['check', 'user']);
+        }
+    };
+    $twig->addGlobal('auth', $auth);
+    $twig->addGlobal('base_url', Env::string('APP_URL') . Env::string('APP_BASE_URL'));
+    $twig->addGlobal('APP_THEME', Env::string('APP_THEME', 'default'));
+    $twig->addGlobal('app_theme', Env::string('APP_THEME', 'default'));
+    $twig->addExtension(new \Rhapsody\Core\Twig\StorageExtension());
+
+    // Lazy‑loaded flash messages
+    $flash = new class {
+        public function __get(string $name): mixed
+        {
+            return Session::getFlash($name);
+        }
+        public function __isset(string $name): bool
+        {
+            return Session::hasFlash($name);
+        }
+    };;
+
+    $twig->addGlobal('flash', $flash);
+
+    $twig->addFunction(new \Twig\TwigFunction('csrf_field', function () {
+        $token = Session::csrfToken();
+        return new \Twig\Markup('<input type="hidden" name="_token" value="' . $token . '">', 'UTF-8');
+    }));
+
+    return $twig;
+});
+
+// --- VIEW RENDERER BINDING ---
+// Shared render pipeline (meta-merge -> schema -> captcha -> Twig render ->
+// Response wrap) used by BaseController::view() and, from Phase 3 onward,
+// module-facing rendering (TwigFacade). Bound against the same Twig
+// Environment singleton above, so extensions/globals registered on it
+// (by BaseController's constructor or elsewhere) are visible here too.
+$container->singleton(ViewRenderer::class, function (Container $c) {
+    return new ViewRenderer($c->resolve(Environment::class));
+});
+
+// --- ENCRYPTION ---
+$container->singleton(EncrypterInterface::class, fn() => Encrypter::getInstance());
+$container->singleton(UrlSigner::class, fn(Container $c) => new UrlSigner($c->resolve(EncrypterInterface::class)));
+
+// --- OTHER CORE SERVICES ---
+$container->bind(\Rhapsody\Core\Contracts\AuthenticatableInterface::class, \App\Models\User::class);
+$container->bind(PaymentGatewayInterface::class, function () use ($config) {
+    $gatewayType = $config['payment']['gateway'] ?? 'Stripe';
+    $currency    = $config['payment']['currency'] ?? 'USD';
+
+    try {
+        $gateway = Omnipay::create($gatewayType);
+    } catch (\Throwable $e) {
+        throw new \RuntimeException("Unsupported payment gateway: \"{$gatewayType}\". Check the PAYMENT_GATEWAY env variable.", 0, $e);
+    }
+
+    // Configure API keys based on the driver
+    if ($gatewayType === 'Stripe') {
+        $gateway->initialize(['apiKey' => $_ENV['STRIPE_SECRET_KEY'] ?? '']);
+    } elseif ($gatewayType === 'PayPal_Rest') {
+        $gateway->initialize([
+            'clientId' => $_ENV['PAYPAL_CLIENT_ID'] ?? '',
+            'secret'   => $_ENV['PAYPAL_SECRET'] ?? '',
+            'testMode' => filter_var($_ENV['PAYPAL_TEST_MODE'] ?? true, FILTER_VALIDATE_BOOLEAN),
+        ]);
+    }
+
+    return new OmnipayGateway($gateway, $currency);
+});
+
+$container->bind(Rhapsody\Core\Mailer::class, function ($c) use ($config) {
+    return new \Rhapsody\Core\Mailer($config['mailer'] ?? []);
+});
+$container->bind(Validator::class, function (Container $c) {
+    return new Validator($c->resolve(EntityManager::class));
+});
+$container->bind(Request::class, fn() => new Request());
+$container->bind(NotificationService::class, function (Container $c) {
+    return new NotificationService($c->resolve(Cache::class));
+});
+
+// --- COMMAND BINDINGS (Refactored to inject context-aware path mappings) ---
+$container->bind(\Rhapsody\Core\Commands\AuthInstallCommand::class, function ($c) {
+    return new \Rhapsody\Core\Commands\AuthInstallCommand();
+});
+
+$container->bind(CheckVersionCommand::class, function ($c) use ($config) {
+    return new CheckVersionCommand(
+        $config,
+        $c->resolve(Mailer::class),
+        $c->resolve(Cache::class),
+        $c->resolve(NotificationService::class)
+    );
+});
+
+$container->bind(CacheClearCommand::class, function ($c) use ($basePath) {
+    return new CacheClearCommand($c->resolve(Cache::class), $basePath);
+});
+
+$container->bind(CacheWarmCommand::class, function () use ($basePath) {
+    return new CacheWarmCommand($basePath);
+});
+
+$container->bind(EnvSyncCommand::class, function () use ($basePath) {
+    return new EnvSyncCommand($basePath);
+});
+
+$container->bind(MakeControllerCommand::class, function () use ($basePath) {
+    return new MakeControllerCommand($basePath);
+});
+
+$container->bind(MakeEventCommand::class, function () use ($basePath) {
+    return new MakeEventCommand($basePath);
+});
+
+$container->bind(MakeListenerCommand::class, function () use ($basePath) {
+    return new MakeListenerCommand($basePath);
+});
+
+$container->bind(MakeMiddlewareCommand::class, function () use ($basePath) {
+    return new MakeMiddlewareCommand($basePath);
+});
+
+$container->bind(MakeMigrationCommand::class, function () use ($basePath) {
+    return new MakeMigrationCommand($basePath);
+});
+
+$container->bind(MakeModelCommand::class, function () use ($basePath) {
+    return new MakeModelCommand($basePath);
+});
+
+$container->bind(MigrateCommand::class, function ($c) use ($basePath) {
+    return new MigrateCommand($basePath, $c->resolve(\Rhapsody\Core\Database::class));
+});
+
+$container->bind(SkeletonSyncCommand::class, function () use ($basePath) {
+    return new SkeletonSyncCommand($basePath);
+});
+
+$container->bind(RouteCacheCommand::class, function () use ($basePath) {
+    return new RouteCacheCommand($basePath);
+});
+
+$container->bind(RouteClearCommand::class, function () use ($basePath) {
+    return new RouteClearCommand($basePath);
+});
+
+$container->bind(ReactInstallCommand::class, function () use ($basePath) {
+    return new ReactInstallCommand($basePath);
+});
+
+$container->bind(MakeReactCommand::class, function () use ($basePath) {
+    return new MakeReactCommand($basePath);
+});
+
+$container->bind(\Rhapsody\Core\Commands\BuildProxiesCommand::class, function ($c) {
+    return new \Rhapsody\Core\Commands\BuildProxiesCommand;
+});
+
+// --------------------------------------------------------------
+// STEP 2.5: USER EXTENSION HOOK
+// --------------------------------------------------------------
+$userBootstrap = $basePath . '/bootstrap.php';
+if (file_exists($userBootstrap)) {
+    // The container is fully built; pass it to the user file.
+    require $userBootstrap;
+}
+
+// =========================================================================
+// STEP 2.6: MODULE BOOTSTRAP
+// =========================================================================
+// Discover every installed Composer package of type "rhapsody-module",
+// validate its manifest/compatibility, and boot it. Must run after the
+// container above is fully built (modules resolve EventDispatcher/Router/
+// Twig through it via ModuleContext) and before STEP 3 loads routes, since
+// a module's boot() is where it registers its own routes.
+$moduleInstalls = new \Rhapsody\Core\Modules\ModuleInstallationStore($basePath);
+$moduleRegistry = new \Rhapsody\Core\Modules\ModuleRegistry($container, $basePath, $moduleInstalls);
+
+// Register both in the container BEFORE bootAll() runs — modules get
+// container access during boot (indirectly, via ModuleContext), so if a
+// module's boot() ever resolves either of these services to inspect its
+// own or another module's installation state, it needs to find the real,
+// already-constructed instances here, not a resolution failure or a
+// stale duplicate built from scratch.
+$container->instance(\Rhapsody\Core\Modules\ModuleInstallationStore::class, $moduleInstalls);
+$container->instance(\Rhapsody\Core\Modules\ModuleRegistry::class, $moduleRegistry);
+
+$moduleRegistry->bootAll();
+
+// =========================================================================
+// STEP 2.7: LAZY LOADING DECORATOR (web only)
+// =========================================================================
+
+// Web SAPI and RoadRunner workers (CLI, but serving HTTP per request).
+if (PHP_SAPI !== 'cli' || (defined('RHAPSODY_HTTP_WORKER') && RHAPSODY_HTTP_WORKER)) {
+    $lazyEnabled = filter_var(
+        $_ENV['LAZY_LOADING_ENABLED'] ?? $config['lazy']['enabled'] ?? true,
+        FILTER_VALIDATE_BOOLEAN
+    );
+
+    if ($lazyEnabled) {
+        $configuredEager = $config['lazy']['eager'] ?? [];
+
+        $eagerServices = array_values(array_filter(array_merge(
+            is_array($configuredEager) ? $configuredEager : [],
+            [
+                Container::class,
+                \Rhapsody\Core\Routing\Router::class,
+                \Rhapsody\Core\Events\EventDispatcher::class,
+                \Rhapsody\Core\Request::class,
+                \Rhapsody\Core\Response::class,
+                \Rhapsody\Core\Cache::class,
+                \Rhapsody\Core\Database::class,
+                \Rhapsody\Core\Session::class,
+                \Twig\Environment::class,
+                ViewRenderer::class,
+                NotificationService::class,
+                \Doctrine\ORM\EntityManager::class,
+            ]
+        ), 'is_string'));
+
+        $proxyCacheDir = $basePath . '/storage/cache/proxies';
+        $proxyFactory  = new \Rhapsody\Core\Proxy\LazyProxyFactory($container, $proxyCacheDir);
+
+        $container = new \Rhapsody\Core\Proxy\ContainerDecorator(
+            $container,
+            $proxyFactory,
+            $lazyEnabled,
+            $eagerServices
+        );
+
+        // Update the global reference.
+        global $container;
+        $container = $container;
+    }
+}
+
+// =========================================================================
+// STEP 3: ROUTING & MIDDLEWARE CONFIGURATION (boot-time, once)
+// =========================================================================
+
+// Global Middleware Configuration Setup
+$middlewareConfig = $config['middleware'] ?? ['map' => [], 'global' => []];
+Router::setMiddlewareConfig($middlewareConfig);
+
+// Load routes exactly once. In production, prefer the compiled route cache
+// if it exists; otherwise load the live route files. This used to be split
+// across bootstrap.php (which only ever loaded routes/web.php, unconditionally)
+// and index.php (which loaded routes/web.php + routes/api.php AGAIN whenever
+// not using the cache) — meaning every app route was registered twice on
+// every non-cached request.
+$routeCachePath = $basePath . '/storage/cache/routes/routes.php';
+if (file_exists($routeCachePath) && ($config['app_env'] ?? 'production') === 'production') {
+    $routes = require $routeCachePath;
+    Router::setRoutes($routes);
+} else {
+    // 1. Framework-defined routes (login, docs, password reset, social auth, etc.)
+    if (file_exists($basePath . '/vendor/arout/rhapsody-core/src/routes.php')) {
+        require $basePath . '/vendor/arout/rhapsody-core/src/routes.php';
+    }
+
+    // 2. Downstream application routes
+    if (file_exists($basePath . '/routes/web.php')) {
+        require $basePath . '/routes/web.php';
+    }
+    if (file_exists($basePath . '/routes/api.php')) {
+        require $basePath . '/routes/api.php';
+    }
+}
+
+// 3. Return the completely compiled and configured dependency injection container.
+Container::setInstance($container);
+return $container;

@@ -1,0 +1,102 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>RoadRunner Persistent Workers</h1>
+    <p>
+        By default, Rhapsody boots fresh on every single request — the container is built, every service binding is registered, modules boot, and routes load, all from scratch, every time. This is what makes Rhapsody work correctly on ordinary shared hosting and modest VPS environments with zero configuration. It's also, unavoidably, work that gets thrown away and redone on the very next request.
+    </p>
+    <p>
+        <code>arout/rhapsody-roadrunner</code> is an optional package that runs your application inside a <a href="https://roadrunner.dev/" target="_blank" rel="noopener">RoadRunner</a> worker process — a long-lived PHP process that stays booted and handles many requests in a loop, instead of one request per process. The container, your service bindings, the Doctrine <code>EntityManager</code>, the Twig environment, and everything else built during boot are constructed <strong>once</strong> and reused across every request the worker serves.
+    </p>
+    <div class="bg-blue-50 border-l-4 border-blue-500 text-blue-700 p-4">
+        <strong>This is opt-in, and it's not for everyone.</strong> Classic per-request Rhapsody is, and will remain, the default and the recommendation for shared hosting. Reach for this package specifically when you're deploying to your own VPS or container and want to eliminate per-request boot overhead under real load.
+    </div>
+
+    <hr>
+
+    <h2>Requirements</h2>
+    <ul>
+        <li>PHP 8.4.1 or greater (same as core Rhapsody)</li>
+        <li>Shell/process access to run a long-lived binary — <strong>this rules out most shared hosting</strong>, since you can't normally start and supervise a persistent process there. A VPS, dedicated server, or container platform is required.</li>
+        <li>The <code>sockets</code> PHP extension</li>
+    </ul>
+    <div class="bg-red-200 border-l-4 border-red-700 text-red-700 p-4">
+        <strong>Check <code>ext-sockets</code> before you install.</strong> RoadRunner's PHP worker communicates with the RoadRunner binary over a socket connection, so this extension is a hard requirement, not an optional one. Run <code>php -m | grep sockets</code> to check. Most VPS and dedicated server environments ship it enabled by default, but some locked-down shared hosts and minimal container images disable it — and on many of those, you won't have the permissions to enable it yourself. If <code>composer require</code> fails with a message about <code>ext-sockets</code>, this is why, and it means this deployment path isn't available to you on that host.
+    </div>
+
+    <hr>
+
+    <h2>Installation</h2>
+    <pre><code class="language-bash">composer require arout/rhapsody-roadrunner</code></pre>
+    <p>
+        This installs the <code>Rhapsody\RoadRunner\RoadRunnerKernel</code> class plus two template files you'll need at your project root — a worker entry point and a RoadRunner config file. Copy them out of the package:
+    </p>
+    <pre><code class="language-bash">cp vendor/arout/rhapsody-roadrunner/stubs/worker.php.stub ./worker.php
+cp vendor/arout/rhapsody-roadrunner/stubs/.rr.yaml.stub ./.rr.yaml</code></pre>
+    <p>
+        Both are yours to edit once copied — they're a starting point, not a file the package manages for you. <code>worker.php</code> is your application's entry point under RoadRunner, the same role <code>index.php</code> plays under classic PHP. <code>.rr.yaml</code> configures the RoadRunner server itself: how many worker processes to run, and when to recycle them.
+    </p>
+    <p>You'll also need the RoadRunner binary itself, which is a separate download (it's a compiled Go binary, not a PHP package):</p>
+    <pre><code class="language-bash">./vendor/bin/rr get</code></pre>
+
+    <hr>
+
+    <h2>Running It</h2>
+    <pre><code class="language-bash">./rr serve</code></pre>
+    <p>
+        This starts the RoadRunner server, which spawns and supervises your <code>worker.php</code> processes according to <code>.rr.yaml</code> and begins forwarding HTTP requests to them. There's no Apache or PHP-FPM involved on the request path — RoadRunner is the server.
+    </p>
+
+    <hr>
+
+    <h2>Deploying Code Changes</h2>
+    <div class="bg-red-200 border-l-4 border-red-700 text-red-700 p-4">
+        <strong>You must restart your workers after every deploy.</strong> Because <code>worker.php</code> and everything it boots stays loaded in memory for the life of the process, a worker that was already running when you deployed new code is still serving the <em>old</em> code — PHP doesn't hot-reload class definitions in a long-running process. This is the single most common mistake when moving from classic per-request PHP to a persistent-worker model: a deploy that looks successful while workers keep quietly serving stale code until they happen to restart on their own.
+    </div>
+    <p>Restart workers as the final step of every deploy:</p>
+    <pre><code class="language-bash">./rr reset</code></pre>
+
+    <hr>
+
+    <h2>What Stays Warm, What Resets</h2>
+    <p>
+        Everything built during boot — the container and its service bindings, the Doctrine <code>EntityManager</code>, the Twig environment, the registered routes and middleware configuration, installed modules — is constructed once per worker process and reused across every request it serves. This is where the performance benefit comes from.
+    </p>
+    <p>
+        The parts of a request that genuinely are per-request — the <code>Request</code> and <code>Response</code> objects, PHP's session, and a short list of internal bookkeeping — are explicitly reset on every single request by <code>Kernel::resetState()</code>, before your route even matches:
+    </p>
+    <ul>
+        <li>The container's dependency-resolution trace is cleared, so the debug toolbar reflects only the current request.</li>
+        <li>The router's last-matched-route is cleared, so no request can ever observe a route matched by the one before it.</li>
+        <li>If a <code>Database</code> connection was opened, it's pinged and transparently reconnected if the underlying connection was dropped while the worker was idle — this happens naturally between requests due to database server timeouts, and would otherwise surface as a confusing connection error on whichever request happens to run next.</li>
+        <li>The Doctrine <code>EntityManager</code>'s identity map is cleared, so entities loaded by a previous request never leak into the current one's object graph. If Doctrine had permanently closed it — which it does after certain unrecoverable ORM exceptions — it's discarded and transparently rebuilt from scratch instead.</li>
+        <li>SQL query logs collected for the debug toolbar are cleared, so the query panel shows only the current request's queries, not every query since the worker started.</li>
+    </ul>
+    <p>
+        <code>$_GET</code>, <code>$_POST</code>, <code>$_SERVER</code>, <code>$_COOKIE</code>, and <code>$_FILES</code> are also repopulated from the actual incoming request on every iteration by <code>RoadRunnerKernel</code>, since a long-running process doesn't get fresh superglobals the way a new PHP process does.
+    </p>
+
+    <hr>
+
+    <h2>Writing Worker-Safe Application Code</h2>
+    <p>
+        The framework itself handles the reset concerns above automatically. But this is a genuinely different execution model than classic PHP, and it has one implication for your own application code that's worth understanding before you deploy on it:
+    </p>
+    <div class="bg-blue-50 border-l-4 border-blue-500 text-blue-700 p-4">
+        <strong>Any <code>static</code> property in your own classes is now a cross-request leak risk.</strong> Under classic PHP, a static property's lifetime is bounded by the request, because the whole process ends afterward — so it was always safe, even if it looked sloppy. Under a persistent worker, that same static property now lives for the life of the worker process, which means data from one visitor's request can silently become visible to the next visitor's request if you're not careful. Before deploying existing application code under RoadRunner, audit it for static properties that hold request-specific data (a static cache of "the current user," a static accumulator, anything set once and read later in the same request) and make sure they're either request-scoped some other way, or explicitly cleared.
+    </div>
+
+    <hr>
+
+    <h2>Safety Net: Automatic Worker Recycling</h2>
+    <p>
+        Code-level reset hygiene reduces leaks, but it's not realistic to guarantee it catches everything — especially in third-party dependencies you don't control. RoadRunner's supervisor can recycle (gracefully restart) a worker after it's handled a fixed number of requests, or if its memory usage crosses a threshold, whichever comes first. This is standard practice for any persistent-PHP-worker deployment, RoadRunner or otherwise — treat it as a backstop alongside the reset behavior above, not a replacement for it:
+    </p>
+    <pre><code class="language-yaml">http:
+  pool:
+    num_workers: 4
+    max_jobs: 1000
+    supervisor:
+      max_worker_memory: 128</code></pre>
+    <p>This example recycles a worker after 1,000 requests, or if it exceeds 128MB of memory — whichever happens first.</p>
+{% endblock %}

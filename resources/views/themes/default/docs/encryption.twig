@@ -1,0 +1,224 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>Encryption &amp; Signing</h1>
+    <p>
+        Rhapsody ships with a small, fast encryption service built on PHP's bundled OpenSSL extension. It covers the four things most applications actually need: <strong>encrypting</strong> a value, <strong>signing</strong> a value so tampering is detectable, <strong>signed URLs</strong>, and <strong>encrypted database columns</strong>. There are no extra Composer dependencies, and the service is only instantiated if your code uses it.
+    </p>
+    <p>
+        Encryption is <strong>authenticated</strong> (AES-256-GCM): a payload that was modified, or that was produced with a different key, simply fails to decrypt. The framework's own <a href="{{ base_url }}/docs/cookie-storage">cookie storage</a> is built on this service.
+    </p>
+
+    <hr>
+
+    <h2>Configuration</h2>
+    <p>
+        Everything is derived from the <code>APP_KEY</code> in your <code>.env</code> file. The key must be <strong>at least 32 bytes</strong>; 64 random hex characters is recommended:
+    </p>
+    <pre><code class="language-bash">APP_KEY=your-64-character-hex-key</code></pre>
+    <p>
+        Generate one with: <code>php -r "echo bin2hex(random_bytes(32));"</code>
+    </p>
+    <p>
+        Separate encryption and signing keys are derived from <code>APP_KEY</code> using HKDF, so you only ever manage one secret. If <code>APP_KEY</code> is missing or too short, the first use of the service throws an exception rather than falling back to an insecure default.
+    </p>
+
+    <hr>
+
+    <h2>Encrypting &amp; Decrypting</h2>
+    <p>
+        Type-hint <code>EncrypterInterface</code> in a controller or service and the container will inject it, or use the shared instance anywhere:
+    </p>
+    <pre><code class="language-php">use Rhapsody\Core\Contracts\EncrypterInterface;
+use Rhapsody\Core\Services\Encrypter;
+
+// Via dependency injection
+public function __construct(protected EncrypterInterface $encrypter) {}
+
+// Or the shared instance
+$encrypter = Encrypter::getInstance();
+
+$token = $encrypter-&gt;encrypt('my secret value');
+// "AQ3x...": safe to use in cookies, URLs and form fields
+
+$plain = $encrypter-&gt;decrypt($token);
+// "my secret value", or null if it was tampered with or can't be decrypted</code></pre>
+
+    <p>
+        <code>decrypt()</code> returns <code>null</code> on any failure, so always compare with <code>=== null</code>. An empty string is a valid decrypted value.
+    </p>
+    <p>
+        Values are strings. To encrypt an array or object, <code>json_encode()</code> it first and <code>json_decode()</code> the result.
+    </p>
+
+    <h3>Contexts</h3>
+    <p>
+        Every method accepts an optional <strong>context</strong> string that is cryptographically bound to the result. A value encrypted under one context will not decrypt under another, which prevents a valid payload from being copied somewhere it was never meant to go.
+    </p>
+    <pre><code class="language-php">$token = $encrypter-&gt;encrypt('42', 'invoice-download');
+
+$encrypter-&gt;decrypt($token, 'invoice-download'); // "42"
+$encrypter-&gt;decrypt($token, 'password-reset');   // null
+$encrypter-&gt;decrypt($token);                     // null</code></pre>
+
+    <hr>
+
+    <h2>Signing</h2>
+    <p>
+        Signing leaves the value <strong>readable</strong> but makes any change detectable. Use it when the user may see the data and you only need to know it hasn't been altered.
+    </p>
+    <pre><code class="language-php">$signed = $encrypter-&gt;sign('user:42');
+// "user:42.Zr8k..."
+
+$value = $encrypter-&gt;unsign($signed);
+// "user:42", or null if the value or signature was changed
+
+// Detached signatures, if you want to store the signature separately
+$sig = $encrypter-&gt;signature($data, 'my-context');
+$ok  = $encrypter-&gt;verifySignature($data, $sig, 'my-context');</code></pre>
+
+    <h3>Signed URLs</h3>
+    <p>
+        <code>UrlSigner</code> adds a <code>signature</code> query parameter to a URL, and optionally an <code>expires</code> timestamp that is covered by the signature. It is ideal for email verification, unsubscribe links and temporary downloads.
+    </p>
+    <pre><code class="language-php">use Rhapsody\Core\Services\UrlSigner;
+
+public function __construct(protected UrlSigner $signer) {}
+
+// Valid until changed
+$url = $this-&gt;signer-&gt;sign('https://example.com/unsubscribe?user=42');
+
+// Valid for one hour
+$url = $this-&gt;signer-&gt;sign('https://example.com/download?file=7', 3600);
+
+// In the route that receives the link: pass the full URL of the request
+if (! $this-&gt;signer-&gt;verify($fullRequestUrl)) {
+    // invalid signature, altered parameters, or expired
+}</code></pre>
+    <p>
+        Sign and verify the same form of URL. A link signed as a relative path (<code>/verify?id=5</code>) will not verify when checked as an absolute URL.
+    </p>
+
+    <hr>
+
+    <h2>Key Rotation</h2>
+    <p>
+        Changing <code>APP_KEY</code> would normally make everything encrypted with the old key unreadable. To rotate without breaking existing data, move the old key into <code>APP_PREVIOUS_KEYS</code> (comma-separated):
+    </p>
+    <pre><code class="language-bash">APP_KEY=the-new-64-character-hex-key
+APP_PREVIOUS_KEYS=the-old-key,an-even-older-key</code></pre>
+    <p>
+        New data is always written with <code>APP_KEY</code>. When reading, the current key is tried first, then each previous key. Once you are confident nothing encrypted with an old key remains (cookies have expired, database columns have been re-saved), remove it from the list.
+    </p>
+
+    <hr>
+
+    <h2>Encrypted Database Columns</h2>
+    <p>
+        The <code>encrypted</code> Doctrine type encrypts a value when it is saved and decrypts it when it is loaded, so the database only ever contains ciphertext. The type is registered by the framework; just use it on an entity property:
+    </p>
+    <pre><code class="language-php">use Doctrine\ORM\Mapping as ORM;
+
+#[ORM\Entity]
+class Integration
+{
+    #[ORM\Column(type: 'encrypted', nullable: true)]
+    private ?string $apiKey = null;
+
+    public function getApiKey(): ?string { return $this-&gt;apiKey; }
+    public function setApiKey(?string $key): void { $this-&gt;apiKey = $key; }
+}</code></pre>
+    <p>
+        The column is created as <code>TEXT</code> on MySQL, SQL Server, PostgreSQL and SQLite. In a hand-written migration, use a text column.
+    </p>
+    <p><strong>Things to know:</strong></p>
+    <ul>
+        <li><strong>You cannot query by an encrypted column.</strong> Each encryption uses a random nonce, so the same plaintext produces different ciphertext every time. <code>WHERE</code>, <code>ORDER BY</code> and indexes won't work on it. If you need lookups, store a separate hash column.</li>
+        <li><strong>Strings only.</strong> <code>json_encode()</code> arrays before assigning them.</li>
+        <li><strong>Unreadable data throws.</strong> If a stored value can't be decrypted (corrupt, or the key changed without being added to <code>APP_PREVIOUS_KEYS</code>), loading the entity throws an exception instead of returning an empty value that could be saved over the real one.</li>
+    </ul>
+
+    <hr>
+
+    <h2>Method Reference</h2>
+    <div class="overflow-x-auto">
+        <table class="w-full border-collapse bg-gray-50 dark:bg-gray-800/50 rounded-lg overflow-hidden">
+            <thead>
+                <tr class="bg-gray-200 dark:bg-gray-700">
+                    <th class="text-left p-3 font-semibold text-gray-700 dark:text-gray-300">Method</th>
+                    <th class="text-left p-3 font-semibold text-gray-700 dark:text-gray-300">Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>encrypt(string $plaintext, string $context = '')</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">Encrypts and authenticates a string. Returns a URL and cookie-safe string.</td>
+                </tr>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>decrypt(string $payload, string $context = '')</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">Returns the original string, or <code>null</code> if the payload is invalid, altered, or bound to another context.</td>
+                </tr>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>sign(string $value, string $context = '')</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">Returns <code>value.signature</code>. The value remains readable.</td>
+                </tr>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>unsign(string $signed, string $context = '')</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">Returns the original value, or <code>null</code> if the signature doesn't match.</td>
+                </tr>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>signature(string $data, string $context = '')</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">Returns a detached, URL-safe signature for any data.</td>
+                </tr>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>verifySignature(string $data, string $signature, string $context = '')</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">Timing-safe check of a detached signature.</td>
+                </tr>
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="p-3"><code>UrlSigner::sign(string $url, ?int $ttlSeconds = null)</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">Returns the URL with a signature (and optional expiry) appended.</td>
+                </tr>
+                <tr>
+                    <td class="p-3"><code>UrlSigner::verify(string $url)</code></td>
+                    <td class="p-3 text-gray-600 dark:text-gray-400">Returns <code>true</code> if the signature is valid and the link has not expired.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <hr>
+
+    <h2>Custom Drivers</h2>
+    <p>
+        The default driver is one class behind a small interface. To use something different (for example a key held in a KMS or HSM), implement <code>Rhapsody\Core\Contracts\EncrypterInterface</code> and register it, typically in your application's <code>bootstrap.php</code>:
+    </p>
+    <pre><code class="language-php">use Rhapsody\Core\Contracts\EncrypterInterface;
+use Rhapsody\Core\Services\Encrypter;
+
+$myDriver = new App\Security\KmsEncrypter();
+
+Encrypter::setInstance($myDriver);
+$container-&gt;instance(EncrypterInterface::class, $myDriver);</code></pre>
+    <p>
+        Cookies, signed URLs and encrypted columns all use whichever instance is registered. <code>Encrypter::setInstance()</code> is also the right way to supply a fixed key in unit tests.
+    </p>
+
+    <hr>
+
+    <h2>What This Is Not For</h2>
+    <ul>
+        <li><strong>Passwords:</strong> never encrypt passwords. Hash them with <code>password_hash()</code> and verify with <code>password_verify()</code>.</li>
+        <li><strong>CSRF tokens and sessions:</strong> these are random values stored server-side and compared directly. Encrypting them adds cost without adding security.</li>
+        <li><strong>Secrets the browser must read:</strong> encryption protects data from the client, but the server holds the key. Data that JavaScript needs (for example in <code>localStorage</code>) cannot be protected this way.</li>
+    </ul>
+
+    <hr>
+
+    <h2>Upgrading</h2>
+    <p>
+        The encrypted payload format changed when this service was introduced (a version byte and a per-cookie context were added). Cookies set by earlier versions of Rhapsody will no longer decrypt: <code>Cookie::get()</code> returns your default value for them, exactly as it does for a tampered cookie, and the next <code>Cookie::set()</code> replaces them. PHP sessions are not affected.
+    </p>
+    <p>
+        <code>Cookie::setEncryptionKey()</code> has been removed. The key now always comes from <code>APP_KEY</code> (and <code>APP_PREVIOUS_KEYS</code>). If your own code called it, delete the call.
+    </p>
+{% endblock %}

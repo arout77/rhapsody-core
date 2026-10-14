@@ -1,0 +1,282 @@
+{% extends "docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>Using Tailwind CSS in a Theme</h1>
+    <p>
+        Rhapsody is CSS-agnostic: it doesn't ship a Tailwind build step and it doesn't care how your stylesheet is produced. A Tailwind theme is simply a regular theme whose stylesheet happens to be <strong>compiled by you</strong> and linked from your layout. This page walks through the full workflow, from installing Tailwind to activating the theme.
+    </p>
+
+    <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
+        <strong>The short version:</strong> create the theme folder, compile Tailwind into <code>public/themes/&lt;theme_name&gt;/css/</code>, link that file from your <code>main.twig</code>, and set <code>APP_THEME</code> in <code>.env</code>. Tailwind runs at build time only, so nothing about it executes on the server.
+    </div>
+
+    <hr>
+
+    <h2>Checklist</h2>
+    <ol>
+        <li>Create the theme folder and a <code>main.twig</code> layout.</li>
+        <li>Install Tailwind (Node is only needed on your development machine).</li>
+        <li>Create an <code>input.css</code> that tells Tailwind where your templates live.</li>
+        <li>Build the CSS into the theme's public folder.</li>
+        <li>Link the compiled file from the <code>styles</code> block of <code>main.twig</code>.</li>
+        <li>Activate the theme with <code>APP_THEME</code>.</li>
+    </ol>
+
+    <hr>
+
+    <h2>1. Create the Theme Folder</h2>
+    <p>Every theme lives in its own folder under <code>views/themes/</code>. The layout must be named <code>main.twig</code> and sit in a <code>layouts</code> subfolder:</p>
+    <pre><code class="language-bash">views/themes/my_theme/
+├── layouts/
+│   └── main.twig
+├── auth/           ← login, register, forgot/reset password overrides
+├── errors/         ← 404.twig, 500.twig, ...
+└── pages/          ← your page templates
+
+public/themes/my_theme/
+└── css/
+    └── my_theme.css   ← compiled Tailwind output (generated, see below)</code></pre>
+    <p>See <a href="{{ base_url }}/docs/themes">Creating custom themes</a> for how view resolution and overrides work.</p>
+
+    <hr>
+
+    <h2>2. Install Tailwind</h2>
+    <p>From your application root (the folder containing <code>views/</code> and <code>public/</code>):</p>
+    <pre><code class="language-bash">npm init -y
+npm install -D tailwindcss @tailwindcss/cli</code></pre>
+    <p>Optionally add the typography plugin if you render long-form content with the <code>prose</code> classes:</p>
+    <pre><code class="language-bash">npm install -D @tailwindcss/typography</code></pre>
+    <p>
+        These commands target <strong>Tailwind v4</strong>. If you are on v3, see <a href="#tailwind-v3">Tailwind v3</a> below.
+    </p>
+
+    <hr>
+
+    <h2>3. Create <code>input.css</code></h2>
+    <p>Tailwind only generates the classes it finds in your templates, so it needs to know where your Twig files are. Paths in <code>@source</code> are relative to the CSS file itself.</p>
+    <pre><code class="language-css">/* input.css (application root) */
+@import "tailwindcss" source(none);
+
+/* Scan only your theme's templates */
+@source "./views/themes/my_theme";
+
+/* Class-based dark mode (see "Dark, Light and System Mode") */
+@custom-variant dark (&amp;:where(.dark, .dark *));
+
+/* Optional plugins */
+/* @plugin "@tailwindcss/typography"; */
+
+/* Your design tokens */
+@theme {
+    --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+    --color-brand-500: oklch(0.62 0.19 259);
+}</code></pre>
+    <p>
+        <code>source(none)</code> switches off Tailwind's automatic file detection so it only scans the paths you list. This keeps builds fast and avoids picking up unrelated files.
+    </p>
+
+    <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4">
+        <strong>Extending core views?</strong> Templates in <code>vendor/arout/rhapsody-core/resources/views</code> use their own Tailwind classes. If your theme extends or includes any of them (for example the built-in auth views), add
+        <code>@source "./vendor/arout/rhapsody-core/resources/views";</code> too. Otherwise their classes won't exist in your compiled CSS and those pages will look unstyled. Automatic detection skips git-ignored folders like <code>vendor/</code>, which is why this has to be declared explicitly.
+    </div>
+
+    <hr>
+
+    <h2>4. Build the CSS</h2>
+    <p>Compile into your theme's public folder. Add these as scripts in <code>package.json</code> so you don't have to remember them:</p>
+    <pre><code class="language-json">{
+    "scripts": {
+        "css:watch": "tailwindcss -i ./input.css -o ./public/themes/my_theme/css/my_theme.css --watch",
+        "css:build": "tailwindcss -i ./input.css -o ./public/themes/my_theme/css/my_theme.css --minify"
+    }
+}</code></pre>
+    <pre><code class="language-bash"># While developing: rebuilds on every template change
+npm run css:watch
+
+# Before deploying or releasing: minified output
+npm run css:build</code></pre>
+    <p>
+        You can also run the CLI directly with <code>npx @tailwindcss/cli -i ./input.css -o ./public/themes/my_theme/css/my_theme.css</code>.
+    </p>
+    <p>
+        <strong>Rebuild whenever you add or change classes in a template.</strong> A page that looks right in one place and unstyled in another almost always means the build is stale or the template isn't covered by an <code>@source</code> path.
+    </p>
+
+    <hr>
+
+    <h2>5. Link the Stylesheet in <code>main.twig</code></h2>
+    <p>
+        Your <code>main.twig</code> must contain the standard Rhapsody blocks (<code>title</code>, <code>description</code>, <code>styles</code>, <code>head_extensions</code>, <code>navigation</code>, <code>content</code> and <code>scripts</code>). A minimal Tailwind skeleton looks like this:
+    </p>
+    <pre><code class="language-twig">{% verbatim %}&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+    &lt;meta charset="utf-8"&gt;
+    &lt;meta name="viewport" content="width=device-width, initial-scale=1"&gt;
+
+    &lt;title&gt;{% block title %}{{ meta.title }}{% endblock %}&lt;/title&gt;
+    &lt;meta name="description" content="{% block description %}{{ meta.description }}{% endblock %}" /&gt;
+
+    {# Set the dark class before first paint to avoid a flash #}
+    &lt;script&gt;
+        (function () {
+            try {
+                var saved = localStorage.getItem('theme');
+                var dark = saved ? saved === 'dark'
+                                 : window.matchMedia('(prefers-color-scheme: dark)').matches;
+                document.documentElement.classList.toggle('dark', dark);
+            } catch (e) {}
+        })();
+    &lt;/script&gt;
+
+    {% block styles %}
+        &lt;link rel="stylesheet" href="{{ base_url }}/themes/my_theme/css/my_theme.css"&gt;
+    {% endblock %}
+
+    {% block head_extensions %}{% endblock %}
+&lt;/head&gt;
+&lt;body class="bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100"&gt;
+
+    {% block navigation %}
+        {# your header / nav #}
+    {% endblock %}
+
+    &lt;main&gt;
+        {% block content %}{% endblock %}
+    &lt;/main&gt;
+
+    {% block scripts %}
+        {{ vite_assets('resources/js/app.jsx') }}
+        {{ schema_markup|raw }}
+    {% endblock %}
+&lt;/body&gt;
+&lt;/html&gt;{% endverbatim %}</code></pre>
+    <p>A few points worth noting:</p>
+    <ul>
+        <li>Build asset URLs with <code>{% verbatim %}{{ base_url }}{% endverbatim %}</code> rather than hard-coded paths, so your theme keeps working when the app is installed in a subdirectory.</li>
+        <li>The <code>scripts</code> block must keep the <code>vite_assets()</code> and <code>schema_markup|raw</code> lines exactly as shown. Any child template that overrides <code>scripts</code> must call <code>{% verbatim %}{{ parent() }}{% endverbatim %}</code>.</li>
+        <li>The framework's default layout already emits the canonical link tag from <code>Request::getCanonicalUrl()</code>. A custom layout that replaces it should emit it <strong>once</strong>, since duplicates hurt SEO.</li>
+        <li>If your JavaScript sends <code>fetch()</code> POST requests, add a <code>&lt;meta name="csrf-token" content="{% verbatim %}{{ csrf_token() }}{% endverbatim %}"&gt;</code> tag in <code>head_extensions</code> and send the value as <code>_token</code> in the request <em>body</em>. The CSRF middleware doesn't read headers.</li>
+    </ul>
+
+    <hr>
+
+    <h2>6. Activate the Theme</h2>
+    <p>Set the theme name in <code>.env</code>. The value must match the folder name under <code>views/themes/</code> exactly:</p>
+    <pre><code class="language-bash">APP_THEME=my_theme</code></pre>
+
+    <hr>
+
+    <h2>Dark, Light and System Mode</h2>
+    <p>
+        The <code>@custom-variant</code> line in <code>input.css</code> makes <code>dark:</code> utilities respond to a <code>dark</code> class on the <code>&lt;html&gt;</code> element, and the inline script in <code>main.twig</code> sets that class before the page paints. A toggle only needs to flip the class and remember the choice:
+    </p>
+    <pre><code class="language-javascript">function setTheme(mode) {          // 'light' | 'dark' | 'system'
+    var root = document.documentElement;
+    if (mode === 'system') {
+        localStorage.removeItem('theme');
+        root.classList.toggle('dark', window.matchMedia('(prefers-color-scheme: dark)').matches);
+    } else {
+        localStorage.setItem('theme', mode);
+        root.classList.toggle('dark', mode === 'dark');
+    }
+}</code></pre>
+    <p>If you'd rather follow the operating system only, skip the custom variant. Tailwind's default <code>dark:</code> behaviour uses <code>prefers-color-scheme</code>.</p>
+
+    <hr>
+
+    <h2>Writing Tailwind in Twig</h2>
+
+    <h3>Always use complete class names</h3>
+    <p>Tailwind finds classes by scanning your files as plain text, so it can't see classes assembled at render time:</p>
+    <pre><code class="language-twig">{% verbatim %}{# Won't work: Tailwind never sees "bg-red-500" #}
+&lt;div class="bg-{{ color }}-500"&gt;
+
+{# Works: full class names appear in the source #}
+{% set colors = {
+    'danger':  'bg-red-500',
+    'success': 'bg-green-500'
+} %}
+&lt;div class="{{ colors[status] }}"&gt;{% endverbatim %}</code></pre>
+
+    <h3>Reuse markup with partials, not <code>@apply</code></h3>
+    <p>Rather than growing a pile of custom CSS, put repeated UI (buttons, cards, form fields) in Twig partials and include them:</p>
+    <pre><code class="language-twig">{% verbatim %}{# views/themes/my_theme/partials/button.twig #}
+&lt;button type="{{ type|default('button') }}"
+        class="rounded-lg bg-brand-500 px-4 py-2 font-semibold text-white
+               hover:opacity-90 focus-visible:outline focus-visible:outline-2"&gt;
+    {{ label }}
+&lt;/button&gt;
+
+{# Usage #}
+{% include 'partials/button.twig' with { label: 'Save', type: 'submit' } %}{% endverbatim %}</code></pre>
+
+    <h3>Forms</h3>
+    <p>Styling doesn't change the framework's form requirements. Every form in your theme still needs the CSRF field and, where reCAPTCHA is used, the captcha tag:</p>
+    <pre><code class="language-twig">{% verbatim %}&lt;form method="post" action="{{ base_url }}/contact"&gt;
+    {{ csrf_field() }}
+    &lt;input name="email" type="email"
+           class="w-full rounded-lg border border-gray-300 px-3 py-2
+                  dark:border-gray-700 dark:bg-gray-900"&gt;
+    {{ captcha_form|raw }}
+    {% include 'partials/button.twig' with { label: 'Send', type: 'submit' } %}
+&lt;/form&gt;{% endverbatim %}</code></pre>
+    <p>Controllers that process the form should validate with the framework's <a href="{{ base_url }}/docs/validation">Validation</a> class and display any errors in the template.</p>
+
+    <hr>
+
+    <h2>Performance Tips</h2>
+    <ul>
+        <li><strong>Ship minified CSS.</strong> Use <code>--minify</code> for anything you deploy.</li>
+        <li><strong>Don't use the Tailwind Play CDN script in production.</strong> It compiles in the browser and is intended for prototyping only.</li>
+        <li><strong>Keep <code>@source</code> narrow.</strong> Scan your theme folder rather than the whole project.</li>
+        <li><strong>Self-host fonts</strong> and reference them from <code>@theme</code> or <code>@font-face</code> rules in <code>input.css</code>.</li>
+        <li><strong>Ship the compiled file with the theme.</strong> People installing your theme shouldn't need Node just to get working styles. Include the unminified source and <code>input.css</code> if you want them to be able to recompile.</li>
+    </ul>
+
+    <hr>
+
+    <h2>Distributing a Tailwind Theme</h2>
+    <p>If you plan to submit your theme to the Marketplace, the usual theme rules apply on top of the above:</p>
+    <ul>
+        <li><code>main.twig</code> lives in <code>views/themes/&lt;theme_name&gt;/layouts</code> and contains all the required blocks in their documented formats.</li>
+        <li>Auth views belong in <code>views/themes/&lt;theme_name&gt;/auth</code> and error pages in <code>views/themes/&lt;theme_name&gt;/errors</code>.</li>
+        <li>Every form includes <code>csrf_field()</code> and <code>captcha_form|raw</code>.</li>
+        <li>The theme must not create new folders in the application root. Keep any Tailwind source files inside the theme's own folders.</li>
+        <li>Compiled CSS must be included, since reviewers and users won't run your build.</li>
+    </ul>
+
+    <hr>
+
+    <h2 id="tailwind-v3">Tailwind v3</h2>
+    <p>On v3 the setup uses a config file instead of CSS directives:</p>
+    <pre><code class="language-bash">npm install -D tailwindcss@3
+npx tailwindcss init</code></pre>
+    <pre><code class="language-javascript">// tailwind.config.js
+module.exports = {
+    darkMode: 'class',
+    content: [
+        './views/themes/my_theme/**/*.twig',
+        // './vendor/arout/rhapsody-core/resources/views/**/*.twig',
+    ],
+    theme: { extend: {} },
+    plugins: [],
+};</code></pre>
+    <pre><code class="language-css">/* input.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;</code></pre>
+    <pre><code class="language-bash">npx tailwindcss -i ./input.css -o ./public/themes/my_theme/css/my_theme.css --minify</code></pre>
+
+    <hr>
+
+    <h2>Troubleshooting</h2>
+    <ul>
+        <li><strong>The page has no styling at all.</strong> Open the browser's network tab and check the CSS request. A 404 usually means a wrong path, or an <code>.htaccess</code> rule that doesn't allow <code>public/themes/...</code> (patterns anchored with <code>^/public/</code> can break when the app lives in a subdirectory).</li>
+        <li><strong>Some classes work, others don't.</strong> The build is stale, or the template isn't covered by an <code>@source</code> path, or the class name is being built dynamically.</li>
+        <li><strong>My CSS loads, but I still see the default theme's pages.</strong> Check that <code>APP_THEME</code> matches the folder name exactly, and that you're editing files under <code>views/themes/&lt;theme_name&gt;/</code> rather than a top-level copy. Clear the cache if you have view caching enabled.</li>
+        <li><strong>Built-in pages (auth, errors) look unstyled.</strong> Either override them in your theme or add the core views to <code>@source</code>.</li>
+        <li><strong>The page flashes light before switching to dark.</strong> The inline theme script must run in <code>&lt;head&gt;</code>, before the stylesheet and body render.</li>
+        <li><strong><code>dark:</code> classes do nothing.</strong> You're using the class strategy but the <code>@custom-variant</code> line (v4) or <code>darkMode: 'class'</code> (v3) is missing, or the <code>dark</code> class isn't being set on <code>&lt;html&gt;</code>.</li>
+    </ul>
+{% endblock %}

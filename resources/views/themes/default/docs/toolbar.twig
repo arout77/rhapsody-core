@@ -1,0 +1,400 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>Rhapsody Debug Toolbar</h1>
+    <p>
+        Rhapsody includes a powerful, non‑intrusive debug toolbar that appears at the bottom of every page
+        when the application is in <strong>development mode</strong> (<code>APP_ENV=development</code>).
+        It gives you real‑time insight into your application's performance, database queries, session data,
+        middleware execution, dependency resolution, and more – all without cluttering your design.
+    </p>
+
+    <div class="bg-blue-50 dark:bg-blue-950/40 border-l-4 border-blue-500 dark:border-blue-400 p-4 rounded-r-lg my-4">
+        <strong class="text-blue-800 dark:text-blue-300">💡 Tip:</strong>
+        <span class="text-blue-800 dark:text-blue-300">The toolbar is only injected into HTML responses. JSON/API responses are never altered.</span>
+    </div>
+
+    <hr>
+
+    <h2>Toolbar Overview</h2>
+    <p>
+        The toolbar is divided into clickable tabs, each displaying a specific category of debug information.
+        It also includes a persistent header that shows key metrics at a glance.
+    </p>
+
+    <div class="bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl p-4 my-4 font-mono text-sm">
+        <div class="flex items-center space-x-4">
+            <span class="bg-indigo-600 text-white px-3 py-1 rounded">Rhapsody v1.0</span>
+            <span class="text-gray-700 dark:text-gray-300">Request <span class="text-green-400">200</span></span>
+            <span class="text-gray-700 dark:text-gray-300">Logs</span>
+            <span class="text-gray-700 dark:text-gray-300">Database <span class="text-yellow-400">12 Queries</span></span>
+            <span class="text-gray-700 dark:text-gray-300">Session</span>
+            <span class="text-gray-700 dark:text-gray-300">Cache</span>
+            <span class="text-gray-700 dark:text-gray-300">Performance</span>
+            <span class="text-gray-700 dark:text-gray-300">Environment</span>
+            <span class="ml-auto text-gray-700 dark:text-gray-300">Time: 231 ms</span>
+            <span class="text-gray-700 dark:text-gray-300 flex items-center">
+                <span class="w-3 h-3 bg-green-500 rounded-full mr-1"></span>
+                45%
+            </span>
+        </div>
+    </div>
+
+    <h3>Header Widgets</h3>
+    <ul>
+        <li><strong>Request Status</strong> – HTTP status code of the response (green = 200, red = 4xx/5xx).</li>
+        <li><strong>Execution Time</strong> – total time taken to process the request (in milliseconds).</li>
+        <li><strong>Memory Peak</strong> – a visual bar showing peak memory usage relative to the <code>memory_limit</code>; colour‑coded: green (safe), amber (warning), red (critical).</li>
+    </ul>
+
+    <hr>
+
+    <h2>Request Tab</h2>
+    <p>
+        The Request tab provides a comprehensive snapshot of the incoming HTTP request. It's your go‑to for
+        debugging routing issues, inspecting headers, or reproducing a request via cURL.
+    </p>
+
+    <h3>Request Overview</h3>
+    <p>At the top, you'll find essential request metadata:</p>
+    <ul>
+        <li><strong>Method</strong> – HTTP verb (GET, POST, PUT, DELETE, etc.)</li>
+        <li><strong>Full URL</strong> – the complete URL of the request (including protocol, host, and query string)</li>
+        <li><strong>Client IP</strong> – the IP address of the client making the request</li>
+        <li><strong>Timestamp</strong> – exact time the request was received</li>
+    </ul>
+
+    <h3>Route Details</h3>
+    <p>Displays information about the matched route:</p>
+    <ul>
+        <li><strong>Path</strong> – the URI path (after stripping <code>APP_BASE_URL</code>)</li>
+        <li><strong>Controller</strong> – the class handling the request</li>
+        <li><strong>Action</strong> – the method being called</li>
+        <li><strong>Parameters</strong> – dynamic route parameters (e.g., <code>user_id</code> from <code>/users/{user_id}</code>)</li>
+        <li><strong>Middleware</strong> – the list of route‑specific middleware (shown as a chain, e.g., <code>auth → guest</code>)</li>
+    </ul>
+    <p>If no route matched, the panel shows a helpful "No route matched" message – ideal for debugging 404s.</p>
+
+    <h3>Request Headers</h3>
+    <p>
+        All HTTP headers sent by the client are displayed in a clean key‑value table. This includes standard headers
+        like <code>User-Agent</code>, <code>Accept</code>, <code>Content-Type</code>, and any custom headers your
+        application or client may send.
+    </p>
+
+    <h3>Query Parameters</h3>
+    <p>
+        If the request URL contains a query string (e.g., <code>/users?page=2&limit=10</code>), the parameters are
+        displayed in a key‑value table. This is useful for debugging pagination, filters, or other GET parameters.
+    </p>
+
+    <h3>Request Body</h3>
+    <p>
+        For POST, PUT, PATCH, or DELETE requests, the raw request body is displayed:
+    </p>
+    <ul>
+        <li>If the body is valid JSON, it is automatically <strong>pretty‑printed</strong> for readability.</li>
+        <li>If the body is plain text (e.g., form data), it is shown as‑is.</li>
+        <li>If the request had no body, this section is omitted.</li>
+    </ul>
+
+    <h3>Copy cURL Command</h3>
+    <p>
+        At the bottom of the Request tab, there is a <strong>📋 Copy cURL</strong> button. Clicking it generates a
+        complete <code>curl</code> command that replicates the current request – including method, URL, headers,
+        and body. This is invaluable for:
+    </p>
+    <ul>
+        <li>Reproducing bugs in a terminal</li>
+        <li>Sharing a request with a colleague for debugging</li>
+        <li>Testing API endpoints independently</li>
+    </ul>
+
+    <div class="bg-green-50 dark:bg-green-950/40 border-l-4 border-green-500 dark:border-green-400 p-4 rounded-r-lg my-4">
+        <strong class="text-green-800 dark:text-green-300">Pro Tip:</strong>
+        <span class="text-green-800 dark:text-green-300">
+            On Windows, use <code>curl.exe</code> instead of <code>curl</code> to avoid PowerShell's alias.
+            The command generated in the toolbar will automatically use <code>curl.exe</code> on Windows.
+        </span>
+    </div>
+
+    <h4>Why use cURL instead of just viewing page source?</h4>
+    <p>
+        You might wonder: <em>"I can already see the page source in my browser – why do I need a cURL command?"</em>
+        Here's why it's much more powerful:
+    </p>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-4">
+        <div class="bg-gray-800 rounded p-4 border border-gray-700">
+            <h5 class="text-white font-bold flex items-center gap-2">
+                <span class="text-blue-400">🔁</span> Reproduce anywhere
+            </h5>
+            <p class="text-gray-300 text-sm mt-1">
+                Run the exact same request on any machine – your local terminal, a server, or a colleague's laptop.
+                No browser, no cookies, no extensions.
+            </p>
+        </div>
+
+        <div class="bg-gray-800 rounded p-4 border border-gray-700">
+            <h5 class="text-white font-bold flex items-center gap-2">
+                <span class="text-yellow-400">✏️</span> Modify and test
+            </h5>
+            <p class="text-gray-300 text-sm mt-1">
+                Tweak headers, change parameters, or alter the request body to test different scenarios quickly.
+                No need to navigate through forms or click around.
+            </p>
+        </div>
+
+        <div class="bg-gray-800 rounded p-4 border border-gray-700">
+            <h5 class="text-white font-bold flex items-center gap-2">
+                <span class="text-purple-400">📦</span> See the full response
+            </h5>
+            <p class="text-gray-300 text-sm mt-1">
+                Page source only shows the HTML body. cURL shows <strong>everything</strong> – status code, headers,
+                cookies, and timing details. Perfect for debugging APIs.
+            </p>
+        </div>
+
+        <div class="bg-gray-800 rounded p-4 border border-gray-700">
+            <h5 class="text-white font-bold flex items-center gap-2">
+                <span class="text-indigo-400">📤</span> Share with teammates
+            </h5>
+            <p class="text-gray-300 text-sm mt-1">
+                Instead of saying <em>"click this button and fill out that form"</em>, you can share a one‑line
+                command that reproduces the bug exactly.
+            </p>
+        </div>
+
+        <div class="bg-gray-800 rounded p-4 border border-gray-700">
+            <h5 class="text-white font-bold flex items-center gap-2">
+                <span class="text-red-400">⏱️</span> Measure performance
+            </h5>
+            <p class="text-gray-300 text-sm mt-1">
+                Add timing flags to measure DNS lookup, connection time, and total response time – metrics you
+                can't get from page source.
+            </p>
+        </div>
+
+        <div class="bg-gray-800 rounded p-4 border border-gray-700">
+            <h5 class="text-white font-bold flex items-center gap-2">
+                <span class="text-cyan-400">🤖</span> Automate testing
+            </h5>
+            <p class="text-gray-300 text-sm mt-1">
+                Use the cURL command in CI/CD pipelines, load‑testing scripts, or monitoring tools to verify
+                your endpoints automatically.
+            </p>
+        </div>
+    </div>
+
+    <div class="bg-amber-50 dark:bg-amber-950/40 border-l-4 border-amber-500 dark:border-amber-400 p-4 rounded-r-lg my-4">
+        <strong class="text-amber-800 dark:text-amber-300">🧠 In a nutshell:</strong>
+        <span class="text-amber-800 dark:text-amber-300">
+            <strong>View Page Source</strong> = quick visual inspection of the HTML structure.<br>
+            <strong>cURL Command</strong> = a complete, reproducible snapshot of the entire HTTP transaction.
+        </span>
+    </div>
+
+    <hr>
+
+    <h2>Logs Tab</h2>
+    <p>
+        Shows the last 50 lines of your PHP error log and Apache error log (or web server log).
+        The log file paths are defined in <code>config.php</code> under the <code>logging</code> key.
+    </p>
+    <div class="bg-amber-50 dark:bg-amber-950/40 border-l-4 border-amber-500 dark:border-amber-400 p-4 rounded-r-lg my-4">
+        <strong class="text-amber-800 dark:text-amber-300">Note:</strong>
+        <span class="text-amber-800 dark:text-amber-300">If a log file is not found or not readable, the toolbar will show a message indicating that.</span>
+    </div>
+
+    <hr>
+
+    <h2>Database Tab</h2>
+    <p>
+        Lists every SQL query executed during the request, along with:
+    </p>
+    <ul>
+        <li><strong>SQL</strong> – the raw query string</li>
+        <li><strong>Parameters</strong> – bound values (as JSON)</li>
+        <li><strong>Execution Time</strong> – time taken (in milliseconds)</li>
+        <li><strong>Caller</strong> – the file and line where the query was initiated</li>
+    </ul>
+
+    <h3>N+1 Query Detection</h3>
+    <p>
+        The toolbar automatically flags potential <strong>N+1 query patterns</strong>. This happens when the same
+        query structure (after normalising literal values) is executed <strong>more than 3 times</strong> in a single request.
+    </p>
+    <ul>
+        <li>If detected, a warning box appears at the top of the Database tab.</li>
+        <li>Each flagged query is marked with a warning icon (<code>⚠️</code>) in the list.</li>
+        <li>See the <a href="{{ base_url }}/docs/performance">Performance &amp; Caching</a> guide for strategies to fix N+1.</li>
+    </ul>
+
+    <div class="bg-blue-50 dark:bg-blue-950/40 border-l-4 border-blue-500 dark:border-blue-400 p-4 rounded-r-lg my-4 text-blue-600 dark:text-blue-300">
+        <h4 class="font-bold">N+1 Queries Explained</h4>
+        <p>
+            N+1 queries occur when your code executes one query to fetch a list of records, and then another query for each record to fetch related data.
+        </p>
+        <h5 class="font-bold mt-2">Simple analogy</h5>
+        <p>
+            Imagine you go to a library and ask:<br>
+            "How many books do you have?" (1 query)<br>
+            The librarian tells you there are 10 books.<br>
+            Then you ask:<br>
+            "What are the titles of each of the 10 books?"<br>
+            ... and you ask that 10 separate times (10 more queries).<br>
+            That's 11 queries total — an N+1 problem.
+        </p>
+    </div>
+
+    <hr>
+
+    <h2>Session Tab</h2>
+    <p>
+        Shows the contents of <code>$_SESSION</code> in a clean key‑value table.
+        Nested arrays are rendered as indented lists for readability.
+        Values are colour‑coded:
+    </p>
+    <ul>
+        <li><span class="text-green-400">true</span> / <span class="text-red-400">false</span> – booleans</li>
+        <li><span class="text-gray-500">null</span> – null values</li>
+        <li><span class="text-yellow-400">Object</span> – objects (class name shown)</li>
+        <li><span class="text-cyan-400">Keys</span> – array keys</li>
+    </ul>
+    <p>This is invaluable for debugging authentication state, flash messages, and user‑specific data.</p>
+
+    <hr>
+
+    <h2>Cache Tab</h2>
+    <p>
+        Displays performance metrics for the framework's cache system (driven by <code>Cache::remember()</code> and <code>Cache::get()</code>).
+    </p>
+    <ul>
+        <li><strong>Hits</strong> – number of successful cache lookups</li>
+        <li><strong>Misses</strong> – number of cache misses (values not found)</li>
+        <li><strong>Total Requests</strong> – hits + misses</li>
+        <li><strong>Hit Ratio</strong> – percentage of requests that were hits</li>
+        <li>A progress bar visualises the ratio with colour coding:
+            <ul>
+                <li><span class="text-green-400">Green</span> – &gt; 70% (healthy)</li>
+                <li><span class="text-yellow-400">Yellow</span> – 40‑70% (room for improvement)</li>
+                <li><span class="text-red-400">Red</span> – &lt; 40% (cache may be underused or ineffective)</li>
+            </ul>
+        </li>
+    </ul>
+    <p>
+        If your application is not using caching, the stats will remain zero – that's expected.
+        See the <a href="{{ base_url }}/docs/caching">Caching documentation</a> to add cache to your code.
+    </p>
+
+    <hr>
+
+    <h2>Performance Tab</h2>
+    <p>
+        This tab is powered by a <strong>React</strong> component (<code>PerformancePanel</code>) and provides a
+        high‑level dashboard of your application's performance metrics, all in one place.
+    </p>
+    <ul>
+        <li><strong>Execution Time</strong> – same as the header, with a progress bar scaled to 1000ms</li>
+        <li><strong>Memory Usage</strong> – current memory peak (MB) with a bar scaled to 16MB</li>
+        <li><strong>Database Queries</strong> – total query count, scaled to 100 queries</li>
+        <li><strong>Cache Hit Ratio</strong> – the same cache ratio as the Cache tab</li>
+        <li><strong>N+1 Detection</strong> – summary of any potential N+1 patterns, with a collapsible detail list</li>
+        <li><strong>Route / Controller</strong> – shows the matched route (same as Request tab)</li>
+    </ul>
+
+    <hr>
+
+    <h2>Environment Tab</h2>
+    <p>
+        This comprehensive tab gives you deep insight into your application's runtime environment,
+        middleware pipeline, and dependency injection container. It is your go‑to for debugging bootstrapping
+        issues, middleware misconfigurations, and circular dependencies.
+    </p>
+
+    <h3>Environment Variables</h3>
+    <p>
+        Displays all environment variables (<code>$_ENV</code>) in a sortable table.
+        Sensitive values (passwords, secrets, API keys) are partially masked for your security.
+        This is useful for verifying that your <code>.env</code> settings are correctly loaded.
+    </p>
+
+    <h3>Middleware Tracer</h3>
+    <p>
+        Shows every middleware that ran during the request, in the exact order they were executed:
+    </p>
+    <ul>
+        <li><strong>Type</strong> – <span class="text-blue-400">Global</span> (runs on every request) or <span class="text-purple-400">Route</span> (assigned to specific routes)</li>
+        <li><strong>Class</strong> – the middleware class name</li>
+        <li><strong>Route</strong> – the route path (for route middleware)</li>
+        <li><strong>Duration</strong> – execution time in milliseconds (colour‑coded: green &lt; 20ms, yellow 20‑50ms, red &gt; 50ms)</li>
+        <li><strong>Total Middleware Time</strong> – sum of all middleware execution times</li>
+    </ul>
+    <p>
+        This is invaluable for pinpointing slow middleware that might be causing request latency, or for
+        verifying that your middleware stack is correctly ordered.
+    </p>
+
+    <h3>Container Inspector</h3>
+    <p>
+        Visualises the service container's dependency resolution for the current request:
+    </p>
+    <ul>
+        <li><strong>Service</strong> – the resolved class (or interface)</li>
+        <li><strong>Duration</strong> – time taken to resolve (colour‑coded like middleware)</li>
+        <li><strong>Called By</strong> – the class that requested this service (helps trace dependencies)</li>
+        <li><strong>Status</strong> – <span class="text-green-400">✅ Resolved</span> (success) or <span class="text-red-400">⚠️ Circular</span> (if a circular dependency was detected)</li>
+        <li><strong>Total Resolve Time</strong> – sum of all resolution times</li>
+    </ul>
+    <p>
+        If you see a <span class="text-red-400">⚠️ Circular</span> status, the toolbar will also show
+        the circular chain (e.g., <code>A → B → C → A</code>), making it easy to fix.
+        This is particularly useful for debugging complex dependency graphs in large applications.
+    </p>
+
+    <div class="bg-green-50 dark:bg-green-950/40 border-l-4 border-green-500 dark:border-green-400 p-4 rounded-r-lg my-4">
+        <strong class="text-green-800 dark:text-green-300">Pro Tip:</strong>
+        <span class="text-green-800 dark:text-green-300">
+            The Environment tab is perfect for diagnosing "silent" failures – when a page loads but behaves unexpectedly.
+            Check the middleware order and container resolutions to catch misconfigurations quickly.
+        </span>
+    </div>
+
+    <hr>
+
+    <h2>Enabling / Disabling the Toolbar</h2>
+    <p>
+        The toolbar is automatically injected when <code>APP_ENV</code> is set to <code>development</code>.
+        To disable it in development (e.g., to test raw HTML output), you can temporarily comment out the toolbar
+        injection in <code>index.php</code> (around line where <code>Toolbar</code> is instantiated).
+    </p>
+    <p>
+        In production (<code>APP_ENV=production</code>), the toolbar is <strong>never</strong> shown, regardless of
+        the <code>development</code> setting. This is a security feature.
+    </p>
+
+    <hr>
+
+    <h2>Extending the Toolbar</h2>
+    <p>
+        The toolbar is designed to be extensible. You can add your own panels by hooking into the
+        <code>Debug::end()</code> method and injecting custom data into the <code>$this->data</code> array.
+        The React components (<code>PerformancePanel</code>, <code>MemoryProfiler</code>) are also open to extension.
+    </p>
+    <p>
+        For advanced use, refer to the source code in <code>vendor/arout/rhapsody-core/src/Debug.php</code>
+        and <code>vendor/arout/rhapsody-core/src/Toolbar.php</code>.
+    </p>
+
+    <hr>
+
+    <div class="bg-green-50 dark:bg-green-950/40 border-l-4 border-green-500 dark:border-green-400 p-4 rounded-r-lg">
+        <strong class="text-green-800 dark:text-green-300">Happy debugging!</strong>
+        <p class="text-green-800 dark:text-green-300 mt-1">
+            The toolbar is your best friend during development. Use it to catch performance bottlenecks,
+            inefficient queries, middleware misconfigurations, circular dependencies, session anomalies,
+            and request‑level issues before they reach production.
+        </p>
+    </div>
+
+{% endblock %}

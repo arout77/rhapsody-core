@@ -1,0 +1,177 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>Image Processing</h1>
+    <p class="lead">
+        Rhapsody uses <a href="https://glide.thephpleague.com/" target="_blank">League Glide</a>, an on-demand image manipulation library built on <a href="https://image.intervention.io/" target="_blank">Intervention Image</a>, to resize, crop, convert, and compress images simply by changing the URL. Every variant is generated once, cached on disk, and served from the cache afterwards, saving storage space and improving performance.
+    </p>
+
+    <hr>
+
+    <h2>Installation</h2>
+    <p>
+        First, add the library to your project using Composer:
+    </p>
+    <pre><code class="language-bash">composer require league/glide</code></pre>
+    <p>
+        Glide needs either the <code>gd</code> or the <code>imagick</code> PHP extension. GD is enabled by default in most PHP installations, including WAMP.
+    </p>
+
+    <h2>The ImageController</h2>
+    <p>
+        An <code>ImageController</code> is included in the application skeleton to handle all image requests. For each request it validates the URL signature, asks Glide for the matching image variant (generating and caching it the first time), and returns it with the correct <code>Content-Type</code> and caching headers.
+    </p>
+    <p>
+        By default, source images are read from the <code>public/images/</code> directory (see <a href="#changing-the-image-directory">Changing the Image Directory</a> to use another one), and processed images are stored in <code>storage/cache/images/</code>. Ensure the cache directory is writable by your web server. Image paths are always relative to the source directory, so the file <code>public/images/wrestlers/hogan.webp</code> is requested as <code>wrestlers/hogan.webp</code>.
+    </p>
+
+    <h2>Routing</h2>
+    <p>
+        A wildcard route captures all image requests. It is already registered in the skeleton's <code>routes/web.php</code> file and should not be removed:
+    </p>
+    <pre><code class="language-php">
+// in routes/web.php
+use App\Controllers\ImageController;
+
+Router::get('/img/{path}', [ImageController::class, 'show']);
+</code></pre>
+    <p>
+        This route directs any URL starting with <code>/img/</code> to the <code>ImageController</code>.
+    </p>
+
+    <h2 id="changing-the-image-directory">Changing the Image Directory</h2>
+    <p>
+        The source directory is set in the <code>show()</code> method of <code>app/Controllers/ImageController.php</code>, on the <code>source</code> line of the Glide server configuration. To serve images from somewhere else, such as a theme folder, change that path:
+    </p>
+    <pre><code class="language-php">
+use Rhapsody\Core\Helpers\Path;
+
+$server = ServerFactory::create([
+    // Default: Path::public('images')
+    'source'         => Path::public('themes/default/images'),
+    'cache'          => $cachePath,
+    'max_image_size' => self::MAX_IMAGE_PIXELS,
+]);
+</code></pre>
+    <p>
+        <code>Path</code> is a small helper in <code>Rhapsody\Core\Helpers</code> that returns absolute filesystem paths. <code>Path::public('themes/default/images')</code> resolves to <code>public/themes/default/images</code> inside your project, using the correct directory separator for your operating system. Use it (or the related <code>Path::root()</code>, <code>Path::storage()</code>, and <code>Path::resources()</code> methods) instead of hard-coding absolute paths, so the controller works on any server.
+    </p>
+    <p>A few things to keep in mind when you change the directory:</p>
+    <ul>
+        <li><strong>Image paths are relative to the new directory.</strong> With the example above, the file <code>public/themes/default/images/logo.png</code> is requested as <code>image_url('logo.png', {w: 200})</code>.</li>
+        <li><strong>Serving several themes.</strong> Glide reads from one directory at a time. Point <code>source</code> at the parent folder, <code>Path::public('themes')</code>, and include the theme in the image path (<code>image_url('default/images/logo.png', {w: 200})</code>) to reach every theme from a single setting.</li>
+        <li><strong>Choosing the theme at runtime.</strong> If you build the directory from a variable, such as <code>Path::public('themes/' . $theme . '/images')</code>, take <code>$theme</code> from your application's configuration, never from the request. A value supplied by a visitor could point the processor at an arbitrary directory.</li>
+        <li><strong>Originals do not have to be public.</strong> Every image is served through the controller, so the source directory can live outside <code>public/</code>, for example <code>Path::storage('uploads/images')</code>.</li>
+        <li><strong>Clear the image cache after changing the directory.</strong> Cached variants are stored in folders named after the image path, so a file with the same name in the old and new directories can be served from the old cache. Delete the contents of <code>storage/cache/images/</code> once.</li>
+    </ul>
+
+    <h2>Usage in Twig</h2>
+    <p>
+        Use the <code>image_url()</code> Twig function to build the image source. It takes the image path (relative to <code>public/images/</code>) and an optional object of parameters, and returns a complete, signed URL.
+    </p>
+
+    <h4>Example: Resizing an Image</h4>
+    <p>Let's say you have an image located at <code>public/images/wrestlers/hogan.webp</code>.</p>
+
+    <p><strong>Original HTML:</strong></p>
+    {% verbatim %}<pre><code class="language-html">&lt;img src="{{ base_url }}/public/images/wrestlers/hogan.webp"&gt;</code></pre>{% endverbatim %}
+
+    <p><strong>Optimized HTML with resizing:</strong></p>
+    {% verbatim %}<pre><code class="language-html">&lt;!-- A 150x150 square, cropped to fill --&gt;
+&lt;img src="{{ image_url('wrestlers/hogan.webp', {w: 150, h: 150, fit: 'crop'}) }}" alt=""&gt;
+
+&lt;!-- A 300px wide version at 80% quality --&gt;
+&lt;img src="{{ image_url('wrestlers/hogan.webp', {w: 300, q: 80}) }}" alt=""&gt;
+
+&lt;!-- Convert to WebP --&gt;
+&lt;img src="{{ image_url('wrestlers/hogan.jpg', {w: 300, fm: 'webp'}) }}" alt=""&gt;
+</code></pre>{% endverbatim %}
+
+    <h4>Example: Responsive Images</h4>
+    <p>Generate each size you need in the template and let the browser choose:</p>
+    {% verbatim %}<pre><code class="language-html">&lt;img src="{{ image_url('wrestlers/hogan.webp', {w: 400}) }}"
+     srcset="{{ image_url('wrestlers/hogan.webp', {w: 400}) }} 400w,
+             {{ image_url('wrestlers/hogan.webp', {w: 800}) }} 800w"
+     sizes="(max-width: 600px) 400px, 800px"
+     alt=""&gt;
+</code></pre>{% endverbatim %}
+
+    <h2>Signed URLs</h2>
+    <p>
+        Every distinct set of query parameters creates a separate cached file, so unrestricted resizing would let anyone fill your disk and CPU by requesting thousands of sizes. To prevent this, image variants must be signed by your application:
+    </p>
+    <ul>
+        <li>A request <strong>with</strong> query parameters must carry a valid <code>s</code> signature. Missing, invalid, or edited signatures return <strong>403</strong>.</li>
+        <li>A request <strong>without</strong> query parameters (the plain original image, e.g. <code>/img/wrestlers/hogan.webp</code>) is public and needs no signature.</li>
+        <li>The signature covers the image path and every parameter, so changing <code>w=300</code> to <code>w=3000</code> in a signed URL invalidates it.</li>
+    </ul>
+    <p>
+        Always build URLs with <code>image_url()</code> in Twig. Outside of templates, use the same signer in PHP:
+    </p>
+    <pre><code class="language-php">
+use Rhapsody\Core\Helpers\ImageSigner;
+
+$url = ImageSigner::url('wrestlers/hogan.webp', ['w' => 300, 'q' => 80]);
+</code></pre>
+    <p>
+        URLs assembled in JavaScript cannot be signed, because the signing key must stay on the server. Generate each size you need in Twig (for example in a <code>srcset</code>) instead of building query strings in the browser.
+    </p>
+
+    <h4>Signing Key</h4>
+    <p>
+        Signatures are made with the <code>IMAGE_SIGN_KEY</code> value from your <code>.env</code> file when it is set. Otherwise a separate key is derived from your <code>APP_KEY</code> (the raw <code>APP_KEY</code> is never used directly). If neither is set, generating a URL throws an exception.
+    </p>
+    <pre><code class="language-bash"># .env (optional)
+IMAGE_SIGN_KEY=a-long-random-string</code></pre>
+    <p>
+        Changing the key invalidates every previously signed URL, including URLs saved in cached pages. Set <code>IMAGE_SIGN_KEY</code> if you want to rotate the image key independently of <code>APP_KEY</code>.
+    </p>
+
+    <h2>Available Parameters</h2>
+    <p>Pass these as the second argument of <code>image_url()</code>. Glide supports many more, documented in the <a href="https://glide.thephpleague.com/" target="_blank">Glide documentation</a>.</p>
+    <table class="table">
+        <thead>
+            <tr><th>Parameter</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>w</code></td><td>The target width in pixels.</td></tr>
+            <tr><td><code>h</code></td><td>The target height in pixels. If only one dimension is provided, the image is scaled proportionally.</td></tr>
+            <tr>
+                <td><code>fit</code></td>
+                <td>
+                    How the image is fitted to <code>w</code> and <code>h</code>:
+                    <code>contain</code> (default) fits inside the box keeping the aspect ratio;
+                    <code>max</code> does the same but never enlarges a smaller image;
+                    <code>fill</code> fits inside the box and fills the leftover space with the <code>bg</code> color;
+                    <code>stretch</code> ignores the aspect ratio;
+                    <code>crop</code> fills the box exactly, cropping the overflow (also <code>crop-top-left</code>, <code>crop-bottom-right</code> and the other position variants).
+                </td>
+            </tr>
+            <tr><td><code>q</code></td><td>The compression quality from 0 to 100 for JPEG and WebP output. Defaults to 90.</td></tr>
+            <tr><td><code>fm</code></td><td>The output format: <code>jpg</code>, <code>pjpg</code> (progressive JPEG), <code>png</code>, <code>gif</code>, or <code>webp</code>. Defaults to the source format.</td></tr>
+            <tr><td><code>dpr</code></td><td>Device pixel ratio from 1 to 8. Multiplies <code>w</code> and <code>h</code> for high-density screens.</td></tr>
+            <tr><td><code>bg</code></td><td>Background color (hex or named), used by <code>fit: 'fill'</code> and when converting transparent images to JPEG.</td></tr>
+            <tr><td><code>or</code></td><td>Orientation: <code>auto</code>, <code>0</code>, <code>90</code>, <code>180</code>, or <code>270</code>.</td></tr>
+            <tr><td><code>blur</code>, <code>sharp</code>, <code>filt</code></td><td>Blur (0&ndash;100), sharpen (0&ndash;100), and filters (<code>greyscale</code>, <code>sepia</code>).</td></tr>
+        </tbody>
+    </table>
+
+    <h2>Caching and Limits</h2>
+    <p>
+        The first request for a variant generates it and stores it under <code>storage/cache/images/</code>, in a folder named after the source image, with one file per unique parameter combination. Later requests are served from that file. Responses are sent with <code>Cache-Control: public, max-age=86400</code>, so browsers and CDNs keep them for a day.
+    </p>
+    <p>
+        If you replace a source image, delete its folder inside <code>storage/cache/images/</code> (or the whole directory) so variants are regenerated from the new file.
+    </p>
+    <p>
+        The largest image Glide will generate is 4,000,000 pixels (width &times; height, equal to 2000&times;2000). Larger sources and requests are scaled down to fit, even when no size is requested. To change the limit, edit the <code>MAX_IMAGE_PIXELS</code> constant in <code>ImageController</code>.
+    </p>
+
+    <h2>Troubleshooting</h2>
+    <ul>
+        <li><strong>403 Invalid image signature</strong> &mdash; the URL was built by hand, edited, or built in JavaScript. Generate it with <code>image_url()</code>.</li>
+        <li><strong>404 Image not found</strong> &mdash; the path is relative to the image source directory (<code>public/images/</code> by default). Use <code>wrestlers/hogan.webp</code>, not <code>public/images/wrestlers/hogan.webp</code>.</li>
+        <li><strong>An exception about <code>APP_KEY</code> or <code>IMAGE_SIGN_KEY</code></strong> &mdash; set one of them in your <code>.env</code> file.</li>
+        <li><strong>Cache errors</strong> &mdash; make sure <code>storage/cache/images/</code> exists and is writable by your web server.</li>
+    </ul>
+{% endblock %}

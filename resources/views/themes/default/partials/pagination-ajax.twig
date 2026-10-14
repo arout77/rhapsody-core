@@ -1,0 +1,63 @@
+{#
+    Include this once on any page that uses AJAX-driven pagination:
+        {% include "@core/partials/pagination-ajax.twig" %}
+
+    Markup contract — wrap the list, the pagination nav, and (optionally)
+    the jump-to-page menu in one [data-ajax-pagination] container, pointing
+    data-list-target / data-pagination-target / data-jump-target at CSS
+    selectors for each piece. See the Pagination documentation for a full
+    working example.
+#}
+<script>
+(function () {
+    function swap(selector, html) {
+        if (!selector || html === null || html === undefined) return;
+        var el = document.querySelector(selector);
+        if (el) el.innerHTML = html;
+    }
+
+    function loadPage(container, url) {
+        fetch(url, { headers: { 'Accept': 'application/json' } })
+            .then(function (response) { return response.json(); })
+            .then(function (payload) {
+                swap(container.dataset.listTarget, payload.list);
+                swap(container.dataset.paginationTarget, payload.pagination);
+                swap(container.dataset.jumpTarget, payload.jumpMenu);
+                window.history.pushState({ ajaxPaginationUrl: url }, '', url);
+            })
+            .catch(function () {
+                // Fall back to a full navigation rather than leaving the
+                // user stuck on a dead link/button if the fetch fails.
+                window.location.href = url;
+            });
+    }
+
+    // Delegated on document, so links/forms swapped in by loadPage() work
+    // immediately without any re-binding step.
+    document.addEventListener('click', function (event) {
+        var container = event.target.closest('[data-ajax-pagination]');
+        if (!container) return;
+
+        var link = event.target.closest('a[href]');
+        if (!link || !container.contains(link)) return;
+
+        event.preventDefault();
+        loadPage(container, link.getAttribute('href'));
+    });
+
+    document.addEventListener('submit', function (event) {
+        var container = event.target.closest('[data-ajax-pagination]');
+        var form      = event.target;
+        if (!container || form.tagName !== 'FORM' || !container.contains(form)) return;
+
+        event.preventDefault();
+        var url = form.getAttribute('action') + '?' + new URLSearchParams(new FormData(form)).toString();
+        loadPage(container, url);
+    });
+
+    window.addEventListener('popstate', function () {
+        var container = document.querySelector('[data-ajax-pagination]');
+        if (container) loadPage(container, window.location.href);
+    });
+})();
+</script>

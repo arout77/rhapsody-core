@@ -1,0 +1,412 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+
+<h1>Module UI: Styling Module Pages</h1>
+<p>
+    A <strong>module</strong> can add whole pages to a site: an admin dashboard, a settings screen, a list of
+    records. The problem is that a module author has no idea which <strong>theme</strong> the site owner will
+    use. If the module writes plain HTML, it looks unstyled next to a fully designed navbar and footer. If it
+    ships its own big stylesheet, it looks foreign on every theme, and every module ends up reinventing
+    forms and tables.
+</p>
+<p>
+    <strong>Module UI</strong> solves this. It is a small set of ready-made CSS classes (all starting with
+    <code>rhapsody-</code>) and a base layout that every module page can build on. The classes look decent on any
+    theme, light or dark, and a theme can fine-tune them if it wants to. This page explains how to use them
+    from scratch.
+</p>
+<div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
+    <strong>Who is this page for?</strong> Module authors (how to build pages), and theme authors (how to make
+    those pages match your theme, which is optional). Skip to the section that applies to you.
+</div>
+
+<hr>
+
+<h2>The 60-second version</h2>
+<p>Create a Twig view in your module. Extend the Module UI layout, and put your page inside the <code>module_content</code> block:</p>
+
+<pre><code class="language-twig">{% verbatim %}{% extends "@core/module-layout.twig" %}
+
+{% block module_content %}
+    &lt;header class="rhapsody-page-header"&gt;
+        &lt;h1 class="rhapsody-title"&gt;Hello from my module&lt;/h1&gt;
+        &lt;p class="rhapsody-muted"&gt;This page is styled automatically.&lt;/p&gt;
+    &lt;/header&gt;
+
+    &lt;div class="rhapsody-card"&gt;
+        &lt;p&gt;Anything you put in here gets the theme's navbar and footer, plus Module UI styling.&lt;/p&gt;
+        &lt;a href="{{ base_url }}/somewhere" class="rhapsody-btn"&gt;A button&lt;/a&gt;
+    &lt;/div&gt;
+{% endblock %}{% endverbatim %}</code></pre>
+
+<p>That is the whole idea. The rest of this page covers what each part does and every class you can use.</p>
+
+<hr>
+
+<h2>How it works</h2>
+<p>A module page is built from three layers of templates, each one extending the next:</p>
+
+<pre><code class="language-text">{% verbatim %}Your module view            e.g. @my-module/dashboard.twig
+   |  extends
+   v
+@core/module-layout.twig    adds the Module UI stylesheet and a wrapper
+   |  extends
+   v
+layouts/main.twig           the site's active theme: navbar, footer, fonts, colors{% endverbatim %}</code></pre>
+
+<ul>
+    <li><strong>Your view</strong> only contains the page itself.</li>
+    <li><strong><code>@core/module-layout.twig</code></strong> comes with the framework. It wraps your content in a
+        <code>&lt;div class="rhapsody-ui"&gt;</code> container, and adds the baseline stylesheet. Every Module UI rule is
+        scoped to that container, so nothing leaks out and changes the rest of the theme.</li>
+    <li><strong><code>layouts/main.twig</code></strong> is whatever theme the site owner has chosen. Because your page
+        extends it indirectly, you get that theme's navigation and footer for free, and you never need to know what
+        they look like.</li>
+</ul>
+<p>
+    The stylesheet picks its colors from the surrounding text color instead of hard-coding a palette. That is why
+    the same page works on a dark theme and a light theme without any extra work.
+</p>
+
+<h3>Blocks you can use</h3>
+<ul>
+    <li><code>module_content</code>: <strong>your page goes here.</strong> This is the one you will use 99% of the time.</li>
+    <li><code>styles</code> and <code>scripts</code>: only if your page needs extra CSS or JavaScript. See the warning below.</li>
+</ul>
+<div class="bg-red-200 border-l-4 border-red-700 text-red-700 p-4">
+    <strong>Two easy mistakes:</strong>
+    <ul>
+        <li><strong>Do not override the <code>content</code> block.</strong> That block is where the wrapper and the Module UI
+            classes live. Overriding it throws them away. Always use <code>module_content</code>.</li>
+        <li><strong>Always call <code>{% verbatim %}{{ parent() }}{% endverbatim %}</code> when you override <code>styles</code> or <code>scripts</code>.</strong> Without it, the
+            Module UI stylesheet or script is replaced by your block and your page loses its styling or spacing.</li>
+    </ul>
+</div>
+
+<pre><code class="language-twig">{% verbatim %}{% block scripts %}
+    {{ parent() }}
+    &lt;script src="{{ base_url }}/my-module/chart.js"&gt;&lt;/script&gt;
+{% endblock %}{% endverbatim %}</code></pre>
+
+<hr>
+
+<h2>Class reference</h2>
+<p>
+    Every class below works inside <code>module_content</code>. You never need to write CSS for any of this. Copy the
+    markup and change the text.
+</p>
+
+<h3>Page header and text</h3>
+<ul>
+    <li><code>rhapsody-page-header</code>: a block that holds the page title and an optional description.</li>
+    <li><code>rhapsody-title</code>: the main page heading (use it on your <code>&lt;h1&gt;</code>).</li>
+    <li><code>rhapsody-section-title</code>: a smaller heading for sections further down the page (use it on <code>&lt;h2&gt;</code>).</li>
+    <li><code>rhapsody-muted</code>: softer, lower-contrast text, good for descriptions and empty states.</li>
+    <li><code>rhapsody-list</code>: a bulleted list with proper spacing.</li>
+</ul>
+
+<pre><code class="language-html">{% verbatim %}&lt;header class="rhapsody-page-header"&gt;
+    &lt;h1 class="rhapsody-title"&gt;Redirects&lt;/h1&gt;
+    &lt;p class="rhapsody-muted"&gt;Send visitors from old URLs to new ones.&lt;/p&gt;
+&lt;/header&gt;
+
+&lt;h2 class="rhapsody-section-title"&gt;Why use redirects?&lt;/h2&gt;
+&lt;ul class="rhapsody-list"&gt;
+    &lt;li&gt;They keep old links working.&lt;/li&gt;
+    &lt;li&gt;They preserve search rankings when a page moves.&lt;/li&gt;
+&lt;/ul&gt;{% endverbatim %}</code></pre>
+
+<h3>Cards and grids</h3>
+<p>
+    A <strong>card</strong> is a bordered, softly shaded box. Use it to group related things. A <strong>grid</strong>
+    lays several cards side by side, and wraps them onto separate rows on narrow screens, so there is nothing to
+    configure for mobile.
+</p>
+
+<pre><code class="language-html">{% verbatim %}&lt;div class="rhapsody-grid"&gt;
+    &lt;div class="rhapsody-card"&gt;
+        &lt;strong&gt;Total pages&lt;/strong&gt;
+        &lt;p&gt;128&lt;/p&gt;
+    &lt;/div&gt;
+    &lt;div class="rhapsody-card"&gt;
+        &lt;strong&gt;Redirects&lt;/strong&gt;
+        &lt;p&gt;14&lt;/p&gt;
+    &lt;/div&gt;
+    &lt;div class="rhapsody-card"&gt;
+        &lt;strong&gt;404 errors this week&lt;/strong&gt;
+        &lt;p&gt;3&lt;/p&gt;
+    &lt;/div&gt;
+&lt;/div&gt;{% endverbatim %}</code></pre>
+
+<h3>Forms</h3>
+<p>The building blocks of a form:</p>
+<ul>
+    <li><code>rhapsody-form</code>: put this on the <code>&lt;form&gt;</code> tag. It stacks the fields with consistent spacing.</li>
+    <li><code>rhapsody-form--inline</code>: add this too for a compact one-row form (a search box plus a button, for example).</li>
+    <li><code>rhapsody-field</code>: one label plus one input, grouped together.</li>
+    <li><code>rhapsody-label</code>: the label text.</li>
+    <li><code>rhapsody-input</code>, <code>rhapsody-select</code>, <code>rhapsody-textarea</code>: the form controls themselves.</li>
+    <li><code>rhapsody-help</code>: small grey hint text under a field.</li>
+    <li><code>rhapsody-error</code>: red error text under a field.</li>
+    <li><code>rhapsody-field--error</code>: add this to a field whose value failed validation. The input gets a red border.</li>
+</ul>
+<p>Here is a complete form, including showing validation errors. The <code>errors</code> and <code>old</code> variables are the same ones the framework's own login and registration forms use (see the <a href="{{ base_url }}/docs/validation">Validation docs</a>):</p>
+
+<pre><code class="language-twig">{% verbatim %}&lt;form class="rhapsody-form" method="post" action="{{ base_url }}/my-module/settings"&gt;
+    {{ csrf_field()|raw }}
+
+    &lt;div class="rhapsody-field {{ errors.site_name is defined ? 'rhapsody-field--error' : '' }}"&gt;
+        &lt;label class="rhapsody-label" for="site_name"&gt;Site name&lt;/label&gt;
+        &lt;input type="text" class="rhapsody-input" id="site_name" name="site_name"
+               value="{{ old.site_name|default(site_name) }}"&gt;
+        &lt;span class="rhapsody-help"&gt;Shown in the browser tab.&lt;/span&gt;
+        {% if errors.site_name is defined %}
+            &lt;span class="rhapsody-error"&gt;{{ errors.site_name|first }}&lt;/span&gt;
+        {% endif %}
+    &lt;/div&gt;
+
+    &lt;div class="rhapsody-field"&gt;
+        &lt;label class="rhapsody-label" for="mode"&gt;Mode&lt;/label&gt;
+        &lt;select class="rhapsody-select" id="mode" name="mode"&gt;
+            &lt;option value="live"&gt;Live&lt;/option&gt;
+            &lt;option value="test"&gt;Test&lt;/option&gt;
+        &lt;/select&gt;
+    &lt;/div&gt;
+
+    &lt;div class="rhapsody-field"&gt;
+        &lt;label class="rhapsody-label" for="notes"&gt;Notes&lt;/label&gt;
+        &lt;textarea class="rhapsody-textarea" id="notes" name="notes"&gt;{{ old.notes|default('') }}&lt;/textarea&gt;
+    &lt;/div&gt;
+
+    &lt;div class="rhapsody-actions"&gt;
+        &lt;button type="submit" class="rhapsody-btn"&gt;Save&lt;/button&gt;
+    &lt;/div&gt;
+&lt;/form&gt;{% endverbatim %}</code></pre>
+
+<div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
+    <strong>Never forget:</strong> every form that posts data needs <code>{% verbatim %}{{ csrf_field()|raw }}{% endverbatim %}</code> inside it, exactly as
+    in the example. Without it, the request is rejected. Always use <code>{% verbatim %}{{ base_url }}{% endverbatim %}</code> at the start of links and
+    form actions, so your module keeps working if the site lives in a sub-folder.
+</div>
+<p>For a one-row form, add <code>rhapsody-form--inline</code>. Fields can then sit directly in the form without <code>rhapsody-field</code> wrappers:</p>
+
+<pre><code class="language-html">{% verbatim %}&lt;form class="rhapsody-form rhapsody-form--inline" method="post" action="{{ base_url }}/my-module/search"&gt;
+    &lt;input type="text" class="rhapsody-input" name="q" placeholder="Search..."&gt;
+    &lt;button type="submit" class="rhapsody-btn"&gt;Search&lt;/button&gt;
+&lt;/form&gt;{% endverbatim %}</code></pre>
+
+<h3>Buttons</h3>
+<ul>
+    <li><code>rhapsody-btn</code>: the main button, in the accent color.</li>
+    <li><code>rhapsody-btn--secondary</code>: a quieter outlined button (add it <em>next to</em> <code>rhapsody-btn</code>).</li>
+    <li><code>rhapsody-btn--danger</code>: a red button for destructive actions such as Delete.</li>
+    <li><code>rhapsody-btn--sm</code>: a smaller button, good inside table rows.</li>
+    <li><code>rhapsody-actions</code>: put buttons inside this to line them up in a row with a gap between them.</li>
+</ul>
+<p>Modifier classes are always combined with the base class. Links work as buttons too:</p>
+
+<pre><code class="language-html">{% verbatim %}&lt;div class="rhapsody-actions"&gt;
+    &lt;button type="submit" class="rhapsody-btn"&gt;Save&lt;/button&gt;
+    &lt;a href="{{ base_url }}/my-module" class="rhapsody-btn rhapsody-btn--secondary"&gt;Cancel&lt;/a&gt;
+    &lt;button type="submit" class="rhapsody-btn rhapsody-btn--danger rhapsody-btn--sm"&gt;Delete&lt;/button&gt;
+&lt;/div&gt;{% endverbatim %}</code></pre>
+
+<h3>Tables</h3>
+<p>
+    Wrap every table in <code>rhapsody-table-wrap</code>. It lets wide tables scroll sideways on small screens instead of
+    breaking the page layout. Put <code>rhapsody-table</code> on the table itself. To draw attention to a cell (a value that is
+    too long, a missing field), add <code>rhapsody-warn</code> to it. The cell is highlighted with a tint and bold text, so it
+    stays readable on any theme and does not rely on color alone.
+</p>
+
+<pre><code class="language-twig">{% verbatim %}&lt;div class="rhapsody-table-wrap"&gt;
+    &lt;table class="rhapsody-table"&gt;
+        &lt;thead&gt;
+            &lt;tr&gt;&lt;th&gt;Page&lt;/th&gt;&lt;th&gt;Title length&lt;/th&gt;&lt;th&gt;&lt;/th&gt;&lt;/tr&gt;
+        &lt;/thead&gt;
+        &lt;tbody&gt;
+        {% for page in pages %}
+            &lt;tr&gt;
+                &lt;td&gt;{{ page.path }}&lt;/td&gt;
+                &lt;td class="{{ page.title_length &gt; 60 ? 'rhapsody-warn' : '' }}"&gt;{{ page.title_length }}&lt;/td&gt;
+                &lt;td&gt;
+                    &lt;form class="rhapsody-form rhapsody-form--inline" method="post"
+                          action="{{ base_url }}/my-module/pages/{{ page.id }}/delete"&gt;
+                        {{ csrf_field()|raw }}
+                        &lt;button type="submit" class="rhapsody-btn rhapsody-btn--danger rhapsody-btn--sm"&gt;Delete&lt;/button&gt;
+                    &lt;/form&gt;
+                &lt;/td&gt;
+            &lt;/tr&gt;
+        {% else %}
+            &lt;tr&gt;&lt;td colspan="3" class="rhapsody-muted"&gt;Nothing here yet.&lt;/td&gt;&lt;/tr&gt;
+        {% endfor %}
+        &lt;/tbody&gt;
+    &lt;/table&gt;
+&lt;/div&gt;{% endverbatim %}</code></pre>
+
+<p>The <code>{% verbatim %}{% else %}{% endverbatim %}</code> branch of the <code>{% verbatim %}{% for %}{% endverbatim %}</code> loop runs when the list is empty. It is a good habit to always provide one, so a new install does not show a blank table.</p>
+
+<h3>Alerts and badges</h3>
+<ul>
+    <li><code>rhapsody-alert</code> plus one of <code>rhapsody-alert--info</code>, <code>rhapsody-alert--success</code>, <code>rhapsody-alert--warning</code> or <code>rhapsody-alert--error</code>: a colored message box.</li>
+    <li><code>rhapsody-badge</code>: a small pill-shaped label, good for statuses like "Active" or "Pending".</li>
+</ul>
+
+<pre><code class="language-html">{% verbatim %}&lt;div class="rhapsody-alert rhapsody-alert--success"&gt;Your settings were saved.&lt;/div&gt;
+&lt;div class="rhapsody-alert rhapsody-alert--error"&gt;Something went wrong. Please try again.&lt;/div&gt;
+
+&lt;p&gt;Status: &lt;span class="rhapsody-badge"&gt;Active&lt;/span&gt;&lt;/p&gt;{% endverbatim %}</code></pre>
+
+<p>Inline <code>&lt;code&gt;</code> tags inside a Module UI page are styled automatically as well.</p>
+
+<hr>
+
+<h2>A complete example</h2>
+<p>
+    Here is a full page for an imaginary "Notes" module, using almost everything above. It shows a form to add a
+    note, then a table of existing notes. Assume your controller passes in a <code>notes</code> list, and (after a failed
+    form submission) <code>errors</code> and <code>old</code>.
+</p>
+
+<pre><code class="language-twig">{% verbatim %}{% extends "@core/module-layout.twig" %}
+
+{% block module_content %}
+    &lt;header class="rhapsody-page-header"&gt;
+        &lt;h1 class="rhapsody-title"&gt;Notes&lt;/h1&gt;
+        &lt;p class="rhapsody-muted"&gt;Short notes your team can see.&lt;/p&gt;
+    &lt;/header&gt;
+
+    &lt;div class="rhapsody-card"&gt;
+        &lt;h2 class="rhapsody-section-title"&gt;Add a note&lt;/h2&gt;
+        &lt;form class="rhapsody-form" method="post" action="{{ base_url }}/notes"&gt;
+            {{ csrf_field()|raw }}
+
+            &lt;div class="rhapsody-field {{ errors.body is defined ? 'rhapsody-field--error' : '' }}"&gt;
+                &lt;label class="rhapsody-label" for="body"&gt;Note&lt;/label&gt;
+                &lt;textarea class="rhapsody-textarea" id="body" name="body"&gt;{{ old.body|default('') }}&lt;/textarea&gt;
+                {% if errors.body is defined %}
+                    &lt;span class="rhapsody-error"&gt;{{ errors.body|first }}&lt;/span&gt;
+                {% endif %}
+            &lt;/div&gt;
+
+            &lt;div class="rhapsody-actions"&gt;
+                &lt;button type="submit" class="rhapsody-btn"&gt;Add note&lt;/button&gt;
+            &lt;/div&gt;
+        &lt;/form&gt;
+    &lt;/div&gt;
+
+    &lt;h2 class="rhapsody-section-title"&gt;All notes&lt;/h2&gt;
+    &lt;div class="rhapsody-table-wrap"&gt;
+        &lt;table class="rhapsody-table"&gt;
+            &lt;thead&gt;&lt;tr&gt;&lt;th&gt;Note&lt;/th&gt;&lt;th&gt;Status&lt;/th&gt;&lt;th&gt;&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+            &lt;tbody&gt;
+            {% for note in notes %}
+                &lt;tr&gt;
+                    &lt;td&gt;{{ note.body }}&lt;/td&gt;
+                    &lt;td&gt;&lt;span class="rhapsody-badge"&gt;{{ note.status }}&lt;/span&gt;&lt;/td&gt;
+                    &lt;td&gt;
+                        &lt;form class="rhapsody-form rhapsody-form--inline" method="post"
+                              action="{{ base_url }}/notes/{{ note.id }}/delete"&gt;
+                            {{ csrf_field()|raw }}
+                            &lt;button type="submit" class="rhapsody-btn rhapsody-btn--danger rhapsody-btn--sm"&gt;Delete&lt;/button&gt;
+                        &lt;/form&gt;
+                    &lt;/td&gt;
+                &lt;/tr&gt;
+            {% else %}
+                &lt;tr&gt;&lt;td colspan="3" class="rhapsody-muted"&gt;No notes yet.&lt;/td&gt;&lt;/tr&gt;
+            {% endfor %}
+            &lt;/tbody&gt;
+        &lt;/table&gt;
+    &lt;/div&gt;
+{% endblock %}{% endverbatim %}</code></pre>
+
+<p>
+    For how your module's controller or route handler actually renders a view like this one, see the
+    <a href="{{ base_url }}/docs/modules">Modules documentation</a>.
+</p>
+
+<hr>
+
+<h2>Automatic spacing around menus</h2>
+<p>
+    Themes position their navigation in all kinds of ways: a bar fixed to the top of the screen, a menu down the
+    left side (very common in admin-style themes), a floating pill, or something else entirely. If a menu is
+    <em>fixed</em> to the screen, it floats on top of the page, and content that starts at the very top of the page
+    would be hidden underneath it.
+</p>
+<p>
+    Module UI handles this for you. A tiny script (loaded by <code>@core/module-layout.twig</code>) <strong>measures</strong> the
+    page, finds any fixed menu that actually overlaps your content, and adds just enough padding to keep your page
+    clear of it. It does not assume what kind of menu there is or how big it is.
+</p>
+<ul>
+    <li>A <strong>wide, short bar</strong> at the top of the screen gets space added above your content.</li>
+    <li>A <strong>tall, narrow menu</strong> on the left or right edge gets space added on that side.</li>
+    <li>If the theme already leaves room for its menu, <strong>nothing extra is added</strong>.</li>
+    <li>Menus that slide in and out (such as a mobile drawer), or collapse, are re-measured automatically when the window is resized or the menu animates.</li>
+    <li>Things that are not navigation are ignored: cookie banners at the bottom, decorative backgrounds, and chat bubbles.</li>
+</ul>
+<div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
+    <strong>Good to know:</strong> this relies on JavaScript. If a visitor has it turned off, the page simply keeps its normal padding.
+    The script also looks for menus that contain at least one link or button, which every real menu does.
+</div>
+<p>
+    If a theme has an unusual menu that is not detected correctly, the theme can set the space explicitly. See
+    <a href="#customizing">Customizing the look</a> below.
+</p>
+
+<hr>
+
+<h2 id="customizing">Customizing the look (for theme authors)</h2>
+<p>
+    Out of the box, Module UI works on any theme, and there is nothing you must do. If you would like module pages to
+    match your theme more closely, set any of these CSS variables on <code>:root</code> in your theme's stylesheet. All of
+    them are optional, and anything you leave out keeps its sensible default.
+</p>
+<ul>
+    <li><code>--rhapsody-primary</code>: the accent color, used for the main button, focus outlines and info alerts. Default: a violet-blue.</li>
+    <li><code>--rhapsody-primary-contrast</code>: the text color shown on top of the accent color. Default: white.</li>
+    <li><code>--rhapsody-danger</code>, <code>--rhapsody-success</code>, <code>--rhapsody-warning</code>: the red, green and amber used for errors, success messages and highlighted table cells.</li>
+    <li><code>--rhapsody-radius</code>: how rounded the corners are on cards, inputs and buttons. Default: <code>0.5rem</code>.</li>
+    <li><code>--rhapsody-gap</code>: the spacing between blocks. Default: <code>1rem</code>.</li>
+    <li><code>--rhapsody-border</code>: the color of borders and dividers.</li>
+    <li><code>--rhapsody-surface</code>: the background of cards and badges.</li>
+    <li><code>--rhapsody-inset-top</code>, <code>--rhapsody-inset-left</code>, <code>--rhapsody-inset-right</code>: space to reserve for a fixed menu. You normally do not need these, because the spacing is measured automatically. Use them only to override the automatic result. The larger of the two values wins.</li>
+</ul>
+<p>For example, a theme with a gold accent and square corners might add this to its main stylesheet:</p>
+
+<pre><code class="language-css">{% verbatim %}:root {
+    --rhapsody-primary: #c9a227;
+    --rhapsody-primary-contrast: #1a1a1a;
+    --rhapsody-radius: 2px;
+}{% endverbatim %}</code></pre>
+
+<p>
+    The default border and card colors are worked out from the text color, so they already suit both light and dark
+    themes. Most themes only need to set <code>--rhapsody-primary</code> to feel at home.
+</p>
+
+<hr>
+
+<h2>Common mistakes</h2>
+<ul>
+    <li><strong>Using the theme's own classes.</strong> Classes like Tailwind's <code>bg-blue-500</code> only exist if the active theme provides them. A module cannot know that. Stick to <code>rhapsody-*</code> classes and your page works everywhere.</li>
+    <li><strong>Putting Module UI classes outside <code>module_content</code>.</strong> The styles only apply inside the <code>rhapsody-ui</code> wrapper, which <code>module_content</code> sits in.</li>
+    <li><strong>Overriding <code>content</code> instead of <code>module_content</code>.</strong> This removes the wrapper and the styling.</li>
+    <li><strong>Forgetting <code>{% verbatim %}{{ parent() }}{% endverbatim %}</code></strong> when overriding <code>styles</code> or <code>scripts</code>.</li>
+    <li><strong>Hard-coding URLs</strong> such as <code>/my-module/save</code>. Use <code>{% verbatim %}{{ base_url }}/my-module/save{% endverbatim %}</code> so your module works when the site is installed in a sub-folder.</li>
+    <li><strong>Forgetting <code>{% verbatim %}{{ csrf_field()|raw }}{% endverbatim %}</code></strong> inside a form.</li>
+</ul>
+
+<hr>
+
+<h2>Related documentation</h2>
+<ul>
+    <li><a href="{{ base_url }}/docs/modules">Modules &amp; Extensibility</a>: how to build a module and render its views.</li>
+    <li><a href="{{ base_url }}/docs/themes">Creating custom themes</a>: the blocks every theme layout must provide.</li>
+    <li><a href="{{ base_url }}/docs/views">Views &amp; Templating</a>: Twig basics, inheritance and passing data.</li>
+    <li><a href="{{ base_url }}/docs/validation">Validation</a>: where the <code>errors</code> and <code>old</code> variables come from.</li>
+</ul>
+
+{% endblock %}

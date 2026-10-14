@@ -1,0 +1,45 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>Updating The Framework</h1>
+    <p>
+        Rhapsody includes a powerful set of console commands to make updating your application simple, safe, and automatic.
+    </p>
+
+    <hr>
+
+    <h2>Automated Update Command</h2>
+    <p>
+        The recommended way to update your application is by using the <code>app:update</code> command. It orchestrates the entire update workflow to ensure a smooth deployment.
+    </p>
+    <pre class="command-line"><code class="language-bash">php rhapsody app:update</code></pre>
+    
+    <h3>Update Workflow</h3>
+    <p>The command performs the following steps in sequence:</p>
+    <ol>
+        <li><strong>Enters Maintenance Mode:</strong> Puts the site into maintenance mode to prevent access during the update.</li>
+        <li><strong>Fetches Latest Code:</strong> Forcefully resets your local branch to match the remote repository, ensuring all new files (like <code>.env.example</code>) are downloaded.</li>
+        <li><strong>Updates Dependencies:</strong> Runs <code>composer install</code>.</li>
+        <li><strong>Syncs Environment File:</strong> Safely appends any new variables from <code>.env.example</code> to your <code>.env</code> file without overwriting your settings.</li>
+        <li><strong>Runs Database Migrations:</strong> Applies any pending schema changes.</li>
+        <li><strong>Clears Caches:</strong> Flushes all route and application caches.</li>
+        <li><strong>Updates Version:</strong> Updates the <code>app_version</code> in your <code>config.php</code> file.</li>
+        <li><strong>Exits Maintenance Mode:</strong> Brings your application back online.</li>
+    </ol>
+
+    <hr>
+    
+    <h2>After Updating</h2>
+    <p>
+        After pulling the latest framework version, always run <code>php rhapsody env:sync</code>
+        to add any new environment variables required by the new version.
+    </p>
+
+    <hr>
+
+    <h2>Upgrade Notes</h2>
+    <h3>Custom cache drivers</h3>
+    <p>
+        If you wrote your own driver implementing <code>CacheInterface</code>, update its method signatures to match the interface: <code>get(string $key, mixed $default = null): mixed</code> and <code>put(string $key, mixed $value, int $minutes): void</code>. A driver that omits the <code>mixed</code> return type on <code>get()</code> will fail to load. See <a href="{{ base_url }}/docs/caching">Caching</a> for the full interface.
+    </p>
+{% endblock %}

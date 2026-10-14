@@ -1,0 +1,149 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>Service Container Lazy Loading</h1>
+
+    <p>
+        Rhapsody includes a powerful lazy‑loading system for the service container. Instead of instantiating every service eagerly at the start of a request, the framework can defer the creation of services until they are actually used. This improves performance, especially in applications with many dependencies or heavy services that are not always needed.
+    </p>
+
+    <h2>How It Works</h2>
+    <p>
+        The lazy‑loading system is implemented via a <strong>proxy pattern</strong>. When you request a service from the container, the <code>ContainerDecorator</code> may return a proxy object instead of the real service. The proxy has the same interface as the target class, but it does not instantiate the real object until one of its methods is called.
+    </p>
+
+    <div class="bg-gray-100 dark:bg-gray-800 p-4 rounded mb-6">
+        <h4 class="font-bold">Lazy Loading Flow</h4>
+        <ol class="list-decimal pl-6 space-y-1">
+            <li>Your code requests a service via <code>$container->get(SomeService::class)</code></li>
+            <li>The <code>ContainerDecorator</code> checks if lazy loading is enabled and if the service is not marked as "eager"</li>
+            <li>A dynamic proxy class is generated (if not already cached) by <code>ProxyGenerator</code></li>
+            <li>The proxy is instantiated with an initializer closure that knows how to resolve the real service</li>
+            <li>The proxy is returned to your code – the real service is <strong>not</strong> created yet</li>
+            <li>When you call a method on the proxy, the proxy triggers the initializer, instantiates the real service, and forwards the call</li>
+        </ol>
+    </div>
+
+    <p>
+        This means that heavy services (e.g., those that connect to external APIs, load large datasets, or have complex constructors) will only be built if they are actually used during the request.
+    </p>
+
+    <h2>Configuration</h2>
+    <p>
+        Lazy loading is controlled via the <code>config.php</code> file under the <code>lazy</code> key, or via environment variables.
+    </p>
+
+    <h3>Master Toggle</h3>
+    <pre><code class="language-php">// config.php
+'lazy' => [
+    'enabled' => filter_var($_ENV['LAZY_LOADING_ENABLED'] ?? true, FILTER_VALIDATE_BOOLEAN),
+    // ...
+]</code></pre>
+    <p>
+        You can disable lazy loading entirely by setting <code>LAZY_LOADING_ENABLED=false</code> in your <code>.env</code> file.
+    </p>
+
+    <h3>Eager Services</h3>
+    <p>
+        Some services should <strong>never</strong> be lazy-loaded – for example, those that must be fully initialised early, or that have side effects in their constructor. You can list them in the <code>eager</code> array:
+    </p>
+    <pre><code class="language-php">'lazy' => [
+    'enabled' => true,
+    'eager' => [
+        \App\Services\PaymentGateway::class,
+        \App\Services\EmailDispatcher::class,
+    ],
+]</code></pre>
+    <p>
+        Controllers are <strong>always</strong> resolved eagerly because they are typically needed immediately and their constructors should not be deferred.
+    </p>
+
+    <h2>Example: Lazy vs Eager</h2>
+    <p>
+        Suppose you have a heavy service <code>ReportGenerator</code> that generates complex PDF reports. It is rarely used – only on a specific admin page.
+    </p>
+
+    <pre><code class="language-php">// Service with heavy constructor
+class ReportGenerator
+{
+    public function __construct(
+        private PdfEngine $engine,
+        private Database $db,
+        private Logger $logger
+    ) {
+        // This can be slow: connecting to PDF service, loading fonts, etc.
+        $this->engine->loadFonts();
+        $this->logger->info('ReportGenerator initialized');
+    }
+
+    public function generate(): string { ... }
+}</code></pre>
+
+    <p>
+        Without lazy loading, <code>ReportGenerator</code> would be built on every request where it is injected (even if not used). With lazy loading, the service is only created when <code>generate()</code> is called.
+    </p>
+
+    <pre><code class="language-php">// Controller that uses the service only in one method
+class AdminController extends BaseController
+{
+    public function __construct(
+        private ReportGenerator $reportGenerator // <- this is a proxy, not the real object
+    ) {}
+
+    public function dashboard(Request $request): Response
+    {
+        // If this method returns early, the report generator is never instantiated
+        if (! $request->hasParam('generate')) {
+            return $this->view('admin/dashboard');
+        }
+
+        // Only now does the real ReportGenerator get built
+        $pdf = $this->reportGenerator->generate();
+        return $this->fileResponse($pdf);
+    }
+}</code></pre>
+
+    <p>
+        The first request (without <code>generate</code>) will not construct <code>ReportGenerator</code>, saving time and resources. Only when the method is actually called does the proxy trigger initialisation.
+    </p>
+
+    <h2>Performance Benefits</h2>
+    <ul>
+        <li><strong>Faster request startup</strong> – fewer services are instantiated upfront.</li>
+        <li><strong>Lower memory usage</strong> – unused services are never created.</li>
+        <li><strong>Selective heavy lifting</strong> – expensive operations happen only when needed.</li>
+    </ul>
+
+    <h2>Limitations</h2>
+    <ul>
+        <li><strong>Final classes</strong> – cannot be proxied because proxy classes extend the target; <code>ProxyGenerator</code> throws an exception if the class is final.</li>
+        <li><strong>Constructors are not lazy</strong> – the real object is only created when a method is called; constructor logic is deferred until that point.</li>
+        <li><strong>Private methods</strong> – are not proxied, but that's fine because proxy only forwards public/protected calls.</li>
+        <li><strong>Static methods</strong> – are not supported for lazy loading (they would bypass the proxy).</li>
+    </ul>
+
+    <h2>When to Use Eager Loading</h2>
+    <ul>
+        <li>Services that must be fully initialised early for correct operation (e.g., database connection, session handler).</li>
+        <li>Services with side effects in their constructor that must happen immediately.</li>
+        <li>Services that are used in almost every request (e.g., logging, configuration).</li>
+    </ul>
+
+    <h2>Advanced: Customising the Proxy Generation</h2>
+    <p>
+        Proxies are generated on‑the‑fly by <code>ProxyGenerator</code> and cached in <code>storage/cache/proxies/</code>. You can pre‑build proxies for all services using the CLI command:
+    </p>
+    <pre><code class="language-bash">php rhapsody build:proxies</code></pre>
+    <p>
+        This can be useful in production to avoid the overhead of generating proxies on the first request.
+    </p>
+
+    <h2>Conclusion</h2>
+    <p>
+        Service container lazy loading is a powerful optimisation technique that can significantly improve performance by deferring the creation of heavy services until they are actually needed. Combined with the caching system, it provides a robust toolkit for building high‑performance applications.
+    </p>
+
+    <div class="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 p-4 mt-6">
+        <p class="text-sm"><strong>Note:</strong> Lazy loading is enabled by default. You can disable it globally via <code>LAZY_LOADING_ENABLED=false</code> in your <code>.env</code> file.</p>
+    </div>
+{% endblock %}

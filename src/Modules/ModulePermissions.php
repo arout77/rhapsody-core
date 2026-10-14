@@ -1,0 +1,160 @@
+<?php
+
+namespace Rhapsody\Core\Modules;
+
+use Rhapsody\Core\Modules\Exceptions\ManifestValidationException;
+
+/**
+ * Normalized, read-only view of what a module's manifest requested.
+ *
+ * Every ModuleContext facade consults this before doing anything on the
+ * module's behalf. This is the single source of truth for "is this module
+ * allowed to do X" — both at runtime (ModuleContext) and at review time
+ * (the marketplace's static analysis can build the same object from a
+ * submission's module.json without running any of the module's code).
+ */
+final class ModulePermissions
+{
+    /** A fully-qualified class name with at least one namespace segment, no leading backslash. */
+    private const CLASS_NAME_PATTERN = '/^[A-Za-z_]\w*(?:\\\\[A-Za-z_]\w*)+$/';
+
+    /** @param array<string, array<string, mixed>> $grants capability => detail array */
+    private function __construct(private readonly array $grants)
+    {
+    }
+
+    /**
+     * @param array<string, mixed> $data the raw "permissions" object from module.json
+     */
+    public static function fromArray(array $data, string $context = 'module.json'): self
+    {
+        $grants = [];
+
+        foreach ($data as $capability => $detail) {
+            if (! in_array($capability, ModuleManifest::CAPABILITIES, true)) {
+                throw new ManifestValidationException(
+                    "{$context}: unknown permission \"{$capability}\" — allowed: " .
+                    implode(', ', ModuleManifest::CAPABILITIES)
+                );
+            }
+
+            if ($detail === false) {
+                continue; // explicitly declined, equivalent to omitting the key
+            }
+
+            $grants[$capability] = is_array($detail) ? $detail : [];
+        }
+
+        // "give me all events" is not a valid grant — force an explicit,
+        // reviewable whitelist for anything that touches the event bus.
+        if (isset($grants['events.listen']) && empty($grants['events.listen']['listen'])) {
+            throw new ManifestValidationException(
+                "{$context}: \"events.listen\" requires a non-empty \"listen\" array of event class names"
+            );
+        }
+
+        // Same explicit-whitelist rule for dispatching. Each entry must be a
+        // fully-qualified, namespaced class name — no wildcards, no global-
+        // namespace classes. Whether the classes actually belong to THIS
+        // module is checked in ModuleManifest (it knows the provider
+        // namespace; this class doesn't).
+        if (isset($grants['events.dispatch'])) {
+            $dispatch = $grants['events.dispatch']['dispatch'] ?? null;
+
+            if (! is_array($dispatch) || $dispatch === []) {
+                throw new ManifestValidationException(
+                    "{$context}: \"events.dispatch\" requires a non-empty \"dispatch\" array of event class names"
+                );
+            }
+
+            foreach ($dispatch as $eventClass) {
+                if (! is_string($eventClass) || ! preg_match(self::CLASS_NAME_PATTERN, $eventClass)) {
+                    throw new ManifestValidationException(
+                        "{$context}: \"events.dispatch.dispatch\" entries must be fully-qualified, namespaced class names " .
+                        "(e.g. \"Vendor\\\\Module\\\\Events\\\\Thing\"), got " . var_export($eventClass, true)
+                    );
+                }
+            }
+        }
+
+        if (isset($grants['routes.register']['prefix'])) {
+            $prefix = $grants['routes.register']['prefix'];
+
+            if (! is_string($prefix) || ! preg_match('/^[a-z0-9\-]+$/', $prefix)) {
+                throw new ManifestValidationException(
+                    "{$context}: \"routes.register.prefix\" must be lowercase alphanumeric/dashes only"
+                );
+            }
+        }
+
+        // Root-level routes (no prefix) are an explicit, reviewable
+        // whitelist — same reasoning as events.listen — so a module can ask
+        // for exactly "/sitemap.xml" without getting the run of every path.
+        if (isset($grants['routes.register']['paths'])) {
+            $paths = $grants['routes.register']['paths'];
+
+            if (! is_array($paths)) {
+                throw new ManifestValidationException(
+                    "{$context}: \"routes.register.paths\" must be an array of absolute paths"
+                );
+            }
+
+            foreach ($paths as $path) {
+                if (! is_string($path) || ! preg_match('#^/[a-z0-9\-/._]+$#', $path)) {
+                    throw new ManifestValidationException(
+                        "{$context}: \"routes.register.paths\" entries must be absolute paths " .
+                        "(lowercase alphanumeric/dash/dot/slash), got \"" . var_export($path, true) . "\""
+                    );
+                }
+            }
+        }
+
+        return new self($grants);
+    }
+
+    public function can(string $capability): bool
+    {
+        return isset($this->grants[$capability]);
+    }
+
+    /** @return list<string> fully-qualified event class names this module may listen for */
+    public function grantedEvents(): array
+    {
+        return self::stringList($this->grants['events.listen']['listen'] ?? null);
+    }
+
+    /** @return list<string> fully-qualified event class names this module may dispatch (all inside its own namespace) */
+    public function dispatchableEvents(): array
+    {
+        return self::stringList($this->grants['events.dispatch']['dispatch'] ?? null);
+    }
+
+    public function routePrefix(string $fallback): string
+    {
+        $prefix = $this->grants['routes.register']['prefix'] ?? null;
+
+        return is_string($prefix) ? $prefix : $fallback;
+    }
+
+    /** @return list<string> exact root-level paths (no namespace prefix) this module may register */
+    public function rootPaths(): array
+    {
+        return self::stringList($this->grants['routes.register']['paths'] ?? null);
+    }
+
+    /**
+     * Keep only the string entries of a list-like grant value.
+     *
+     * @return list<string>
+     */
+    private static function stringList(mixed $value): array
+    {
+        return is_array($value) ? array_values(array_filter($value, 'is_string')) : [];
+    }
+
+    /** @return array<string, array<string, mixed>> */
+    public function toArray(): array
+    {
+        return $this->grants;
+    }
+}

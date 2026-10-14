@@ -1,0 +1,279 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>AI Integration (Gemini)</h1>
+    <p>
+        Rhapsody ships with a provider-agnostic contract for text and chat generation, plus a Google Gemini implementation of it. It's not tied to any specific feature — it's a general-purpose building block for whatever you want to build with it: content generation, drafting assistance, summarization, chat, or anything else.
+    </p>
+    <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
+        <strong>v1 scope:</strong> text and chat generation only, via Google AI Studio (a single API key — not the GCP-project/service-account flow Vertex AI uses). Streaming, multimodal input, function calling, and embeddings aren't implemented yet — see <a href="#extending">Swapping or extending the provider</a> below if you need one of those today.
+    </div>
+
+    <hr>
+
+    <h2>Setup</h2>
+
+    <h3>1. Get an API key</h3>
+    <p>Generate a free key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a>, then add it to <code>.env</code>:</p>
+    <pre><code class="language-bash">GEMINI_API_KEY=your-key-here
+GEMINI_MODEL=gemini-2.5-flash</code></pre>
+
+    <h3>2. Configure</h3>
+    <p>Add an <code>ai</code> block to <code>config.php</code> if it does not already exist (should be near the bottom of the returned array), alongside your other integration settings:</p>
+    <pre><code class="language-php">'ai' => [
+    'provider' => $_ENV['AI_PROVIDER'] ?? 'gemini',
+    'gemini' => [
+        'api_key'         => $_ENV['GEMINI_API_KEY'] ?? '',
+        'model'           => $_ENV['GEMINI_MODEL'] ?? 'gemini-2.5-flash',
+        'timeout'         => (int) ($_ENV['GEMINI_TIMEOUT'] ?? 60),
+        'connect_timeout' => (int) ($_ENV['GEMINI_CONNECT_TIMEOUT'] ?? 5),
+    ],
+],</code></pre>
+    <p>
+        The default 60-second timeout is deliberately generous — generation can genuinely take tens of seconds for longer output. This isn't a typo; treat a slow response as normal, not as something to chase down.
+    </p>
+{# 
+    <h3>3. Bind it in the container</h3>
+    <p>In <code>bootstrap.php</code>, alongside your other service bindings:</p>
+    <pre><code class="language-php">use Rhapsody\Core\Contracts\AiClientInterface;
+use Rhapsody\Core\Services\GeminiClient;
+
+$container->bind(AiClientInterface::class, function () use ($config) {
+    return new GeminiClient(
+        new \GuzzleHttp\Client(),
+        $config['ai']['gemini'] ?? []
+    );
+});</code></pre>
+    <p><code>guzzlehttp/guzzle</code> is already a dependency (pulled in transitively via Omnipay), so no extra <code>composer require</code> should be needed.</p> #}
+
+    <hr>
+
+    <h2>Basic usage</h2>
+    <p>Type-hint <code>AiClientInterface</code> in any container-resolved class — a controller, a listener, a console command — and the container will inject the bound <code>GeminiClient</code>:</p>
+    <pre><code class="language-php">use Rhapsody\Core\Contracts\AiClientInterface;
+
+class MyController extends BaseController
+{
+    public function __construct(protected AiClientInterface $ai) {}
+
+    public function summarize(Request $request): Response
+    {
+        $response = $this->ai->generateContent(
+            'Summarize this in one sentence: ' . $request->input('text')
+        );
+
+        return $this->json(['summary' => $response->getText()]);
+    }
+}</code></pre>
+
+    <h3>Multi-turn chat</h3>
+    <p>For a conversation rather than a single prompt, use <code>generateChatContent()</code> with an ordered list of turns:</p>
+    <pre><code class="language-php">$response = $this->ai->generateChatContent([
+    ['role' => 'user', 'content' => 'What is the capital of France?'],
+    ['role' => 'assistant', 'content' => 'Paris.'],
+    ['role' => 'user', 'content' => 'What is its population?'],
+]);</code></pre>
+
+    <h3>Options</h3>
+    <p>Both methods accept an <code>$options</code> array as their second argument:</p>
+    <pre><code class="language-php">$response = $this->ai->generateContent($prompt, [
+    'model'       => 'gemini-2.5-pro',  // override the configured default model
+    'temperature' => 0.9,               // 0.0–1.0, higher = more creative/random
+    'max_tokens'  => 500,               // maxOutputTokens
+    'top_p'       => 0.95,
+    'top_k'       => 40,
+    'timeout'     => 90,                // override the configured request timeout, in seconds
+]);</code></pre>
+
+    <hr>
+
+    <h2>The response object</h2>
+    <p>
+        <code>generateContent()</code>/<code>generateChatContent()</code> return an <code>AiResponse</code> — not a raw decoded array — so your code has a stable contract even if Gemini's response shape changes, and so a second provider can be added later behind the same shape.
+    </p>
+    <pre><code class="language-php">$response = $this->ai->generateContent($prompt);
+
+$response->getText();       // string — the generated text
+$response->getFinishReason(); // ?string — e.g. 'STOP', 'MAX_TOKENS', 'SAFETY'
+$response->wasTruncated();  // bool — true if cut off by the max_tokens limit
+$response->wasBlocked();    // bool — true if blocked by safety filters or recitation
+$response->getUsage();      // array — ['prompt_tokens' => .., 'completion_tokens' => .., 'total_tokens' => ..]
+$response->getRaw();        // array — the full decoded provider payload, as an escape hatch</code></pre>
+
+    <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
+        <strong>Important:</strong> a truncated or blocked response is <em>not</em> an exception. Both are legitimate, successful outcomes of a real API call — Gemini generated something, it's just incomplete or was filtered. Check <code>wasTruncated()</code>/<code>wasBlocked()</code> and decide what that means for your use case, rather than expecting these to throw.
+    </div>
+
+    <hr>
+
+    <h2>Error handling</h2>
+    <p>Genuine failures to communicate with the provider are thrown as exceptions, all extending a common base:</p>
+    <ul>
+        <li><code>AiAuthenticationException</code> – the API key is missing, invalid, or not authorized (HTTP 401/403, or caught locally before any request is sent if no key is configured at all).</li>
+        <li><code>AiRateLimitException</code> – rate limit or quota exceeded (HTTP 429). Exposes <code>$e->retryAfter</code> (an <code>?int</code> in seconds) when the provider supplies a <code>Retry-After</code> header.</li>
+        <li><code>AiTimeoutException</code> – the request took too long, whether at the connection stage or waiting for a response.</li>
+        <li><code>AiServerException</code> – the provider itself failed (HTTP 5xx) — an outage on Google's side, not a problem with your request.</li>
+        <li><code>AiException</code> – the base class; catch this for "something failed" generically, or any other failure mode not covered above.</li>
+    </ul>
+    <pre><code class="language-php">use Rhapsody\Core\Ai\Exceptions\{
+    AiAuthenticationException,
+    AiRateLimitException,
+    AiTimeoutException,
+    AiServerException,
+    AiException,
+};
+
+try {
+    $response = $this->ai->generateContent($prompt);
+} catch (AiRateLimitException $e) {
+    // e.g. tell the user how long to wait
+    $wait = $e->retryAfter ?? 30;
+} catch (AiTimeoutException $e) {
+    // e.g. suggest a shorter prompt and retry
+} catch (AiServerException $e) {
+    // e.g. the provider is down — try again shortly
+} catch (AiAuthenticationException $e) {
+    // e.g. log it — this is a config problem, not a per-request one
+    error_log($e->getMessage());
+} catch (AiException $e) {
+    // anything else
+}</code></pre>
+
+    <hr>
+
+    <h2>Exposing it over HTTP: <code>BaseAiController</code></h2>
+    <p>
+        <code>Rhapsody\Core\Controllers\BaseAiController</code> gives you a ready-made JSON endpoint — the same pattern as <code>BaseBillingController</code>/<code>BaseWebhookController</code> — with every exception above already mapped to a sensible HTTP status:
+    </p>
+    <table class="min-w-full text-sm">
+        <thead>
+            <tr class="text-left border-b border-gray-300 dark:border-gray-700">
+                <th class="pr-6 py-2">Exception</th>
+                <th class="pr-6 py-2">HTTP status</th>
+                <th class="py-2">Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="pr-6 py-1"><code>AiAuthenticationException</code></td><td class="pr-6 py-1">500</td><td class="py-1">Logged server-side; the client just sees a generic message — this is a config problem, not something the user caused.</td></tr>
+            <tr><td class="pr-6 py-1"><code>AiRateLimitException</code></td><td class="pr-6 py-1">429</td><td class="py-1"><code>Retry-After</code> header set when available.</td></tr>
+            <tr><td class="pr-6 py-1"><code>AiTimeoutException</code></td><td class="pr-6 py-1">504</td><td class="py-1">—</td></tr>
+            <tr><td class="pr-6 py-1"><code>AiServerException</code></td><td class="pr-6 py-1">502</td><td class="py-1">—</td></tr>
+            <tr><td class="pr-6 py-1"><code>AiException</code></td><td class="pr-6 py-1">500</td><td class="py-1">Generic fallback.</td></tr>
+        </tbody>
+    </table>
+
+    <p>Wire up a route:</p>
+    <pre><code class="language-php">use Rhapsody\Core\Controllers\BaseAiController;
+
+Router::post('/ai/generate', [BaseAiController::class, 'generate'])->middleware('auth');</code></pre>
+    <div class="bg-red-200 border-l-4 border-red-700 text-red-700 p-4">
+        <strong>Don't skip <code>->middleware('auth')</code> without thinking about it.</strong> An unauthenticated public AI endpoint means anyone who finds the URL can spend your API quota. Requiring auth is a sensible default, not a hard requirement — just make the call deliberately.
+    </div>
+
+    <p>The endpoint expects a JSON body with a <code>prompt</code> field (and your CSRF <code>_token</code>, since this isn't under <code>api/*</code> and so isn't CSRF-exempt), and returns:</p>
+    <pre><code class="language-json">{
+    "text": "...",
+    "truncated": false,
+    "blocked": false,
+    "usage": { "prompt_tokens": 12, "completion_tokens": 48, "total_tokens": 60 }
+}</code></pre>
+
+    <h3 id="extending">Extending for app-specific behaviour</h3>
+    <p>Same pattern as <code>BillingController extends BaseBillingController</code> — extend the base controller rather than duplicating its error handling:</p>
+    <pre><code class="language-php">namespace App\Controllers;
+
+use Rhapsody\Core\Controllers\BaseAiController;
+
+class AiController extends BaseAiController
+{
+    public function generate(Request $request): Response
+    {
+        // e.g. wrap the user's input in your own prompt template,
+        // apply per-user rate limiting, log usage, then delegate:
+        return parent::generate($request);
+    }
+}</code></pre>
+
+    <hr>
+
+    <h2>The React component</h2>
+    <p>
+        A ready-made island, <code>resources/js/components/AiPrompt.jsx</code>, gives you a working prompt-and-response UI with no extra setup — built on the <a href="{{ base_url }}/docs/react">React Islands bridge</a>.
+    </p>
+    <pre><code class="language-twig">{{ '{{' }} react_component('AiPrompt', { endpoint: '/ai/generate' }) {{ '}}' }}</code></pre>
+    <p>
+        It requires a CSRF meta tag on the page — the same convention <code>BaseController::react()</code> already uses for full-SPA mode. If the page isn't already using <code>react()</code>, add this to your layout:
+    </p>
+    <pre><code class="language-twig">&lt;meta name="csrf-token" content="{{ '{{' }} csrf_token() {{ '}}' }}"&gt;</code></pre>
+
+    <h3>What it handles for you</h3>
+    <ul>
+        <li>Disables the form while a request is in flight, and shows a "still working" hint after 8 seconds rather than leaving the user staring at an ambiguous spinner.</li>
+        <li>A <strong>Cancel</strong> button (via <code>AbortController</code>) — lets the user actually stop a slow request instead of just waiting it out. The request is also aborted automatically if the component unmounts mid-request.</li>
+        <li>429 responses show the server's <code>Retry-After</code> value when present; 504 and 502 get their own distinct messages rather than a generic "something went wrong."</li>
+        <li><code>truncated</code>/<code>blocked</code> render as their own inline notices, not folded into an error state — matching <code>AiResponse</code>'s design: these are successful responses worth telling the user about, not failures.</li>
+    </ul>
+
+    <h3>Props</h3>
+    <table class="min-w-full text-sm">
+        <thead>
+            <tr class="text-left border-b border-gray-300 dark:border-gray-700">
+                <th class="pr-6 py-2">Prop</th>
+                <th class="pr-6 py-2">Default</th>
+                <th class="py-2">Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="pr-6 py-1"><code>endpoint</code></td><td class="pr-6 py-1"><code>/ai/generate</code></td><td class="py-1">The route to POST to.</td></tr>
+            <tr><td class="pr-6 py-1"><code>placeholder</code></td><td class="pr-6 py-1"><code>"Ask me anything..."</code></td><td class="py-1">Textarea placeholder text.</td></tr>
+            <tr><td class="pr-6 py-1"><code>buttonLabel</code></td><td class="pr-6 py-1"><code>"Generate"</code></td><td class="py-1">Submit button text.</td></tr>
+        </tbody>
+    </table>
+
+    <hr>
+
+    <h2>Swapping or extending the provider</h2>
+    <p>
+        <code>AiClientInterface</code> exists specifically so nothing in your application code is coupled to Gemini directly — the same reasoning behind going through Omnipay's abstraction for payments rather than writing Stripe-specific code. To add another provider (Claude, OpenAI, or a second Gemini configuration), implement the interface and swap the container binding:
+    </p>
+    <pre><code class="language-php">use Rhapsody\Core\Contracts\AiClientInterface;
+use Rhapsody\Core\Ai\AiResponse;
+
+class MyOtherProviderClient implements AiClientInterface
+{
+    public function generateContent(string $prompt, array $options = []): AiResponse { /* ... */ }
+    public function generateChatContent(array $messages, array $options = []): AiResponse { /* ... */ }
+}</code></pre>
+    <p>Nothing that type-hints <code>AiClientInterface</code> — your controllers, listeners, commands — needs to change.</p>
+
+    <p>
+        If you need something v1 doesn't cover — streaming, multimodal input, function calling, embeddings — the intended path is a new method on <code>AiClientInterface</code> (or a sibling interface, e.g. an <code>EmbeddingClientInterface</code> for embeddings, since that's a different enough use case to warrant its own contract rather than being bolted onto this one) once you have a real caller that needs it, rather than speculative surface area added ahead of time.
+    </p>
+
+    <hr>
+
+    <h2>Testing</h2>
+    <p>
+        <code>GeminiClient</code> is fully testable without a real API key or network access — it depends on Guzzle's <code>ClientInterface</code>, so tests can swap in a <code>MockHandler</code>:
+    </p>
+    <pre><code class="language-php">use GuzzleHttp\Client;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Response as Psr7Response;
+
+$mock = new MockHandler([
+    new Psr7Response(200, [], json_encode([
+        'candidates' => [[
+            'content'      => ['parts' => [['text' => 'Hello!']]],
+            'finishReason' => 'STOP',
+        ]],
+    ])),
+]);
+
+$httpClient = new Client(['handler' => HandlerStack::create($mock)]);
+$ai = new GeminiClient($httpClient, ['api_key' => 'test-key']);
+
+$response = $ai->generateContent('Hi');
+// $response->getText() === 'Hello!'</code></pre>
+    <p>See <code>tests/Unit/GeminiClientTest.php</code> for the full suite, including every error-path exception above.</p>
+{% endblock %}
