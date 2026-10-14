@@ -81,17 +81,26 @@ composer create-project arout/rhapsody-app my-awesome-app
 
 ### Environment Configuration
 
-Once Composer finishes, edit the `.env` file in your root directory with your database credentials and website URL:
+Once Composer finishes, edit the `.env` file in your root directory with your database credentials, environment, app key (a hash used by cookies and encryption) and website URL:
 
 ```env
+# development or production
 APP_ENV=production
+
+# Generate your own unique 32 or 64 character key using:
+# php -r "echo bin2hex(random_bytes(64));"
+APP_KEY=your-key-goes-here
+
+# Website URL
 APP_URL=https://your-client-domain.com
 
+# Database credentials
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_DATABASE=client_app_db
 DB_USERNAME=db_user
 DB_PASSWORD=db_password
+DB_DRIVER="" # Supported databases: mysql, pgsql, sqlite, or sqlsrv
 ```
 
 That is all that is absolutely required to launch your new site, but you'll want to <a href="https://rhapsodyframework.com/docs/installation">check the documentation</a> for other optional steps that you may find useful before going live (installing the React bridge, warming the cache and proxies, etc).
