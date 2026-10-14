@@ -114,16 +114,45 @@ class UserController extends BaseController
 {
     public function __construct(protected User $userModel) {}
 
-    public function show(Request $request, string $id): Response
+    public function show(Request $request, string $user_id): Response
     {
         // Find the user
-        $user = $this->userModel->findById($id);
+        $user = $this->userModel->findById($user_id);
 
         // Tell the controller which view file to render, and pass
         // the user's data to the view
         return $this->view('users/show.twig', ['user' => $user]);
     }
 }
+```
+
+Register the route in **routes/web.php**:
+
+```php
+<?php
+// Note that '{user_id}' is an example of how to create dynamic ($_GET) routes.
+// We chain the ->middleware('auth') middleware to the route in order to ensure
+// only logged in users can view this page (replace 'auth' with 'admin' to do the
+// same to restrict pages to only administrators
+Router::get('/users/{user_id}', [UserController::class, 'show'])
+    ->middleware('auth');
+```
+
+Finally, the Twig view file:
+
+```twig
+{% extends "layouts/main.twig" %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto py-12 px-4">
+    <h1 class="text-3xl font-bold mb-4">About</h1>
+    <p class="text-gray-600 dark:text-gray-400">
+        Welcome, {{ user.name }}. We sent a verification email to you at {{ user.email_address )).
+        Please respond in order to activate your account
+    </p>
+</div>
+{% endblock %}
+
 ```
 
 ---
