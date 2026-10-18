@@ -1,5 +1,4 @@
 <?php
-
 namespace Rhapsody\Core\Modules;
 
 /**
@@ -16,6 +15,11 @@ namespace Rhapsody\Core\Modules;
 final class ModuleInstallationStore
 {
     private readonly string $path;
+
+    /**
+     * @var list<string>|null decoded installed.json, read at most once per instance
+     */
+    private ?array $memo = null;
 
     public function __construct(string $basePath)
     {
@@ -41,16 +45,25 @@ final class ModuleInstallationStore
         $this->write(array_values(array_diff($this->all(), [$packageName])));
     }
 
-    /** @return list<string> */
+    /**
+     * @return list<string>
+     */
     public function all(): array
     {
         if (! is_file($this->path)) {
             return [];
         }
 
-        $decoded = json_decode((string) file_get_contents($this->path), true);
+        if ($this->memo !== null) {
+            return $this->memo;
+        }
+        if (! is_file($this->path)) {
+            return $this->memo = [];
+        }
 
-        return is_array($decoded) ? array_values(array_filter($decoded, 'is_string')) : [];
+        $decoded           = json_decode((string) file_get_contents($this->path), true);
+        return $this->memo = is_array($decoded) ? array_values(array_filter($decoded, 'is_string')) : [];
+
     }
 
     /**
@@ -63,5 +76,6 @@ final class ModuleInstallationStore
             @mkdir($dir, 0755, true);
         }
         file_put_contents($this->path, json_encode($all, JSON_PRETTY_PRINT));
+        $this->memo = $all;
     }
 }

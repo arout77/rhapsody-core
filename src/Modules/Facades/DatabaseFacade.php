@@ -1,5 +1,4 @@
 <?php
-
 namespace Rhapsody\Core\Modules\Facades;
 
 use Doctrine\ORM\EntityManager;
@@ -36,9 +35,27 @@ final class DatabaseFacade
 {
     private const DDL_VERBS = '/^\s*(CREATE|ALTER|DROP)\s+TABLE\s+/i';
 
+    private ?PDO $connection = null;
+
+    private ?EntityManager $entityManager = null;
+
+    /**
+     * The PDO connection and the Doctrine EntityManager are the two most
+     * expensive things a module can ask for, and a module's boot() runs on
+     * every request — including ones that never touch the database (image
+     * resizing, redirects, JSON endpoints). So neither is built here:
+     * both arrive as resolvers and are invoked on first real use, then
+     * memoized. A module that only ever calls query()/insert()/etc. never
+     * pays for Doctrine; a module that is never called in a request pays
+     * for neither. Permission checks run before any resolver, so an
+     * undeclared "database.access" still fails without connecting.
+     *
+     * @param \Closure(): PDO           $connectionResolver
+     * @param \Closure(): EntityManager $entityManagerResolver
+     */
     public function __construct(
-        private readonly PDO $connection,
-        private readonly EntityManager $entityManager,
+        private readonly \Closure $connectionResolver,
+        private readonly \Closure $entityManagerResolver,
         private readonly ModulePermissions $permissions,
         private readonly string $tablePrefix,
     ) {
@@ -54,15 +71,15 @@ final class DatabaseFacade
      * (e.g. a stacked statement), is rejected before it reaches the
      * database at all.
      *
-     * @param array<int|string, mixed> $params
-     * @return array<int, array<string, mixed>>
+     * @param  array<int|string, mixed>        $params
+     * @return array<int,        array<string, mixed>>
      */
     public function query(string $sql, array $params = []): array
     {
         $this->assertAllowed();
         $this->assertReadOnlySql($sql);
 
-        $stmt = $this->connection->prepare($sql);
+        $stmt = $this->connection()->prepare($sql);
         $stmt->execute($params);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -75,41 +92,43 @@ final class DatabaseFacade
     /**
      * Read helper for any table — not scoped to the module's own prefix.
      *
-     * @param array<string, mixed> $where
-     * @param list<string> $columns
-     * @return array<int, array<string, mixed>>
+     * @param  array<string, mixed>        $where
+     * @param  list<string>  $columns
+     * @return array<int,    array<string, mixed>>
      */
     public function select(string $table, array $where = [], array $columns = ['*']): array
     {
         $this->assertAllowed();
 
-        $sql = 'SELECT ' . implode(', ', $columns) . ' FROM ' . $this->quoteIdentifier($table);
-        [$whereSql, $params] = $this->buildWhere($where);
-        $sql .= $whereSql;
+        $sql                  = 'SELECT ' . implode(', ', $columns) . ' FROM ' . $this->quoteIdentifier($table);
+        [$whereSql, $params]  = $this->buildWhere($where);
+        $sql                 .= $whereSql;
 
-        $stmt = $this->connection->prepare($sql);
+        $stmt = $this->connection()->prepare($sql);
         $stmt->execute($params);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    /** @param array<string, mixed> $data */
+    /**
+     * @param array<string, mixed> $data
+     */
     public function insert(string $table, array $data): int
     {
         $this->assertAllowed();
         $this->assertOwnTable($table);
 
         $columns      = array_keys($data);
-        $placeholders = array_map(static fn (string $c) => ':' . $c, $columns);
+        $placeholders = array_map(static fn(string $c) => ':' . $c, $columns);
 
         $sql = 'INSERT INTO ' . $this->quoteIdentifier($table)
-            . ' (' . implode(', ', array_map([$this, 'quoteIdentifier'], $columns)) . ')'
-            . ' VALUES (' . implode(', ', $placeholders) . ')';
+        . ' (' . implode(', ', array_map([$this, 'quoteIdentifier'], $columns)) . ')'
+        . ' VALUES (' . implode(', ', $placeholders) . ')';
 
-        $stmt = $this->connection->prepare($sql);
+        $stmt = $this->connection()->prepare($sql);
         $stmt->execute($data);
 
-        return (int) $this->connection->lastInsertId();
+        return (int) $this->connection()->lastInsertId();
     }
 
     /**
@@ -126,24 +145,26 @@ final class DatabaseFacade
         }
 
         $setSql = implode(', ', array_map(
-            static fn (string $c) => $c . ' = :set_' . $c,
+            static fn(string $c) => $c . ' = :set_' . $c,
             array_keys($data)
         ));
         $setParams = array_combine(
-            array_map(static fn (string $c) => 'set_' . $c, array_keys($data)),
+            array_map(static fn(string $c) => 'set_' . $c, array_keys($data)),
             array_values($data)
         );
 
         [$whereSql, $whereParams] = $this->buildWhere($where, 'where_');
 
         $sql  = 'UPDATE ' . $this->quoteIdentifier($table) . ' SET ' . $setSql . $whereSql;
-        $stmt = $this->connection->prepare($sql);
-        $stmt->execute([...$setParams, ...$whereParams]);
+        $stmt = $this->connection()->prepare($sql);
+        $stmt->execute([ ...$setParams, ...$whereParams]);
 
         return $stmt->rowCount();
     }
 
-    /** @param array<string, mixed> $where */
+    /**
+     * @param array<string, mixed> $where
+     */
     public function delete(string $table, array $where): int
     {
         $this->assertAllowed();
@@ -156,7 +177,7 @@ final class DatabaseFacade
         [$whereSql, $params] = $this->buildWhere($where);
 
         $sql  = 'DELETE FROM ' . $this->quoteIdentifier($table) . $whereSql;
-        $stmt = $this->connection->prepare($sql);
+        $stmt = $this->connection()->prepare($sql);
         $stmt->execute($params);
 
         return $stmt->rowCount();
@@ -186,7 +207,7 @@ final class DatabaseFacade
         $table = $this->extractDdlTableName($sql);
         $this->assertOwnTable($table);
 
-        $this->connection->exec($sql);
+        $this->connection()->exec($sql);
     }
 
     // ---------------------------------------------------------------
@@ -195,27 +216,27 @@ final class DatabaseFacade
 
     /**
      * @template T of object
-     * @param class-string<T> $entityClass
+     * @param  class-string<T> $entityClass
      * @return T|null
      */
     public function find(string $entityClass, mixed $id): ?object
     {
         $this->assertAllowed();
 
-        return $this->entityManager->find($entityClass, $id);
+        return $this->entityManager()->find($entityClass, $id);
     }
 
     /**
      * @template T of object
-     * @param class-string<T> $entityClass
-     * @param array<string, mixed> $criteria
+     * @param  class-string<T> $entityClass
+     * @param  array<string,   mixed>         $criteria
      * @return list<T>
      */
     public function findBy(string $entityClass, array $criteria): array
     {
         $this->assertAllowed();
 
-        return $this->entityManager->getRepository($entityClass)->findBy($criteria);
+        return $this->entityManager()->getRepository($entityClass)->findBy($criteria);
     }
 
     // ---------------------------------------------------------------
@@ -227,8 +248,8 @@ final class DatabaseFacade
         $this->assertAllowed();
         $this->assertOwnEntity($entity);
 
-        $this->entityManager->persist($entity);
-        $this->entityManager->flush();
+        $this->entityManager()->persist($entity);
+        $this->entityManager()->flush();
     }
 
     public function remove(object $entity): void
@@ -236,8 +257,22 @@ final class DatabaseFacade
         $this->assertAllowed();
         $this->assertOwnEntity($entity);
 
-        $this->entityManager->remove($entity);
-        $this->entityManager->flush();
+        $this->entityManager()->remove($entity);
+        $this->entityManager()->flush();
+    }
+
+    // ---------------------------------------------------------------
+    // Lazy dependencies
+    // ---------------------------------------------------------------
+
+    private function connection(): PDO
+    {
+        return $this->connection ??= ($this->connectionResolver)();
+    }
+
+    private function entityManager(): EntityManager
+    {
+        return $this->entityManager ??= ($this->entityManagerResolver)();
     }
 
     // ---------------------------------------------------------------
@@ -263,7 +298,7 @@ final class DatabaseFacade
 
     private function assertOwnEntity(object $entity): void
     {
-        $tableName = $this->entityManager->getClassMetadata(get_class($entity))->getTableName();
+        $tableName = $this->entityManager()->getClassMetadata(get_class($entity))->getTableName();
         $this->assertOwnTable($tableName);
     }
 
@@ -303,8 +338,8 @@ final class DatabaseFacade
     }
 
     /**
-     * @param array<string, mixed> $where
-     * @return array{0: string, 1: array<string, mixed>}
+     * @param  array<string, mixed>  $where
+     * @return array{0:      string, 1: array<string, mixed>}
      */
     private function buildWhere(array $where, string $paramPrefix = ''): array
     {
@@ -315,9 +350,9 @@ final class DatabaseFacade
         $clauses = [];
         $params  = [];
         foreach ($where as $column => $value) {
-            $param             = $paramPrefix . $column;
-            $clauses[]         = $this->quoteIdentifier($column) . ' = :' . $param;
-            $params[$param]    = $value;
+            $param          = $paramPrefix . $column;
+            $clauses[]      = $this->quoteIdentifier($column) . ' = :' . $param;
+            $params[$param] = $value;
         }
 
         return [' WHERE ' . implode(' AND ', $clauses), $params];

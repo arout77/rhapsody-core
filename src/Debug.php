@@ -14,8 +14,10 @@ use Rhapsody\Core\Routing\Route;
 class Debug
 {
     private static ?self $instance = null;
-    /** @var array<string, mixed> */
-    private array $data            = [];
+    /**
+     * @var array<string, mixed>
+     */
+    private array $data = [];
     private float $startTime;
     private int $startMemory;
 
@@ -71,10 +73,10 @@ class Debug
     /**
      * Gathers final data points at the end of the request.
      *
-     * @param Response             $response
-     * @param array<string, mixed> $config
-     * @param ContainerInterface   $container
-     * @param Route|null           $matchedRoute
+     * @param Response           $response
+     * @param array<string,      mixed>          $config
+     * @param ContainerInterface $container
+     * @param Route|null         $matchedRoute
      */
     public function end(Response $response, array $config, ContainerInterface $container, ?Route $matchedRoute = null): void
     {
@@ -112,7 +114,9 @@ class Debug
             $stackQueries = $stack->queries;
         }
 
-        /** @var list<array<string, mixed>> $queries */
+        /**
+         * @var list<array<string, mixed>> $queries
+         */
         $queries = array_merge(
             QueryLogger::getInstance()->queries,
             TraceablePDO::getQueryLog(),
@@ -122,7 +126,7 @@ class Debug
         // Detect N+1 queries: group by normalized SQL, flag any shape seen more than 3 times
         $groups = [];
         foreach ($queries as $index => $query) {
-            $sql                                  = $query['sql'] ?? '';
+            $sql                                                       = $query['sql'] ?? '';
             $groups[self::normalizeSql(is_string($sql) ? $sql : '')][] = $index;
         }
 

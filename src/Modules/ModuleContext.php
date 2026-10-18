@@ -1,8 +1,10 @@
 <?php
-
 namespace Rhapsody\Core\Modules;
 
+use Doctrine\ORM\EntityManager;
+use PDO;
 use Rhapsody\Core\Contracts\ContainerInterface;
+use Rhapsody\Core\Database;
 use Rhapsody\Core\Events\EventDispatcher;
 use Rhapsody\Core\Mailer;
 use Rhapsody\Core\Modules\Facades\DatabaseFacade;
@@ -128,9 +130,14 @@ final class ModuleContext
 
     public function database(): DatabaseFacade
     {
+        $container = $this->container;
+
+        // Resolvers, not resolved objects: the PDO connection and the
+        // Doctrine EntityManager are only built if and when this facade
+        // is actually used, not on every request that boots the module.
         return new DatabaseFacade(
-            $this->container->resolve(\Rhapsody\Core\Database::class)->getConnection(),
-            $this->container->resolve(\Doctrine\ORM\EntityManager::class),
+            static fn(): PDO           => $container->resolve(Database::class)->getConnection(),
+            static fn(): EntityManager => $container->resolve(EntityManager::class),
             $this->manifest->permissions,
             $this->manifest->tablePrefix(),
         );

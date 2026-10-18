@@ -68,6 +68,7 @@ if (file_exists($basePath . '/.env')) {
     $dotenv = Dotenv\Dotenv::createImmutable($basePath);
     $dotenv->load();
 }
+
 // 2. Create a new Service Container instance and assign it to global scope
 global $container;
 $container = new Container();
@@ -80,6 +81,12 @@ if (! file_exists($configPath)) {
 
 // Expecting config.php to return its configuration array
 $config = require $configPath;
+
+// The framework version shown in the debug toolbar and available to CLI
+// commands via $config['app_version'] — same source as the update-check
+// banner (see NotificationService), so both stay in sync automatically.
+$config['app_version'] = FrameworkInfo::getVersion();
+
 $container->bind('config', function () use ($config) {
     return $config;
 });
@@ -88,11 +95,6 @@ $container->singleton(
     \Rhapsody\Core\Support\Config::class,
     fn($c) => new \Rhapsody\Core\Support\Config($c->get('config'))
 );
-
-// The framework version shown in the debug toolbar and available to CLI
-// commands via $config['app_version'] — same source as the update-check
-// banner (see NotificationService), so both stay in sync automatically.
-$config['app_version'] = FrameworkInfo::getVersion();
 
 // =========================================================================
 // STEP 2: SERVICE REGISTRATION (Register bindings into container memory)
@@ -304,7 +306,7 @@ $container->singleton(Environment::class, function (Container $c) use ($config, 
         {
             return Session::hasFlash($name);
         }
-    };;
+    };;;;;;;
 
     $twig->addGlobal('flash', $flash);
 

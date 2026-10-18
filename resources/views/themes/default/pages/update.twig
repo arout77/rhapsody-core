@@ -1,0 +1,21 @@
+{% extends "@core/layouts/main.twig" %}
+
+{% block content %}
+    <h2 class="text-3xl font-bold text-gray-800 mb-2">System Updates</h2>
+    <hr class="mb-6">
+
+    <div class="space-y-4">
+        <div>
+            <span class="font-bold text-gray-600">Installed version:</span>
+            <span class="font-mono bg-gray-200 p-1 rounded">{{ installed_version }}</span>
+        </div>
+        <div>
+            <span class="font-bold text-gray-600">Current version:</span>
+            <span>{{ current_version }}</span>
+        </div>
+    </div>
+
+    <div class="mt-8">
+        <a href="{{ base_url }}/users" class="text-blue-500 hover:underline">&larr; Back to All Users</a>
+    </div>
+{% endblock %}

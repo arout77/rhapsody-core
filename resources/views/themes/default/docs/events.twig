@@ -12,9 +12,9 @@
     <h2>The Workflow at a Glance</h2>
     <ol>
         <li>An action occurs in your application (e.g., a user registers).</li>
-        <li>Your controller creates and **dispatches** an `Event` object containing data about what happened.</li>
-        <li>The `EventDispatcher` receives the event and finds all registered **Listeners** for it.</li>
-        <li>The dispatcher executes the `handle()` method on each listener, passing them the event object.</li>
+        <li>Your controller creates and <strong>dispatches</strong> an <code>Event</code> object containing data about what happened.</li>
+        <li>The <code>EventDispatcher</code> receives the event and finds all registered <strong>Listeners</strong> for it.</li>
+        <li>The dispatcher runs each listener in the order it was registered, passing it the event object: the <code>handle()</code> method of a listener class, or a callable directly.</li>
     </ol>
     <hr>
     
@@ -22,23 +22,23 @@
     <p>The Rhapsody console includes generator commands to quickly create new event and listener classes for your application.</p>
     
     <h3>Creating an Event</h3>
-    <p>This command will create a new event class in the `app/Events` directory. Events are simple data objects that hold information about the event.</p>
+    <p>This command will create a new event class in the <code>app/Events</code> directory. Events are simple data objects that hold information about the event.</p>
     <pre class="command-line"><code class="language-bash">php rhapsody make:event UserRegistered</code></pre>
-    <p>You can then edit the generated `UserRegistered.php` file to accept data in its constructor, like the user object.</p>
+    <p>You can then edit the generated <code>UserRegistered.php</code> file to accept data in its constructor, like the user object.</p>
     
     <h3>Creating a Listener</h3>
-    <p>This command creates a new listener class in the `app/Listeners` directory. Listeners contain the logic to handle an event.</p>
+    <p>This command creates a new listener class in the <code>app/Listeners</code> directory. Listeners contain the logic to handle an event.</p>
     <pre class="command-line"><code class="language-bash">php rhapsody make:listener SendWelcomeEmail</code></pre>
-    <p>You will then implement the logic for sending the email inside the `handle()` method of the generated `SendWelcomeEmail.php` file.</p>
+    <p>You will then implement the logic for sending the email inside the <code>handle()</code> method of the generated <code>SendWelcomeEmail.php</code> file.</p>
 
     <hr>
 
     <h2>2. Registering Listeners</h2>
     <p>
-        Once you have created your event and listener classes, you need to tell the framework that the listener should be executed when the event is dispatched. This is done in the `app/Providers/EventServiceProvider.php` file.
+        Once you have created your event and listener classes, you need to tell the framework that the listener should be executed when the event is dispatched. This is done in the <code>app/Providers/EventServiceProvider.php</code> file.
     </p>
     <p>
-        The `$listen` property is an array where the keys are the event classes and the values are arrays of listener classes that should handle them.
+        The <code>$listen</code> property is an array where the keys are the event classes and the values are arrays of listener classes that should handle them.
     </p>
     <pre><code class="language-php">
 // in app/Providers/EventServiceProvider.php
@@ -62,7 +62,7 @@ class EventServiceProvider
 
     <h2>3. Dispatching Events</h2>
     <p>
-        The final step is to dispatch the event from your controller (or any other class). You can do this by injecting the `Core\Events\EventDispatcher` into your controller's constructor and calling its `dispatch()` method.
+        The final step is to dispatch the event from your controller (or any other class). You can do this by injecting the <code>Rhapsody\Core\Events\EventDispatcher</code> into your controller's constructor and calling its <code>dispatch()</code> method.
     </p>
     <pre><code class="language-php">
 // in app/Controllers/AuthController.php
@@ -90,12 +90,105 @@ class AuthController extends BaseController
 }
 </code></pre>
     <p>
-        Now, your controller's only responsibility is to handle the registration. It no longer knows anything about sending emails. You can easily add more listeners (e.g., `LogUserRegistration`, `UpdateUserStats`) to the `EventServiceProvider` in the future without ever having to change your `AuthController` again.
+        Now, your controller's only responsibility is to handle the registration. It no longer knows anything about sending emails. You can easily add more listeners (e.g., <code>LogUserRegistration</code>, <code>UpdateUserStats</code>) to the <code>EventServiceProvider</code> in the future without ever having to change your <code>AuthController</code> again.
     </p>
 
     <hr>
 
-    <h2 id="stoppable-events">4. Stoppable Events (Advanced)</h2>
+    <h2 id="listener-types">4. Listener Types and Registering at Runtime</h2>
+    <p>A listener can be either of two things:</p>
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-left border border-gray-300 dark:border-gray-700">
+            <thead class="bg-gray-100 dark:bg-gray-800">
+                <tr>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Listener</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">How it runs</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><strong>A class name</strong>, e.g. <code>SendWelcomeEmail::class</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The class is created by the <a href="{{ base_url }}/docs/container">service container</a>, so its constructor dependencies (a mailer, the entity manager...) are injected automatically. Its <code>handle($event)</code> method is then called. A class with no <code>handle()</code> method but an <code>__invoke()</code> method is invoked instead.</td></tr>
+                <tr><td class="px-4 py-2"><strong>A callable</strong>: a closure, or an <code>[$object, 'method']</code> pair</td><td class="px-4 py-2">Called directly with the event.</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <p>A plain string is always treated as a <strong>class name</strong>. To run a function by name, wrap it in a closure.</p>
+
+    <h3>Registering listeners in code</h3>
+    <p>Besides the <code>EventServiceProvider</code>, you can register a listener at any time with <code>listen()</code>. It accepts a class name or a callable, and anything else is a <code>TypeError</code>:</p>
+    <pre><code class="language-php">$dispatcher->listen(UserRegistered::class, SendWelcomeEmail::class);
+
+$dispatcher->listen(UserRegistered::class, function (UserRegistered $event): void {
+    // runs after the listeners registered before it
+});</code></pre>
+
+    <h3>One listener or several</h3>
+    <p>In the <code>EventServiceProvider</code> you can give an event either a single listener or a list. Several listeners run in the order they are listed.</p>
+    <pre><code class="language-php">protected array $listen = [
+    UserRegistered::class => SendWelcomeEmail::class,                       // one listener
+    OrderPlaced::class    => [NotifyWarehouse::class, EmailReceipt::class], // several, in order
+];</code></pre>
+
+    <h3>Subscribers</h3>
+    <p>A subscriber is a class that registers several listeners in one place. Give it a <code>subscribe()</code> method that receives the dispatcher, then hand the object to <code>$dispatcher->subscribe()</code>, which calls that method for you. An object without a <code>subscribe()</code> method is ignored.</p>
+    <pre><code class="language-php">use Rhapsody\Core\Contracts\EventDispatcherInterface;
+
+class UserEventSubscriber
+{
+    public function subscribe(EventDispatcherInterface $dispatcher): void
+    {
+        $dispatcher->listen(UserRegistered::class, SendWelcomeEmail::class);
+        $dispatcher->listen(UserLoggedIn::class, LogLogin::class);
+    }
+}
+
+$dispatcher->subscribe(new UserEventSubscriber());</code></pre>
+
+    <h3>The ListenerInterface is optional</h3>
+    <p>
+        <code>Rhapsody\Core\Contracts\ListenerInterface</code> describes a listener whose <code>handle(Event $event)</code> accepts <em>any</em> event. The dispatcher does not require it: it only needs a <code>handle()</code> method (or a callable). A listener that handles one specific event, like <code>handle(UserRegistered $event)</code>, simply declares that method and does not implement the interface.
+    </p>
+
+    <h3>Events match by exact class</h3>
+    <p>
+        Listeners are looked up by the <strong>exact class</strong> of the dispatched event. A listener registered for a parent class or an interface does not run for its subclasses, and there are no wildcards. Register the listener for each concrete event class you want it to hear.
+    </p>
+
+    <hr>
+
+    <h2 id="listener-safety">5. How Listeners Behave</h2>
+    <ul>
+        <li><strong>Order:</strong> listeners for an event run in the order they were registered. Their return values are ignored.</li>
+        <li><strong>A failing listener does not break the request.</strong> If a listener throws (a mail server is down, say), the dispatcher catches the exception, writes a line to the PHP error log naming the listener and the event, and carries on with the next listener. The code that called <code>dispatch()</code> never sees the exception.</li>
+        <li><strong>Nested events are capped.</strong> A listener may dispatch further events, but nesting more than 8 levels deep is skipped and logged. This is only a backstop against listeners that trigger each other in a loop; real chains are one or two levels deep.</li>
+        <li><strong><code>dispatch()</code> returns the event.</strong> You usually ignore it, but for a <a href="#stoppable-events">stoppable event</a> it is how you read the answer a listener supplied.</li>
+    </ul>
+    <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
+        <strong>Don't put must-succeed work in a listener.</strong> Because a failing listener is logged and skipped, anything that has to happen (charging a card, saving the order) belongs in your controller or service, not in an event listener. Use listeners for side effects such as emails, notifications and statistics.
+    </div>
+
+    <hr>
+
+    <h2 id="builtin-events">6. Event Classes Included with the Framework</h2>
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-left border border-gray-300 dark:border-gray-700">
+            <thead class="bg-gray-100 dark:bg-gray-800">
+                <tr>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Class (<code>Rhapsody\Core\Events</code>)</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Public properties</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>UserRegistered</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>$user</code></td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>PaymentSucceededEvent</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>$transactionId</code>, <code>$amount</code>, <code>$metadata</code> (array)</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>PaymentFailedEvent</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>$message</code>, <code>$context</code> (array)</td></tr>
+                <tr><td class="px-4 py-2"><code>RouteNotFound</code></td><td class="px-4 py-2"><code>$uri</code>, <code>$method</code>, plus <code>setResponse()</code> / <code>getResponse()</code> (a <a href="#stoppable-events">stoppable event</a>)</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <hr>
+
+    <h2 id="stoppable-events">7. Stoppable Events (Advanced)</h2>
     <p>
         Everything above describes the normal way events work in Rhapsody: dispatching an event is <strong>fire-and-forget</strong>. The code that calls <code>dispatch()</code> doesn't wait to see what listeners do, and nothing a listener does can change what happens next. This is true for <code>UserRegistered</code>, and it's true for almost every event you'll ever write — the whole point of events is to let listeners react to something without the original code needing to know or care.
     </p>
@@ -113,6 +206,9 @@ class AuthController extends BaseController
 }</code></pre>
     <p>
         Inside <code>EventDispatcher::dispatch()</code>, after every listener runs, the dispatcher asks two questions: does this event implement <code>StoppableEventInterface</code>, and if so, is <code>isPropagationStopped()</code> now <code>true</code>? If the answer to both is yes, the dispatcher stops calling any remaining listeners and hands the event straight back to whoever called <code>dispatch()</code>.
+    </p>
+    <p>
+        An event that is <em>already</em> stopped when it is dispatched reaches no listeners at all.
     </p>
     <p>
         <strong>Important:</strong> this check only ever applies to events that implement the interface. <code>UserRegistered</code> and every other ordinary event you create do not implement it, so they are completely unaffected by any of this — every listener always runs for them, in the order they were registered, exactly as described in the sections above.

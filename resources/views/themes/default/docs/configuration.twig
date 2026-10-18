@@ -43,6 +43,73 @@ $raw     = Env::get('SOME_KEY');                  // ?string, null when unset</c
 
     <hr>
 
+    <h2>Reading Config Values</h2>
+    <p>
+        Values from <code>config.php</code> can be read through <code>Rhapsody\Core\Support\Config</code>, a typed reader with dot notation. It does for the config array what <code>Env</code> does for environment variables, with one big difference: it <strong>fails loudly</strong>. A missing key or a value of the wrong type throws a <code>RuntimeException</code> at the point of use, instead of letting a bad value travel through your code.
+    </p>
+    <pre><code class="language-php">use Rhapsody\Core\Support\Config;
+
+$config = $container->get(Config::class);
+
+$host  = $config->string('mail.host');          // throws if 'mail.host' is missing
+$port  = $config->int('mail.port', 587);        // 587 when the key is missing
+$debug = $config->bool('app.debug', false);
+$items = $config->array('cache.stores', []);
+
+$raw = $config->get('app.name', 'Rhapsody');    // any type; the default when missing
+
+if ($config->has('mail.host')) {
+    // the key exists
+}</code></pre>
+    <p>The keys above are examples; use the keys defined in your own <code>config.php</code>.</p>
+
+    <h3>Dot Notation</h3>
+    <p>
+        <code>'mail.host'</code> reads <code>$config['mail']['host']</code>, and you can go as deep as your config array does. An exact top-level key is tried first, so a key that literally contains a dot still works.
+    </p>
+
+    <h3>Typed Getters</h3>
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-left border border-gray-300 dark:border-gray-700">
+            <thead class="bg-gray-100 dark:bg-gray-800">
+                <tr>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Method</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Accepts</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Missing key</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>string($key, $default = null)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Strings, ints and floats</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Throws, unless you pass a default</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>int($key, $default = null)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Ints and whole-number strings such as <code>'587'</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Throws, unless you pass a default</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>bool($key, $default = null)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Bools, and the values <code>true</code>, <code>false</code>, <code>1</code>, <code>0</code>, <code>on</code>, <code>off</code>, <code>yes</code>, <code>no</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Throws, unless you pass a default</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>array($key, $default = null)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Arrays</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Throws, unless you pass a default</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>get($key, $default = null)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Anything (no type check)</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Returns the default</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>has($key)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Returns <code>true</code> if the key exists, even when its value is <code>null</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Returns <code>false</code></td></tr>
+                <tr><td class="px-4 py-2"><code>all()</code></td><td class="px-4 py-2">Returns the whole config array</td><td class="px-4 py-2">&ndash;</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <p>
+        Because config values often come from <code>.env</code> (where everything is a string), the scalar getters are forgiving about format: <code>'587'</code> reads as the integer <code>587</code>, and <code>'true'</code> or <code>'on'</code> reads as <code>true</code>. A value of <code>null</code> counts as missing for the typed getters, so the default applies, or they throw if you gave none.
+    </p>
+
+    <h3>Errors</h3>
+    <p>The exception messages name the key, so a misconfiguration is easy to track down:</p>
+    <pre><code class="language-text">Missing config key 'mail.host'.
+Config key 'mail.port' must be int, string given.</code></pre>
+
+    <h3>Config, Env, or Request?</h3>
+    <ul>
+        <li><strong><code>Config</code></strong> throws on a missing or wrongly-typed key, because a broken setting is a bug in your application.</li>
+        <li><strong><code>Env</code></strong> falls back to the default you supply, so an unset variable is never fatal.</li>
+        <li><strong><code>Request</code> accessors</strong> (<code>string()</code>, <code>int()</code>, <code>bool()</code>, <code>array()</code>) also fall back to a default, because user input is expected to be messy. See <a href="{{ base_url }}/docs/request">The Request Object</a>.</li>
+    </ul>
+    <p>
+        In tests you can build a reader directly from an array: <code>new Config(['mail' =&gt; ['host' =&gt; 'smtp.test']])</code>. More on these helpers is on the <a href="{{ base_url }}/docs/support">Support Helpers</a> page.
+    </p>
+
+    <hr>
+
     <h2>View File Hierarchy & Theme System</h2>
     <p>
         Rhapsody uses Twig for templating. The framework looks for view files in a specific order, making it easy to override core templates or build custom themes.

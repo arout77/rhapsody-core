@@ -65,6 +65,59 @@ public function updateUser(Request $request, string $id): Response
     <pre><code class="language-php">$allInput = $request->getBody();
 $email    = $allInput['email'] ?? null;</code></pre>
 
+    <h3>Typed Input Accessors</h3>
+    <p>
+        <code>string()</code>, <code>int()</code>, <code>bool()</code> and <code>array()</code> read a single input value and hand it back as exactly the type you asked for, so you don't need casts or <code>isset()</code> checks. They look in the request body first (form fields or a JSON payload, as described above) and then fall back to the query string.
+    </p>
+    <pre><code class="language-php">$name   = $request->string('name');        // '' when missing
+$page   = $request->int('page', 1);        // 1 when missing or not an integer
+$active = $request->bool('active');        // false when missing
+$tags   = $request->array('tags');         // [] when missing or not an array
+                                           // ?tags[]=php&amp;tags[]=twig  gives  ['php', 'twig']</code></pre>
+
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-left border border-gray-300 dark:border-gray-700">
+            <thead class="bg-gray-100 dark:bg-gray-800">
+                <tr>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Method</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Accepts</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Gives the default when</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>string($key, $default = '')</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Strings, ints, floats and bools (converted to a string)</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The value is missing, <code>null</code>, or an array</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>int($key, $default = 0)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Ints and integer-like strings such as <code>'42'</code> or <code>'-7'</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The value is anything else, including <code>'1.5'</code>, <code>'12abc'</code>, an empty string, or a decimal number</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>bool($key, $default = false)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>true</code>/<code>false</code>, <code>1</code>/<code>0</code>, and the strings <code>true</code>, <code>false</code>, <code>on</code>, <code>off</code>, <code>yes</code>, <code>no</code> (case-insensitive)</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The value is anything else. An empty string is read as <code>false</code>, not as the default</td></tr>
+                <tr><td class="px-4 py-2"><code>array($key)</code></td><td class="px-4 py-2">Arrays, such as <code>tags[]=a&amp;tags[]=b</code> or a JSON array</td><td class="px-4 py-2">The value is missing or not an array (it always returns <code>[]</code>; there is no default argument)</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <p>A typical controller reads like this:</p>
+    <pre><code class="language-php">public function showUsers(Request $request): Response
+{
+    $page       = $request->int('page', 1);
+    $sort       = $request->string('sort', 'name');
+    $subscribed = $request->bool('subscribed');   // an unchecked checkbox is never submitted, so this is false
+    $roles      = $request->array('roles');
+
+    // ...
+}</code></pre>
+
+    <h3>What the Accessors Do Not Do</h3>
+    <ul>
+        <li><strong>They never throw.</strong> A bad or missing value quietly becomes the default. If a value is required, check it with the <a href="{{ base_url }}/docs/validation">Validator</a> and reject the request. (This is the opposite of the <code>Config</code> reader, which throws on a missing or wrongly-typed key. See <a href="{{ base_url }}/docs/support">Support Helpers</a>.)</li>
+        <li><strong>They don't validate or sanitize.</strong> <code>int()</code> guarantees you receive an integer, not a sensible one, so clamp or range-check values like page numbers and limits yourself. <code>string()</code> returns the text exactly as it was sent, without the HTML-encoding that <code>getQueryParam()</code> applies, so escape it on output (Twig does this automatically) and never build SQL from it.</li>
+        <li><strong>They work on the Request's own data.</strong> Unlike <code>getQueryParam()</code>, which reads PHP's <code>$_GET</code> directly, these methods use the data the <code>Request</code> was built with. That makes them work with requests created by <code>Request::create()</code> in your tests (see <a href="{{ base_url }}/docs/testing">Unit Testing</a>).</li>
+    </ul>
+
+    <h3>input() and all()</h3>
+    <p>
+        The accessors above are built on <code>input()</code>, which returns a single raw value (body first, then the query string) or a default of your choosing. <code>all()</code> returns every input value at once: the query string and the request body merged, with body values winning when a key appears in both.
+    </p>
+    <pre><code class="language-php">$value = $request->input('q', 'none');   // raw value, any type
+$data  = $request->all();                // query string + body</code></pre>
+
     <h3>Retrieving Individual Query Parameters</h3>
     <p>To get a value from the URL's query string (e.g., <code>/users?page=2</code>), use the <code>getQueryParam()</code> method. It includes a second argument to specify a default value if the parameter is not present.</p>
     <pre><code class="language-php">public function showUsers(Request $request): Response

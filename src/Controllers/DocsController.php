@@ -473,6 +473,18 @@ class DocsController extends BaseController
     }
 
     /**
+     * Shows the Session documentation.
+     */
+    public function session(Request $request): Response
+    {
+        return $this->view('@core/docs/sessions.twig', [], [
+            'title'         => 'Sessions – Rhapsody Documentation',
+            'description'   => 'Store per-visitor data, flash messages and CSRF tokens with the Session class, with secure cookie settings applied for you.',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
+
+    /**
      * Shows the social authentication (OAuth) documentation.
      */
     public function socialAuth(Request $request): Response
@@ -480,6 +492,18 @@ class DocsController extends BaseController
         return $this->view('@core/docs/social-auth.twig', [], [
             'title'         => 'Social Authentication (OAuth) – Rhapsody Documentation',
             'description'   => 'Learn how to integrate Google and Facebook OAuth login using the built-in SocialAuthController.',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
+
+    /**
+     * Shows the Support helpers (Config, Env, Fs, Json) documentation.
+     */
+    public function support(Request $request): Response
+    {
+        return $this->view('@core/docs/support.twig', [], [
+            'title'         => 'Support Helpers (Config, Env, Fs, Json) – Rhapsody Documentation',
+            'description'   => 'Typed, fail-loudly helpers for reading config values and environment variables, working with files, and encoding or decoding JSON.',
             'canonical_url' => $request->getCanonicalUrl(),
         ]);
     }

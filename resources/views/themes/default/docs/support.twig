@@ -1,0 +1,267 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>Support Helpers</h1>
+    <p>
+        The <code>Rhapsody\Core\Support</code> namespace holds four small, dependency-free helpers: <code>Config</code>, <code>Env</code>, <code>Fs</code> and <code>Json</code>. They wrap the places where PHP hands you <code>mixed</code> or <code>false</code> (config values, environment variables, file reads, JSON decoding) so your code gets <strong>real, typed values</strong>, or a clear exception at the exact point something went wrong.
+    </p>
+
+    <pre><code class="language-php">use Rhapsody\Core\Helpers\Path;
+use Rhapsody\Core\Support\Env;
+use Rhapsody\Core\Support\Fs;
+use Rhapsody\Core\Support\Json;
+
+$settings = Json::decodeArray(Fs::read(Path::config('settings.json')));
+$appName  = Env::string('APP_NAME', 'Rhapsody');</code></pre>
+
+    <hr>
+
+    <h2>At a Glance</h2>
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-left border border-gray-300 dark:border-gray-700">
+            <thead class="bg-gray-100 dark:bg-gray-800">
+                <tr>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Class</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Use it for</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">When something is wrong</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Config</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Reading values from the application config array, with dot notation and type checks</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Throws <code>RuntimeException</code></td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Env</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Reading values from your <code>.env</code> file / the environment</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Never throws; returns your default</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Fs</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Reading, writing and locating files</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Throws <code>RuntimeException</code></td></tr>
+                <tr><td class="px-4 py-2"><code>Json</code></td><td class="px-4 py-2">Encoding and decoding JSON</td><td class="px-4 py-2">Throws <code>JsonException</code></td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
+        <strong>Why exceptions?</strong> PHP's own functions report failure by returning <code>false</code> (or <code>null</code>), which is easy to ignore and then shows up three calls later as a confusing error. These helpers fail loudly <em>where the problem is</em>, and always return the type their name promises. <code>Env</code> is the one deliberate exception, because an unset environment variable is normal and a default is the natural answer.
+    </div>
+
+    <hr>
+
+    <h2 id="config">Config</h2>
+    <p>
+        <code>Rhapsody\Core\Support\Config</code> is a read-only, typed reader over your application's config array (the array returned by <code>config/config.php</code>). It is registered in the service container as a singleton, so you can type-hint it in a controller constructor or fetch it from the container.
+    </p>
+    <pre><code class="language-php">use Rhapsody\Core\Support\Config;
+
+class MailController extends BaseController
+{
+    public function __construct(Environment $twig, private Config $config)
+    {
+        parent::__construct($twig);
+    }
+
+    public function status(Request $request): Response
+    {
+        $host = $this->config->string('mail.host');
+        // ...
+    }
+}
+
+// Or, anywhere you have the container:
+$config = $container->get(Config::class);</code></pre>
+
+    <h3>Methods</h3>
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-left border border-gray-300 dark:border-gray-700">
+            <thead class="bg-gray-100 dark:bg-gray-800">
+                <tr>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Method</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Returns</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>all()</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The entire config array</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>has($key)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>true</code> if the key exists. A key set to <code>null</code> still counts as existing.</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>get($key, $default = null)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The raw value, or <code>$default</code> if the key does not exist</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>string($key, ?string $default = null)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">A <code>string</code></td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>int($key, ?int $default = null)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">An <code>int</code></td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>bool($key, ?bool $default = null)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">A <code>bool</code></td></tr>
+                <tr><td class="px-4 py-2"><code>array($key, ?array $default = null)</code></td><td class="px-4 py-2">An <code>array</code></td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Dot notation</h3>
+    <p>Reach into nested arrays with dots. An exact key match is tried first, so a key that literally contains a dot still works.</p>
+    <pre><code class="language-php">// config/config.php
+return [
+    'mail' => [
+        'host' => 'smtp.example.com',
+        'port' => '587',
+    ],
+];</code></pre>
+    <pre><code class="language-php">$config->string('mail.host');       // 'smtp.example.com'
+$config->int('mail.port');          // 587 (the string '587' is converted)
+$config->int('mail.timeout', 30);   // 30  (key missing, so the default is used)
+$config->array('mail');             // ['host' => '...', 'port' => '587']</code></pre>
+    <p>The key names above are just an example; use whatever your own <code>config.php</code> defines.</p>
+
+    <h3>What the typed getters do</h3>
+    <ul>
+        <li><strong>Missing key or <code>null</code> value:</strong> the default is returned if you passed one. Otherwise a <code>RuntimeException</code> is thrown: <code>Missing config key 'mail.username'.</code></li>
+        <li><strong>Wrong type:</strong> a <code>RuntimeException</code> is thrown that names the key and what it actually was, e.g. <code>Config key 'mail.port' must be int, array given.</code></li>
+        <li><strong>.env-friendly conversion:</strong> values that arrive as strings are converted when the conversion is unambiguous.
+            <ul>
+                <li><code>string()</code> accepts strings, ints and floats.</li>
+                <li><code>int()</code> accepts ints and integer-looking strings such as <code>'587'</code> (but not <code>'5.5'</code>).</li>
+                <li><code>bool()</code> accepts booleans, plus strings or ints that read as a boolean: <code>true</code>/<code>false</code>, <code>1</code>/<code>0</code>, <code>on</code>/<code>off</code>, <code>yes</code>/<code>no</code>.</li>
+                <li><code>array()</code> accepts arrays only.</li>
+            </ul>
+        </li>
+    </ul>
+
+    <hr>
+
+    <h2 id="env">Env</h2>
+    <p>
+        <code>Rhapsody\Core\Support\Env</code> gives typed access to environment values, such as those loaded from your <code>.env</code> file. It looks in <code>$_ENV</code> first and then falls back to <code>getenv()</code>. All methods are static.
+    </p>
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-left border border-gray-300 dark:border-gray-700">
+            <thead class="bg-gray-100 dark:bg-gray-800">
+                <tr>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Method</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Returns</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Env::get($key)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The raw value as a <code>string</code>, or <code>null</code> if the variable is not set</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Env::string($key, $default = '')</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The value, or <code>$default</code> when unset</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Env::int($key, $default = 0)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The value as an <code>int</code>, or <code>$default</code> when unset or not numeric</td></tr>
+                <tr><td class="px-4 py-2"><code>Env::bool($key, $default = false)</code></td><td class="px-4 py-2">The value as a <code>bool</code>, or <code>$default</code> when unset or not recognised</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <pre><code class="language-php">$url      = Env::string('APP_URL');
+$theme    = Env::string('APP_THEME', 'default');
+$retries  = Env::int('QUEUE_RETRIES', 3);        // example variable
+$maintain = Env::bool('MAINTENANCE_MODE', false);  // example variable</code></pre>
+
+    <p>
+        For <code>Env::bool()</code>, <code>true</code>, <code>1</code>, <code>yes</code> and <code>on</code> are true, and <code>false</code>, <code>0</code>, <code>no</code>, <code>off</code> and an empty value are false (any case). Anything else returns your default.
+    </p>
+
+    <h3>Requiring a value</h3>
+    <p><code>Env</code> never throws. If a variable <em>must</em> be set, check for <code>null</code> yourself:</p>
+    <pre><code class="language-php">$apiKey = Env::get('PAYMENT_API_KEY')
+    ?? throw new RuntimeException('PAYMENT_API_KEY is not set in .env');</code></pre>
+
+    <h3>Env or Config?</h3>
+    <p>
+        <code>Env</code> reads the raw environment. <code>Config</code> reads your application's config array, which is usually itself built from environment values. In application code, prefer <code>Config</code> so each setting is read from one place; reach for <code>Env</code> in the config file itself and in early boot code that runs before the config exists.
+    </p>
+
+    <hr>
+
+    <h2 id="fs">Fs</h2>
+    <p>
+        <code>Rhapsody\Core\Support\Fs</code> wraps PHP's file functions so a failure becomes a <code>RuntimeException</code> instead of a silent <code>false</code>. It pairs naturally with the <a href="{{ base_url }}/docs/path">Path helper</a>, which builds the location.
+    </p>
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-left border border-gray-300 dark:border-gray-700">
+            <thead class="bg-gray-100 dark:bg-gray-800">
+                <tr>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Method</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Returns</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Throws when</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Fs::read($path)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The whole file as a <code>string</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The file cannot be read</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Fs::lines($path, $flags)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">A list of lines. By default newlines are stripped and empty lines are skipped.</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The file cannot be read</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Fs::write($path, $contents, $flags = 0)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The number of bytes written. Pass <code>FILE_APPEND</code> and/or <code>LOCK_EX</code> in <code>$flags</code>.</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The file cannot be written</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Fs::glob($pattern, $flags = 0)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">A list of matching paths. <strong>No matches is an empty list</strong>, not an error.</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The glob itself fails</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Fs::realpath($path)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The canonical absolute path</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The path does not exist</td></tr>
+                <tr><td class="px-4 py-2"><code>Fs::cwd()</code></td><td class="px-4 py-2">The current working directory</td><td class="px-4 py-2">It cannot be determined</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <pre><code class="language-php">use Rhapsody\Core\Helpers\Path;
+use Rhapsody\Core\Support\Fs;
+
+// Append to a log file
+Fs::write(Path::logs('import.log'), date('c') . " import started\n", FILE_APPEND | LOCK_EX);
+
+// Read a file line by line
+foreach (Fs::lines(Path::root('.env.example')) as $line) {
+    // ...
+}
+
+// Find files (an empty list if there are none)
+foreach (Fs::glob(Path::storage('exports/*.csv')) as $file) {
+    // ...
+}</code></pre>
+
+    <h3>Handling failures</h3>
+    <pre><code class="language-php">try {
+    $contents = Fs::read($path);
+} catch (RuntimeException $e) {
+    // The message names the path, e.g. "Unable to read file: /var/www/..."
+}</code></pre>
+    <p><code>Fs::read()</code>, <code>lines()</code> and <code>write()</code> also suppress PHP's own warning, so a failure produces exactly one exception and no stray warning in your logs or toolbar.</p>
+
+    <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
+        <strong>Note:</strong> <code>Fs</code> does not create missing directories and does not sanitise paths. If any part of a path comes from user input, read the security notes on the <a href="{{ base_url }}/docs/path">Path helper</a> page first.
+    </div>
+
+    <hr>
+
+    <h2 id="json">Json</h2>
+    <p>
+        <code>Rhapsody\Core\Support\Json</code> encodes and decodes JSON and always throws a <code>JsonException</code> on bad input, so you never have to check <code>json_last_error()</code>.
+    </p>
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-left border border-gray-300 dark:border-gray-700">
+            <thead class="bg-gray-100 dark:bg-gray-800">
+                <tr>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Method</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Returns</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Json::decode($json)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Any decoded value</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Objects become associative arrays. Valid scalars such as <code>42</code> or <code>null</code> are returned as-is.</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Json::decodeArray($json)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">An <code>array</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Throws if the document is valid JSON but decodes to a scalar or <code>null</code>. Use this when you need an array.</td></tr>
+                <tr><td class="px-4 py-2"><code>Json::encode($value, $flags = 0)</code></td><td class="px-4 py-2">A JSON <code>string</code></td><td class="px-4 py-2">Throws if the value cannot be encoded. Any <code>JSON_*</code> flags are accepted.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <pre><code class="language-php">use Rhapsody\Core\Support\Json;
+
+$composer = Json::decodeArray(Fs::read(Path::root('composer.json')));
+echo $composer['name'];
+
+$payload = Json::encode(['ok' => true, 'url' => 'https://example.com/a/b'], JSON_UNESCAPED_SLASHES);
+
+try {
+    $data = Json::decodeArray($request->getContent());
+} catch (JsonException $e) {
+    // Not valid JSON, or not a JSON object/array
+}</code></pre>
+
+    <hr>
+
+    <h2>Good to Know</h2>
+    <ul>
+        <li>All four classes are <code>final</code>. If you want a project-specific variation, wrap them in your own small class rather than extending them.</li>
+        <li><code>Env</code>, <code>Fs</code> and <code>Json</code> are static; there is nothing to instantiate or inject. <code>Config</code> is an object, so it is injected.</li>
+        <li>The <a href="{{ base_url }}/docs/request">Request object</a> offers the same style of typed access for request input.</li>
+    </ul>
+
+    <hr>
+
+    <h2>Related Documentation</h2>
+    <ul>
+        <li><a href="{{ base_url }}/docs/configuration">Application Configuration</a></li>
+        <li><a href="{{ base_url }}/docs/path">Path Helper</a></li>
+        <li><a href="{{ base_url }}/docs/request">The Request Object</a></li>
+        <li><a href="{{ base_url }}/docs/container">The Service Container</a></li>
+    </ul>
+{% endblock %}

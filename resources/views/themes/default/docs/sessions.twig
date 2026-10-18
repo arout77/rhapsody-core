@@ -1,0 +1,161 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>Sessions</h1>
+    <p>
+        <code>Rhapsody\Core\Session</code> is a small static wrapper around PHP's native sessions. It gives you one consistent place to store per-visitor data (the logged-in user, one-time flash messages, the CSRF token) with secure cookie settings applied for you. There is nothing to instantiate: every method is static.
+    </p>
+
+    <pre><code class="language-php">use Rhapsody\Core\Session;
+
+Session::set('cart_id', 42);
+
+$cartId = Session::get('cart_id');          // 42
+$theme  = Session::get('theme', 'light');   // 'light' (the default) when the key is not set</code></pre>
+
+    <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
+        <strong>Start it once per request:</strong> <code>Session::start()</code> must have run before you read or write session data, and it must run <strong>only once</strong> per request. See <a href="#flash-messages">Flash Messages</a> for why a second call causes trouble.
+    </div>
+
+    <hr>
+
+    <h2>Reading and Writing Values</h2>
+
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-left border border-gray-300 dark:border-gray-700">
+            <thead class="bg-gray-100 dark:bg-gray-800">
+                <tr>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Method</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">What it does</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Session::set($key, $value)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Stores a value under a key.</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Session::get($key, $default = null)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Returns the stored value, or <code>$default</code> when the key is not set.</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Session::has($key)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Returns <code>true</code> if the key is set and its value is not <code>null</code>.</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Session::pull($key, $default = null)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Returns the value <strong>and removes it</strong> in one step. Returns <code>$default</code> if the key was not set.</td></tr>
+                <tr><td class="px-4 py-2"><code>Session::remove($key)</code></td><td class="px-4 py-2">Deletes a key.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <p><code>has()</code> treats a <code>null</code> value as &ldquo;not set&rdquo;. If you need to store a deliberate <code>null</code> and tell it apart from a missing key, store a different marker value instead.</p>
+
+    <h3>Read once with pull()</h3>
+    <p><code>pull()</code> is the right tool for any value that should be used exactly once, such as a one-time confirmation code or the URL a visitor was trying to reach before being sent to the login page:</p>
+    <pre><code class="language-php">// Before redirecting to the login form
+Session::set('intended_url', $request->getPath());
+
+// After a successful login
+$destination = Session::pull('intended_url', '/dashboard');
+// 'intended_url' is now gone from the session</code></pre>
+
+    <hr>
+
+    <h2 id="flash-messages">Flash Messages</h2>
+    <p>
+        A flash message is a value that lives just long enough to be shown after a redirect, then disappears by itself. This is the usual &ldquo;Profile saved&rdquo; or &ldquo;Invalid credentials&rdquo; pattern.
+    </p>
+
+    <pre><code class="language-php">// In the controller that handles the form POST
+Session::flash('success', 'Your profile was saved.');
+// ...then redirect to the profile page
+
+// In the controller that shows the next page
+$success = Session::getFlash('success');   // 'Your profile was saved.' or null</code></pre>
+
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-left border border-gray-300 dark:border-gray-700">
+            <thead class="bg-gray-100 dark:bg-gray-800">
+                <tr>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Method</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">What it does</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Session::flash($key, $message)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Stores a flash message under a key.</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Session::getFlash($key, $default = null)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Returns the message as a string and removes it immediately. Returns <code>null</code> if there is no message, or if the stored value is not a scalar.</td></tr>
+                <tr><td class="px-4 py-2"><code>Session::hasFlash($key)</code></td><td class="px-4 py-2">Returns <code>true</code> if a message exists for the key. It does not remove it.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>How long a flash message lives</h3>
+    <ol>
+        <li>The message is available for the rest of the request that created it.</li>
+        <li>It stays available for the <strong>next</strong> request.</li>
+        <li>At the start of the request after that, <code>Session::start()</code> deletes it.</li>
+    </ol>
+    <p>Reading a message with <code>getFlash()</code> removes it straight away, so read it once and keep the result in a variable if you need it more than once on the same page.</p>
+
+    <div class="bg-red-200 border-l-4 border-red-700 text-red-700 p-4">
+        <strong>Danger:</strong> The aging of flash messages happens inside <code>Session::start()</code>. Calling it a second time in the same request ages the messages again and discards them before your page can show them.
+    </div>
+
+    <p>Flash messages are stored under the key you give them, in the same namespace as values saved with <code>set()</code>. Choose flash keys (<code>success</code>, <code>error</code>, <code>status</code>) that you don't also use for ordinary session data.</p>
+
+    <hr>
+
+    <h2>Login, Logout, and Session Security</h2>
+
+    <h3>After a login: regenerate()</h3>
+    <p>Always regenerate the session ID immediately after a user authenticates. This prevents session fixation, where an attacker plants a known session ID in a victim's browser and waits for them to log in. The old session is deleted.</p>
+    <pre><code class="language-php">// credentials verified...
+Session::regenerate();
+Session::set('user_id', $user->getId());</code></pre>
+
+    <h3>On logout: destroy()</h3>
+    <p><code>destroy()</code> does all three things needed to end a session properly. Doing only one or two leaves a usable session behind:</p>
+    <ol>
+        <li>Empties <code>$_SESSION</code> immediately, so the data is gone for the remainder of the request.</li>
+        <li>Expires the session cookie in the visitor's browser.</li>
+        <li>Destroys the session on the server.</li>
+    </ol>
+    <pre><code class="language-php">Session::destroy();</code></pre>
+
+    <h3>Before a redirect: close()</h3>
+    <p><code>close()</code> writes the session data to storage and releases it. Call it before a redirect if you want to be sure everything you set is saved first. Changes made after <code>close()</code> are not saved.</p>
+    <pre><code class="language-php">Session::set('last_visit', time());
+Session::close();</code></pre>
+
+    <h3>CSRF tokens</h3>
+    <p>The session also holds the CSRF token that protects your forms.</p>
+    <pre><code class="language-php">$token = Session::csrfToken();               // created on first use, then reused
+
+if (!Session::verifyCsrfToken($submitted)) {
+    // reject the request
+}</code></pre>
+    <p><code>verifyCsrfToken()</code> compares the tokens with <code>hash_equals()</code>, so the check is safe against timing attacks, and it returns <code>false</code> when no token has been issued yet. In templates you rarely call these yourself: put <code>{{ '{{ csrf_field() }}' }}</code> inside every POST form and it outputs a hidden <code>_token</code> input holding the session's token. See <a href="{{ base_url }}/docs/security">Security</a> for the full CSRF workflow.</p>
+
+    <hr>
+
+    <h2>Session Cookie Settings</h2>
+    <p><code>Session::start()</code> configures the session cookie before PHP starts the session:</p>
+    <ul>
+        <li><strong>Lifetime:</strong> <code>0</code>, so the cookie lasts until the browser is closed.</li>
+        <li><strong>Path:</strong> <code>/</code>, so the session works across your whole site.</li>
+        <li><strong>HttpOnly:</strong> always on, so JavaScript cannot read the session ID.</li>
+        <li><strong>SameSite:</strong> <code>Lax</code>, which blocks the cookie on most cross-site POST requests.</li>
+        <li><strong>Secure:</strong> turned on automatically when the request is served over HTTPS, including behind a proxy that sends <code>X-Forwarded-Proto: https</code>.</li>
+    </ul>
+    <p>If a session is already active, <code>start()</code> skips starting a new one, but it still ages the flash messages, which is why it must only run once per request.</p>
+
+    <hr>
+
+    <h2>Reserved Keys</h2>
+    <p>The session uses three keys internally. Don't write to them yourself:</p>
+    <ul>
+        <li><code>_token</code> – the CSRF token.</li>
+        <li><code>_flash_new</code> and <code>_flash_old</code> – the bookkeeping that tracks which flash messages to delete.</li>
+    </ul>
+
+    <hr>
+
+    <h2>Related Documentation</h2>
+    <ul>
+        <li><a href="{{ base_url }}/docs/security">Security (CSRF)</a></li>
+        <li><a href="{{ base_url }}/docs/authentication">Authentication</a></li>
+        <li><a href="{{ base_url }}/docs/cookie-storage">Cookie &amp; LocalStorage</a></li>
+        <li><a href="{{ base_url }}/docs/request">The Request Object</a></li>
+    </ul>
+{% endblock %}

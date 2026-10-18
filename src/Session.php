@@ -73,6 +73,35 @@ class Session
     }
 
     /**
+     * String session value. Scalars are cast; missing/array values give $default.
+     */
+    public static function string(string $key, string $default = ''): string
+    {
+        $value = self::get($key);
+
+        return is_scalar($value) ? (string) $value : $default;
+    }
+
+    /**
+     * Integer session value. Accepts ints and integer-like strings; anything else gives $default.
+     */
+    public static function int(string $key, int $default = 0): int
+    {
+        $value = self::get($key);
+        if (is_int($value)) {
+            return $value;
+        }
+        if (is_string($value)) {
+            $filtered = filter_var($value, FILTER_VALIDATE_INT);
+            if ($filtered !== false) {
+                return $filtered;
+            }
+        }
+
+        return $default;
+    }
+
+    /**
      * Retrieves a value and removes it from the session in one step.
      */
     public static function pull(string $key, mixed $default = null): mixed

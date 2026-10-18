@@ -1,5 +1,6 @@
 <?php
 
+use App\Controllers\UpdatesController;
 use Rhapsody\Core\Controllers\AuthController;
 use Rhapsody\Core\Controllers\DocsController;
 use Rhapsody\Core\Controllers\PaymentController;
@@ -15,6 +16,9 @@ Router::post('/forgot-password', [AuthController::class, 'sendResetLink']);
 Router::get('/reset-password/{token}', [AuthController::class, 'showResetForm']);
 Router::post('/reset-password', [AuthController::class, 'resetPassword']);
 
+// Check for updates page
+Router::get('/updates', [UpdatesController::class, 'index']);
+
 // Assumes your Router instance is injected or accessible
 Router::get('/login', [AuthController::class, 'showLoginForm']);
 Router::get('/docs', [DocsController::class, 'index']);
@@ -27,6 +31,7 @@ Router::get('/docs/console-commands', [DocsController::class, 'consoleCommands']
 Router::get('/docs/container', [DocsController::class, 'container']);
 Router::get('/docs/controllers', [DocsController::class, 'controllers']);
 Router::get('/docs/cookie-storage', [DocsController::class, 'cookieStorage']);
+Router::get('/docs/database', [DocsController::class, 'database']);
 Router::get('/docs/ddos-protection', [DocsController::class, 'ddosProtection']);
 Router::get('/docs/debugging', [DocsController::class, 'debugging']);
 Router::get('/docs/doctrine', [DocsController::class, 'doctrine']);
@@ -54,6 +59,9 @@ Router::get('/docs/roadrunner', [DocsController::class, 'roadrunner']);
 Router::get('/docs/routing', [DocsController::class, 'routing']);
 Router::get('/docs/security', [DocsController::class, 'security']);
 Router::get('/docs/seo', [DocsController::class, 'seo']);
+Router::get('/docs/session', [DocsController::class, 'session']);
+Router::get('/docs/social-auth', [DocsController::class, 'socialAuth']);
+Router::get('/docs/support', [DocsController::class, 'support']);
 Router::get('/docs/testing', [DocsController::class, 'testing']);
 Router::get('/docs/themes', [DocsController::class, 'themes']);
 Router::get('/docs/toolbar', [DocsController::class, 'toolbar']);

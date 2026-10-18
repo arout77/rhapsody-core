@@ -1,5 +1,4 @@
 <?php
-
 namespace Rhapsody\Core\Modules;
 
 use Composer\InstalledVersions;
@@ -30,10 +29,14 @@ use Rhapsody\Core\Modules\Exceptions\ManifestValidationException;
  */
 final class ModuleRegistry
 {
-    /** @var ModuleManifest[] */
+    /**
+     * @var ModuleManifest[]
+     */
     private array $booted = [];
 
-    /** @var ModuleBootFailed[] every failure recorded so far this request */
+    /**
+     * @var ModuleBootFailed[] every failure recorded so far this request
+     */
     private array $failures = [];
 
     public function __construct(
@@ -53,7 +56,9 @@ final class ModuleRegistry
         }
     }
 
-    /** @return ModuleManifest[] every module Composer knows about, installed or not */
+    /**
+     * @return ModuleManifest[] every module Composer knows about, installed or not
+     */
     public function discover(): array
     {
         $manifests = [];
@@ -123,7 +128,9 @@ final class ModuleRegistry
         $this->installs->markInstalled($packageName);
     }
 
-    /** Runs the module's uninstall() hook once and deactivates it. */
+    /**
+     * Runs the module's uninstall() hook once and deactivates it.
+     */
     public function uninstall(string $packageName): void
     {
         $manifest = $this->requireManifest($packageName);
@@ -267,13 +274,17 @@ final class ModuleRegistry
         return \Composer\Semver\Semver::satisfies($coreVersion, $manifest->coreConstraint);
     }
 
-    /** @return ModuleManifest[] modules that successfully booted this request */
+    /**
+     * @return ModuleManifest[] modules that successfully booted this request
+     */
     public function booted(): array
     {
         return $this->booted;
     }
 
-    /** @return ModuleBootFailed[] every failure recorded this request, in the order they occurred */
+    /**
+     * @return ModuleBootFailed[] every failure recorded this request, in the order they occurred
+     */
     public function failures(): array
     {
         return $this->failures;
@@ -292,11 +303,11 @@ final class ModuleRegistry
      * instance — this only works because providers are expected to be
      * stateless (see ModuleServiceProviderInterface).
      *
-     * @return array<string, array<string, array{ok: bool, message: string}>>
      *         Keyed by module name, then by check name. Modules with no
      *         checks to report (either they don't implement the interface,
      *         or they returned an empty array) are simply absent — not
      *         listed as empty.
+     * @return array<string, array<string, array{ok: bool, message: string}>>
      */
     public function checkHealth(): array
     {
@@ -363,7 +374,9 @@ final class ModuleRegistry
         }
     }
 
-    /** Clears a specific check's alert dedupe key once it passes again. */
+    /**
+     * Clears a specific check's alert dedupe key once it passes again.
+     */
     private function clearHealthAlert(ModuleManifest $manifest, string $checkName): void
     {
         try {
