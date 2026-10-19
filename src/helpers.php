@@ -1,5 +1,7 @@
 <?php
 
+use Rhapsody\Core\Container;
+use Rhapsody\Core\Contracts\DeferrerInterface;
 use Rhapsody\Core\RedirectResponse;
 
 if (! function_exists('redirect')) {
@@ -68,5 +70,17 @@ if (! function_exists('dump') && class_exists('Symfony\Component\VarDumper\VarDu
         foreach ($vars as $var) {
             var_dump($var);
         }
+    }
+}
+
+if (! function_exists('defer')) {
+    /**
+     * Run a task after the response has been sent to the client.
+     *
+     * @param callable(): mixed $task
+     */
+    function defer(callable $task): void
+    {
+        Container::getInstance()->resolve(DeferrerInterface::class)->defer($task);
     }
 }

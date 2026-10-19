@@ -155,6 +155,18 @@ class DocsController extends BaseController
     }
 
     /**
+     * Shows the defered tasks documentation.
+     */
+    public function defer(Request $request): Response
+    {
+        return $this->view('@core/docs/defer.twig', [], [
+            'title'         => 'Deferred tasks – Rhapsody Documentation',
+            'description'   => 'Run a callable after the HTTP response has been delivered, so slow work (sending mail, calling an API, rebuilding a cache) never delays the visitor.',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
+
+    /**
      * Shows the Doctrine ORM documentation.
      */
     public function doctrine(Request $request): Response

@@ -3,6 +3,7 @@ namespace Rhapsody\Core;
 
 use Doctrine\ORM\EntityManager;
 use Rhapsody\Core\Contracts\ContainerInterface;
+use Rhapsody\Core\Contracts\DeferrerInterface;
 use Rhapsody\Core\Exceptions\HttpException;
 use Rhapsody\Core\Routing\Router;
 use Rhapsody\Core\Services\NotificationService;
@@ -42,6 +43,24 @@ class Kernel
     {
         $this->resetState();
 
+        try {
+            return $this->dispatch($request);
+        } catch (\Throwable $e) {
+            // A failed request must not leave its deferred work behind: in a
+            // persistent worker it would otherwise run after the NEXT response.
+            $this->deferrer()?->discard();
+            throw $e;
+        }
+    }
+
+    /**
+     * Routing plus the 404/500 normalization. Split out of handle() so that
+     * handle() can guarantee deferred tasks are discarded on any failure.
+     *
+     * @throws HttpException
+     */
+    private function dispatch(Request $request): Response
+    {
         $response = Router::dispatch($request, $this->container);
 
         // A controller/middleware may set a 404/500 status directly on the
@@ -66,6 +85,28 @@ class Kernel
         }
 
         return $response;
+    }
+
+    /**
+     * Runs tasks queued with defer(). Call it AFTER Response::send() (or after
+     * the worker has responded). Costs one array lookup on requests that
+     * never deferred anything.
+     */
+    public function afterResponse(): void
+    {
+        $this->deferrer()?->flush();
+    }
+
+    /**
+     * The Deferrer, or null if nothing resolved it this request.
+     */
+    private function deferrer(): ?DeferrerInterface
+    {
+        if (! $this->container->resolved(DeferrerInterface::class)) {
+            return null;
+        }
+
+        return $this->container->resolve(DeferrerInterface::class);
     }
 
     /**

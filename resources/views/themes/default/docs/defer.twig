@@ -1,0 +1,113 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>Deferred Tasks</h1>
+    <p>
+        <code>defer()</code> runs a piece of work <strong>after the response has been delivered</strong>. The visitor gets their page as soon as your controller returns; sending the email, calling the slow API or rebuilding the cache happens afterwards, without making anyone wait.
+    </p>
+
+    <pre><code class="language-php">public function register(Request $request): Response
+{
+    $user = $this->users->create($request);
+
+    // Runs after the response is sent. The visitor does not wait for it.
+    defer(function () use ($user): void {
+        $this->welcomeEmail->sendTo($user);
+    });
+
+    return $this->view('auth/registered.twig');
+}</code></pre>
+
+    <hr>
+
+    <h2>Using It</h2>
+    <p>There are two equivalent ways in. Use whichever fits the code you are writing.</p>
+    <pre><code class="language-php">use Rhapsody\Core\Contracts\DeferrerInterface;
+
+// 1. The global helper, available everywhere once the app has booted
+defer(fn () => $this->rebuildSitemap());
+
+// 2. Inject the service (easier to test and to swap)
+public function __construct(private DeferrerInterface $deferrer) {}
+
+$this->deferrer->defer(fn () => $this->rebuildSitemap());</code></pre>
+
+    <h3>Methods</h3>
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-left border border-gray-300 dark:border-gray-700">
+            <thead class="bg-gray-100 dark:bg-gray-800">
+                <tr>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Method</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">What it does</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>defer(callable $task)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Queues a task. It is called with no arguments, so capture what it needs with <code>use (...)</code>.</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>pending()</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">How many tasks are waiting to run.</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>discard()</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Drops every waiting task without running it.</td></tr>
+                <tr><td class="px-4 py-2"><code>flush()</code></td><td class="px-4 py-2">Finishes the response and runs the waiting tasks. The framework calls this for you; you should not need to.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <hr>
+
+    <h2>How It Runs</h2>
+    <p>The framework detects the environment and picks the best behaviour automatically.</p>
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-left border border-gray-300 dark:border-gray-700">
+            <thead class="bg-gray-100 dark:bg-gray-800">
+                <tr>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Environment</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">What happens</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">PHP-FPM or LiteSpeed</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The response is flushed and the connection is <strong>closed</strong>, then tasks run. The visitor never waits.</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Apache <code>mod_php</code>, the built-in server</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The response is fully flushed, then tasks run. The page is complete in the browser, but the connection stays open until the tasks finish.</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">RoadRunner worker</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Tasks run right after the response is handed to RoadRunner. That worker is busy until they finish.</td></tr>
+                <tr><td class="px-4 py-2"><code>php rhapsody</code> commands and other CLI scripts</td><td class="px-4 py-2">There is no response to wait for, so the task runs <strong>immediately</strong> when you call <code>defer()</code>.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <hr>
+
+    <h2>Good to Know</h2>
+    <ul>
+        <li><strong>Tasks cannot change the response.</strong> By the time they run, the headers and body are gone. Anything a task prints is discarded.</li>
+        <li><strong>The session is already closed.</strong> The session lock is released before tasks run so the visitor's next request is not blocked. Writing to the session inside a task will not persist.</li>
+        <li><strong>Failures are logged, never shown.</strong> A task that throws is written to <code>storage/logs/defer.log</code> and the remaining tasks still run.</li>
+        <li><strong>A failed request runs nothing.</strong> If the request ends in an exception (including a 404 or 500 page), its queued tasks are discarded.</li>
+        <li><strong>Tasks run in the order you queued them,</strong> and a task may call <code>defer()</code> to queue more. A single request runs at most 1000 tasks.</li>
+        <li><strong>PHP time limits still apply.</strong> Under PHP-FPM, <code>max_execution_time</code> and <code>request_terminate_timeout</code> apply to deferred work too. Closing the connection does not remove them.</li>
+        <li><strong>Nothing is saved.</strong> If the server stops while a task is waiting, the task is lost. For work that must survive that (payments, important emails), use a persistent queue instead.</li>
+        <li><strong>Resolve it by its interface.</strong> Ask the container for <code>DeferrerInterface::class</code>, not the concrete class.</li>
+        <li><strong>Boot-time code:</strong> the <code>defer()</code> helper is available once the application has finished booting. A module's <code>boot()</code> runs earlier, so resolve <code>DeferrerInterface</code> from the container there instead.</li>
+    </ul>
+
+    <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
+        <strong>Tip:</strong> keep deferred tasks small and self-contained. Capture plain values (an id, an email address) rather than whole request objects, so the task does not depend on request state that no longer matters.
+    </div>
+
+    <hr>
+
+    <h2>Upgrading an Existing App</h2>
+    <p>New apps from the skeleton have this wired up. If you are updating an existing project, add one line after the response is sent in each entry point:</p>
+    <pre><code class="language-php">// index.php
+$response->send();
+$kernel->afterResponse();</code></pre>
+    <pre><code class="language-php">// worker.php, inside the while() loop, after the try/catch that responds
+$kernel->afterResponse();</code></pre>
+    <p>Apps that do not call <code>defer()</code> pay essentially nothing for this: <code>afterResponse()</code> returns immediately when nothing was queued.</p>
+
+    <hr>
+
+    <h2>Related Documentation</h2>
+    <ul>
+        <li><a href="{{ base_url }}/docs/roadrunner">RoadRunner Persistent Workers</a></li>
+        <li><a href="{{ base_url }}/docs/session">Sessions</a></li>
+        <li><a href="{{ base_url }}/docs/logging">Logging</a></li>
+        <li><a href="{{ base_url }}/docs/container">The Service Container</a></li>
+    </ul>
+{% endblock %}

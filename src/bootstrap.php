@@ -30,12 +30,16 @@ use Rhapsody\Core\Commands\RouteCacheCommand;
 use Rhapsody\Core\Commands\RouteClearCommand;
 use Rhapsody\Core\Commands\SkeletonSyncCommand;
 use Rhapsody\Core\Container;
+use Rhapsody\Core\Contracts\DeferrerInterface;
 use Rhapsody\Core\Contracts\EncrypterInterface;
 use Rhapsody\Core\Contracts\PaymentGatewayInterface;
+use Rhapsody\Core\Defer\DeferMode;
+use Rhapsody\Core\Defer\Deferrer;
 use Rhapsody\Core\Events\EventDispatcher;
 use Rhapsody\Core\FrameworkInfo;
 use Rhapsody\Core\Helpers\OmnipayGateway;
 use Rhapsody\Core\Helpers\Path;
+use Rhapsody\Core\Logger;
 use Rhapsody\Core\Mailer;
 use Rhapsody\Core\Middleware\DdosMiddleware;
 use Rhapsody\Core\Proxy\ContainerDecorator;
@@ -306,7 +310,7 @@ $container->singleton(Environment::class, function (Container $c) use ($config, 
         {
             return Session::hasFlash($name);
         }
-    };;;;;;;
+    };
 
     $twig->addGlobal('flash', $flash);
 
@@ -332,9 +336,15 @@ $container->singleton(ViewRenderer::class, function (Container $c) {
 $container->singleton(EncrypterInterface::class, fn() => Encrypter::getInstance());
 $container->singleton(UrlSigner::class, fn(Container $c) => new UrlSigner($c->resolve(EncrypterInterface::class)));
 
+// --- DEFERRED TASKS ---
+$container->singleton(DeferrerInterface::class, fn() => new Deferrer(
+    new Logger(Path::logs('defer.log')),
+    DeferMode::detect(),
+));
+
 // --- OTHER CORE SERVICES ---
 $container->bind(\Rhapsody\Core\Contracts\AuthenticatableInterface::class, \App\Models\User::class);
-$container->bind(PaymentGatewayInterface::class, function () use ($config) {
+$container->singleton(PaymentGatewayInterface::class, function () use ($config) {
     $gatewayType = $config['payment']['gateway'] ?? 'Stripe';
     $currency    = $config['payment']['currency'] ?? 'USD';
 
@@ -507,6 +517,7 @@ if (PHP_SAPI !== 'cli' || (defined('RHAPSODY_HTTP_WORKER') && RHAPSODY_HTTP_WORK
                 ViewRenderer::class,
                 NotificationService::class,
                 \Doctrine\ORM\EntityManager::class,
+                \Rhapsody\Core\Contracts\DeferrerInterface::class,
             ]
         ), 'is_string'));
 
