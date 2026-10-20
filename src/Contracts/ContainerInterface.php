@@ -31,7 +31,7 @@ interface ContainerInterface
      *
      * @param  class-string<T>|string $id
      * @throws \Exception
-     * @return ($id is class-string<T> ? T : mixed)
+     * @return ($id                   is class-string<T> ? T : mixed)
      */
     public function get(string $id): mixed;
 
@@ -53,7 +53,7 @@ interface ContainerInterface
      *
      * @param  class-string<T>|string $abstract
      * @throws \Exception
-     * @return ($abstract is class-string<T> ? T : mixed)
+     * @return ($abstract             is class-string<T> ? T : mixed)
      */
     public function resolve(string $abstract): mixed;
 
@@ -74,4 +74,16 @@ interface ContainerInterface
      * @return void
      */
     public function forgetSingleton(string $abstract): void;
+
+    /**
+     * Call a callable, auto-wiring its parameters from the container.
+     *
+     * Class and interface type-hints are resolved from the container; values in
+     * $parameters are matched by parameter name and take precedence.
+     *
+     * @param  callable|array{0: object|class-string, 1: string} $target A callable, or [object|class-string, method]
+     * @param  array<string,     mixed>               $parameters Named values that override container resolution
+     * @return mixed             Whatever the callable returns
+     */
+    public function call(callable | array $target, array $parameters = []): mixed;
 }

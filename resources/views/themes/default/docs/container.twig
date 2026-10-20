@@ -20,6 +20,7 @@
     <ul>
         <li><strong>Binds names to things.</strong> An interface or alias can be mapped to a concrete class or to a factory function (a closure).</li>
         <li><strong>Auto-wires constructor dependencies.</strong> If a class's constructor asks for <code>LoggerInterface</code> and <code>UserRepository</code>, the container will resolve both and pass them in — recursively, all the way down.</li>
+        <li><strong>Calls methods and closures with injection.</strong> <code>call()</code> invokes any callable and fills its type-hinted parameters from the container — the same way constructors are filled.</li>
         <li><strong>Detects circular dependencies.</strong> If <code>A</code> needs <code>B</code> and <code>B</code> needs <code>A</code>, the container stops immediately and tells you, instead of looping forever.</li>
         <li><strong>Supports singletons.</strong> <code>singleton()</code> bindings are built once and then reused on every later request.</li>
         <li><strong>Traces every resolution.</strong> Class name, how long it took, who asked for it — all logged for debugging.</li>
@@ -45,6 +46,19 @@ $container->bind(LoggerInterface::class, FileLogger::class);
 $container->bind('db', function () {
     return new PDO('mysql:host=localhost;dbname=test', 'user', 'pwd');
 });</code></pre>
+
+    <h4>Binding to a class name (aliases)</h4>
+    <p>
+        When the second argument is a class name rather than a closure, the container treats the binding as an
+        <strong>alias</strong>: asking for the abstract resolves the class you named, auto-wiring its constructor as
+        usual.
+    </p>
+    <ul>
+        <li><strong>The target's own binding is honored.</strong> If <code>FileLogger::class</code> is itself bound (a closure, a <code>singleton()</code>, an <code>instance()</code>), that binding is what you get back.</li>
+        <li><strong>Aliases can chain.</strong> <code>A</code> → <code>B</code> → <code>C</code> resolves <code>C</code>. A loop (<code>A</code> → <code>B</code> → <code>A</code>) throws the usual circular dependency error.</li>
+        <li><strong><code>singleton()</code> caches under the abstract.</strong> <code>singleton(LoggerInterface::class, FileLogger::class)</code> builds one <code>FileLogger</code> and returns it for every later <code>resolve(LoggerInterface::class)</code>; <code>resolved()</code> and <code>forgetSingleton()</code> use the abstract name too.</li>
+        <li><strong>Self-binding is unchanged.</strong> <code>bind(UserService::class)</code> with no second argument resolves <code>UserService</code> itself.</li>
+    </ul>
 
     <h3><code>singleton()</code> — build once, reuse forever</h3>
     <p>
@@ -120,6 +134,50 @@ $userService = $container->resolve(UserService::class);</code></pre>
 
     <hr>
 
+    <h2>Calling Methods with Injection</h2>
+    <p>
+        <code>call()</code> invokes a callable and resolves its parameters from the container, so a method can ask for
+        the services it needs without receiving them in the constructor. This is how queued jobs get their
+        dependencies in <code>handle()</code>.
+    </p>
+    <pre><code class="language-php">// An instance method: services come from the container
+$container->call([$job, 'handle']);
+
+// A class name: the container builds the instance (constructor included) first
+$container->call([ReportController::class, 'show']);
+
+// A closure, an invokable object, or a static method
+$container->call(fn(Mailer $mailer) => $mailer->flush());
+$container->call(new SendDigest());
+$container->call([Reports::class, 'build']);
+
+// The return value is passed straight back
+$total = $container->call([$invoice, 'total']);</code></pre>
+
+    <h3>Passing your own values</h3>
+    <p>
+        Anything the container can't know — an ID from the URL, a flag — goes in the second argument, keyed by
+        <strong>parameter name</strong>. Named values win over container resolution, and anything not named is
+        resolved as usual:
+    </p>
+    <pre><code class="language-php">class ReportController
+{
+    public function show(int $id, ReportService $reports, string $format = 'html'): Response { /* ... */ }
+}
+
+// $id comes from you, ReportService from the container, $format keeps its default
+$container->call([ReportController::class, 'show'], ['id' => 42]);</code></pre>
+
+    <h3>Rules</h3>
+    <ul>
+        <li>Parameters are resolved in this order: a value passed by name, then a class or interface type-hint (through <code>resolve()</code>, so aliases and singletons apply), then the parameter's default value. If none apply, <code>call()</code> throws and names the parameter and the function.</li>
+        <li>Only <strong>public</strong> methods can be called. A protected or private method throws instead of being invoked.</li>
+        <li><code>call()</code> is part of <code>ContainerInterface</code>, so it is available on whatever <code>Container::getInstance()</code> returns.</li>
+        <li>Exceptions thrown by the callable are not caught.</li>
+    </ul>
+
+    <hr>
+
     <h2>Singleton Lifecycle</h2>
     <p>
         Two methods exist for managing already-resolved singletons <strong>without</strong> triggering a new
@@ -146,6 +204,10 @@ $userService = $container->resolve(UserService::class);</code></pre>
     </p>
     <pre><code class="language-php">// Throws: Circular dependency detected: App\A → App\B → App\A
 $container->resolve(App\A::class);</code></pre>
+    <p>
+        The same check covers alias bindings: <code>bind(A::class, B::class)</code> together with
+        <code>bind(B::class, A::class)</code> is reported as a circular dependency.
+    </p>
 
     <hr>
 
@@ -161,6 +223,11 @@ foreach ($trace as $entry) {
 
 Container::resetTrace();        // clear the log
 Container::setProxyMode(true);  // flag subsequent entries as proxy resolutions</code></pre>
+    <p>
+        An alias binding produces one entry for the abstract and further entries for the class it points to (and
+        that class's dependencies). The abstract's <code>duration</code> includes the time spent resolving the
+        target, so it will always be at least as large as the target's own entry.
+    </p>
 
     <hr>
 
@@ -218,7 +285,9 @@ Container::forgetInstance();</code></pre>
     <ul>
         <li><strong><code>bind()</code> always creates a new instance.</strong> If you want something shared, use <code>singleton()</code>.</li>
         <li><strong>No contextual binding.</strong> You can't say "give this class implementation X of the interface, but give that class implementation Y." One binding per abstract, period.</li>
+        <li><strong><code>call()</code> injects by type, not by position.</strong> Scalars and untyped parameters can only come from <code>$parameters</code> (by name) or a default value. Variadic parameters get no special treatment: a typed one receives a single resolved instance, and a scalar one throws unless you pass a value by name (it is passed as one argument).</li>
         <li><strong>The resolution trace is static and shared.</strong> <code>getTrace()</code> returns the same log across every container instance in the process.</li>
+        <li><strong>A string that is also callable is called, not resolved.</strong> A string concrete naming a global function or a static method (<code>'Foo::create'</code>) is invoked as a factory, exactly as before. Any other string is treated as a class name.</li>
         <li><strong>No implicit interface autowiring.</strong> An interface must be explicitly <code>bind()</code>'d to a concrete class before it can be resolved.</li>
     </ul>
 {% endblock %}

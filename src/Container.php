@@ -13,6 +13,7 @@
  * │ • Binds interfaces/abstracts to concrete implementations                │
  * │ • Auto-resolves constructor dependencies via Reflection API             │
  * │ • Detects and prevents circular dependencies                            │
+ * │ • Calls closures/methods with auto-wired parameters via call()          │
  * │ • Supports closure-based bindings (factory pattern)                     │
  * │ • Stores singleton instances via instance() method                      │
  * │ • Supports singleton() bindings that resolve once and cache the result  │
@@ -104,7 +105,10 @@
 
 namespace Rhapsody\Core;
 
+use Closure;
 use ReflectionClass;
+use ReflectionFunction;
+use ReflectionMethod;
 use ReflectionParameter;
 use Rhapsody\Core\Contracts\ContainerInterface;
 
@@ -309,7 +313,7 @@ class Container implements ContainerInterface
      * @template T of object
      *
      * @param  class-string<T>|string $id The abstract name to resolve
-     * @return ($id is class-string<T> ? T : mixed) The resolved instance
+     * @return ($id                   is class-string<T> ? T : mixed) The resolved instance
      */
     public function get(string $id): mixed
     {
@@ -347,7 +351,8 @@ class Container implements ContainerInterface
      * 1. Check if binding exists and is callable → execute closure with timing
      * 2. Check for circular dependency → throw exception if detected
      * 3. Mark as resolving
-     * 4. Use ReflectionClass to inspect the class
+     * 4. If the binding is a different class name (an alias), resolve that
+     *    class through the container; otherwise use ReflectionClass to inspect it
      * 5. Resolve constructor dependencies recursively
      * 6. Instantiate the class
      * 7. Log trace entry with timing and caller info
@@ -364,8 +369,8 @@ class Container implements ContainerInterface
      * @template T of object
      *
      * @param  class-string<T>|string $abstract The class/abstract name to resolve
-     * @throws \Exception If circular dependency, non-instantiable class, or unresolvable parameter
-     * @return ($abstract is class-string<T> ? T : mixed) The resolved instance
+     * @throws \Exception             If circular dependency, non-instantiable class, or unresolvable parameter
+     * @return ($abstract             is class-string<T> ? T : mixed) The resolved instance
      */
     public function resolve(string $abstract): mixed
     {
@@ -416,23 +421,11 @@ class Container implements ContainerInterface
         $start                      = microtime(true);
 
         try {
-            // --- Reflection-based instantiation ---
-            /** @var class-string $class */
-            $class     = $abstract;
-            $reflector = new ReflectionClass($class);
-            if (! $reflector->isInstantiable()) {
-                throw new \Exception("Class {$abstract} is not instantiable.");
-            }
-            $constructor = $reflector->getConstructor();
-            if (is_null($constructor)) {
-                // No constructor → instantiate without arguments
-                $instance = new $abstract();
-            } else {
-                // Resolve constructor parameters recursively
-                $parameters   = $constructor->getParameters();
-                $dependencies = $this->resolveDependencies($parameters);
-                $instance     = $reflector->newInstanceArgs($dependencies);
-            }
+            // --- Alias binding (string concrete) or reflection-based instantiation ---
+            $concrete = $this->bindings[$abstract] ?? null;
+            $instance = is_string($concrete) && $concrete !== $abstract
+                ? $this->resolve($concrete)
+                : $this->instantiate($abstract);
 
             // --- Log successful resolution ---
             $duration = round((microtime(true) - $start) * 1000, 2);
@@ -461,9 +454,87 @@ class Container implements ContainerInterface
     }
 
     /**
+     * Calls a closure, invokable object, static method or instance method,
+     * auto-wiring its parameters from the container.
+     *
+     * Class and interface type-hints are resolved with resolve(), so aliases,
+     * singletons and closure bindings all apply. Anything else falls back to
+     * the parameter's default value. Values passed in $parameters are matched
+     * by parameter name and win over container resolution.
+     *
+     * When the first element of an array target is a class name, the instance
+     * is built through the container first (constructor dependencies included).
+     * Only public methods can be called this way.
+     *
+     * @example
+     * // Instance method, services injected from the container
+     * $container->call([$job, 'handle']);
+     * // Class name: the container builds the instance for you
+     * $container->call([ReportController::class, 'show'], ['id' => 42]);
+     * // Closure
+     * $container->call(fn(Mailer $mailer) => $mailer->flush());
+     * @param  callable|array{0: object|class-string, 1: string} $target What to call
+     * @param  array<string,     mixed>               $parameters Named values that override container resolution
+     * @throws \Exception        If a parameter cannot be resolved, or the method is not public
+     * @return mixed             Whatever the callable returns
+     */
+    public function call(callable | array $target, array $parameters = []): mixed
+    {
+        if (is_array($target)) {
+            [$classOrObject, $method] = $target;
+            $object                   = is_object($classOrObject) ? $classOrObject : $this->resolve($classOrObject);
+            $reflection               = new ReflectionMethod($object, $method);
+            if (! $reflection->isPublic()) {
+                throw new \Exception('Cannot call non-public method ' . $object::class . "::{$method}().");
+            }
+
+            return $reflection->invokeArgs(
+                $reflection->isStatic() ? null : $object,
+                $this->resolveDependencies($reflection->getParameters(), $parameters)
+            );
+        }
+
+        $reflection = new ReflectionFunction(Closure::fromCallable($target));
+
+        return $reflection->invokeArgs($this->resolveDependencies($reflection->getParameters(), $parameters));
+    }
+
+    /**
+     * Builds a class via reflection, auto-wiring its constructor.
+     *
+     * Extracted from resolve() so a string-concrete binding (an alias to
+     * another class) can delegate to resolve() while everything else keeps
+     * the original reflection path.
+     *
+     * @param  string     $abstract The class name to instantiate
+     * @throws \Exception If the class is not instantiable or a parameter cannot be resolved
+     * @return object     The constructed instance
+     */
+    protected function instantiate(string $abstract): object
+    {
+        /**
+         * @var class-string $class
+         */
+        $class     = $abstract;
+        $reflector = new ReflectionClass($class);
+        if (! $reflector->isInstantiable()) {
+            throw new \Exception("Class {$abstract} is not instantiable.");
+        }
+        $constructor = $reflector->getConstructor();
+        if (is_null($constructor)) {
+            // No constructor → instantiate without arguments
+            return new $class();
+        }
+
+        // Resolve constructor parameters recursively
+        return $reflector->newInstanceArgs($this->resolveDependencies($constructor->getParameters()));
+    }
+
+    /**
      * Resolves an array of constructor parameters recursively.
      *
      * For each parameter:
+     * - If a value was passed by name in $overrides → use it
      * - If type-hinted with a class/interface → resolve it recursively
      * - If has a default value → use the default
      * - Otherwise → throw exception (cannot resolve)
@@ -471,16 +542,23 @@ class Container implements ContainerInterface
      * @example
      * // Given constructor: __construct(Logger $logger, Config $config, $debug = false)
      * // Returns: [Logger instance, Config instance, false]
-     * @param  array<ReflectionParameter> $parameters The constructor parameters
+     * @param  array<ReflectionParameter> $parameters The constructor or method parameters
+     * @param  array<string,              mixed>      $overrides Values supplied by parameter name
      * @throws \Exception                 If a parameter cannot be resolved
-     * @return list<mixed>                 Resolved dependency instances
+     * @return list<mixed>                Resolved dependency instances
      */
-    protected function resolveDependencies(array $parameters): array
+    protected function resolveDependencies(array $parameters, array $overrides = []): array
     {
         $dependencies = [];
         foreach ($parameters as $parameter) {
+            if (array_key_exists($parameter->getName(), $overrides)) {
+                // Explicit value wins over container resolution
+                $dependencies[] = $overrides[$parameter->getName()];
+                continue;
+            }
+
             $type = $parameter->getType();
-            if ($type instanceof \ReflectionNamedType && ! $type->isBuiltin()) {
+            if ($type instanceof \ReflectionNamedType  && ! $type->isBuiltin()) {
                 // Type is a class/interface → resolve it
                 $dependencies[] = $this->resolve($type->getName());
             } elseif ($parameter->isDefaultValueAvailable()) {
@@ -488,10 +566,30 @@ class Container implements ContainerInterface
                 $dependencies[] = $parameter->getDefaultValue();
             } else {
                 // No type and no default → cannot resolve
-                throw new \Exception("Cannot resolve parameter \${$parameter->getName()} in {$parameter->getDeclaringClass()?->getName()}. Bind it explicitly or provide a default.");
+                throw new \Exception("Cannot resolve parameter \${$parameter->getName()} in {$this->declaringName($parameter)}. Bind it explicitly or provide a default.");
             }
         }
         return $dependencies;
+    }
+
+    /**
+     * Name of the class declaring the given parameter's method, or the function
+     * name for a plain function or closure (a closure reports '{closure}', not
+     * the class it was written in). Used in error messages.
+     *
+     * @param  ReflectionParameter $parameter The parameter
+     * @return string
+     */
+    private function declaringName(ReflectionParameter $parameter): string
+    {
+        $function = $parameter->getDeclaringFunction();
+
+        // A closure written inside a class reports that class as its scope, so check isClosure() first.
+        if ($function instanceof ReflectionMethod && ! $function->isClosure()) {
+            return $function->getDeclaringClass()->getName();
+        }
+
+        return $function->getName();
     }
 
     /**

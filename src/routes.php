@@ -34,6 +34,7 @@ Router::get('/docs/cookie-storage', [DocsController::class, 'cookieStorage']);
 Router::get('/docs/database', [DocsController::class, 'database']);
 Router::get('/docs/ddos-protection', [DocsController::class, 'ddosProtection']);
 Router::get('/docs/debugging', [DocsController::class, 'debugging']);
+Router::get('/docs/defer', [DocsController::class, 'defer']);
 Router::get('/docs/doctrine', [DocsController::class, 'doctrine']);
 Router::get('/docs/encryption', [DocsController::class, 'encryption']);
 Router::get('/docs/error-handling', [DocsController::class, 'errorHandling']);

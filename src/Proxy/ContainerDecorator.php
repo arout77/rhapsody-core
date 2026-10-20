@@ -10,7 +10,9 @@ class ContainerDecorator implements ContainerInterface
     private Container $container;
     private LazyProxyFactory $proxyFactory;
     private bool $enabled;
-    /** @var list<string> */
+    /**
+     * @var list<string>
+     */
     private array $eagerServices = [];
 
     /**
@@ -65,6 +67,19 @@ class ContainerDecorator implements ContainerInterface
         }
 
         return $this->proxyFactory->create($abstract);
+    }
+
+    /**
+     * Delegates to the real container. Parameters are resolved on the inner
+     * container, exactly as constructor dependencies already are: lazy proxies
+     * are applied only to what is resolved directly through this decorator.
+     *
+     * @param callable|array{0: object|class-string, 1: string} $target
+     * @param array<string,     mixed>               $parameters
+     */
+    public function call(callable | array $target, array $parameters = []): mixed
+    {
+        return $this->container->call($target, $parameters);
     }
 
     private function isEager(string $abstract): bool

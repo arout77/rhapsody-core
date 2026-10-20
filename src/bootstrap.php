@@ -2,6 +2,7 @@
 
 // bootstrap.php
 use App\Providers\EventServiceProvider;
+use Closure;
 use Composer\InstalledVersions;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Types\Type;
@@ -9,6 +10,7 @@ use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\ORMSetup;
 use Omnipay\Omnipay;
 use Predis\Client as RedisClient;
+use Rhapsody\Core\Bootstrap\ServiceRegistrar;
 use Rhapsody\Core\Cache;
 use Rhapsody\Core\Cache\CacheInterface;
 use Rhapsody\Core\Cache\FileCacheDriver;
@@ -310,7 +312,7 @@ $container->singleton(Environment::class, function (Container $c) use ($config, 
         {
             return Session::hasFlash($name);
         }
-    };
+    };;;;
 
     $twig->addGlobal('flash', $flash);
 
@@ -461,9 +463,25 @@ $container->bind(\Rhapsody\Core\Commands\BuildProxiesCommand::class, function ($
 // STEP 2.5: USER EXTENSION HOOK
 // --------------------------------------------------------------
 $userBootstrap = $basePath . '/bootstrap.php';
-if (file_exists($userBootstrap)) {
-    // The container is fully built; pass it to the user file.
-    require $userBootstrap;
+if (is_file($userBootstrap)) {
+    // Load in an isolated scope so the user file can't see $container, $config, etc.
+    $loadUserBootstrap = static fn(string $file): mixed => require $file;
+    $register          = $loadUserBootstrap($userBootstrap);
+
+    if (! $register instanceof \Closure) {
+        throw new \RuntimeException(
+            $userBootstrap . ' must return a closure: '
+            . 'return static function (ServiceRegistrar $services): void { ... };'
+        );
+    }
+
+    $register(new ServiceRegistrar($container, [
+        Mailer::class,
+        PaymentGatewayInterface::class,
+        DeferrerInterface::class,
+        ViewRenderer::class,
+        Validator::class,
+    ]));
 }
 
 // =========================================================================
