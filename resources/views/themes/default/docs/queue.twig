@@ -1,0 +1,255 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>Persistent Queue</h1>
+    <p>
+        The queue runs work <strong>in the background, outside the web request</strong>, and keeps it safe until it has run. Jobs are stored in your database, so they survive a server restart, are retried when they fail, and can be processed by one worker or many.
+    </p>
+
+    <pre><code class="language-php">// In a controller: queue the job and answer the visitor straight away
+dispatch(new SendWelcomeEmail($user->id));
+
+return $this->view('auth/registered.twig');</code></pre>
+
+    <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 my-4">
+        <strong>Queue or <code>defer()</code>?</strong> <a href="{{ base_url }}/docs/defer"><code>defer()</code></a> runs a task right after the response, in the same process, and forgets it if the server stops. The queue stores the job first. Use <code>defer()</code> for quick best-effort work; use the queue for anything that must not be lost (payments, important emails, imports) or that needs retries.
+    </div>
+
+    <hr>
+
+    <h2>Quick Start</h2>
+    <p><strong>1. Create the tables</strong> (once per project):</p>
+    <pre><code class="language-bash">php rhapsody queue:install --migrate</code></pre>
+    <p>This publishes a migration into <code>db/migrations</code> and runs it. Without <code>--migrate</code> it only publishes the file; run <code>php rhapsody migrate</code> yourself when you are ready.</p>
+
+    <p><strong>2. Write a job:</strong></p>
+    <pre><code class="language-php">namespace App\Jobs;
+
+use Rhapsody\Core\Contracts\JobInterface;
+
+final class SendWelcomeEmail implements JobInterface
+{
+    public function __construct(public readonly int $userId) {}
+
+    public function handle(UserRepository $users, WelcomeMailer $mailer): void
+    {
+        $mailer->sendTo($users->find($this->userId));
+    }
+}</code></pre>
+
+    <p><strong>3. Dispatch it:</strong></p>
+    <pre><code class="language-php">dispatch(new SendWelcomeEmail($user->id));</code></pre>
+
+    <p><strong>4. Run a worker:</strong></p>
+    <pre><code class="language-bash">php rhapsody queue:work</code></pre>
+
+    <hr>
+
+    <h2>Writing Jobs</h2>
+    <p>A job is a small class that implements <code>JobInterface</code> and has a public <code>handle()</code> method.</p>
+    <ul>
+        <li><strong><code>handle()</code> gets its dependencies from the container.</strong> Type-hint the services you need, exactly as you would in a controller. The worker calls it through <code>Container::call()</code>, so aliases, singletons and closure bindings all apply.</li>
+        <li><strong>The constructor holds what you dispatch with.</strong> Pass plain values: an id, a string, a number. Look the full record up inside <code>handle()</code> so the job always works with fresh data.</li>
+        <li><strong>No closures or open resources</strong> in constructor arguments. The job is stored as text, and a job that cannot be stored is refused when you dispatch it, with a message naming the class.</li>
+    </ul>
+
+    <h3>Reacting to a Permanent Failure</h3>
+    <p>Implement <code>FailableJobInterface</code> to be told when a job has used up all its attempts. It runs once, after the job has been moved to the failed jobs.</p>
+    <pre><code class="language-php">use Rhapsody\Core\Contracts\FailableJobInterface;
+use Throwable;
+
+final class ChargeInvoice implements FailableJobInterface
+{
+    public function __construct(public readonly int $invoiceId) {}
+
+    public function handle(Billing $billing): void
+    {
+        $billing->charge($this->invoiceId);
+    }
+
+    public function failed(Throwable $exception): void
+    {
+        error_log("Invoice {$this->invoiceId} could not be charged: " . $exception->getMessage());
+    }
+}</code></pre>
+    <p><code>failed()</code> is called directly, so it does <strong>not</strong> get container injection. If it throws, the error is logged and ignored.</p>
+
+    <hr>
+
+    <h2>Dispatching</h2>
+    <pre><code class="language-php">use Rhapsody\Core\Queue\QueueManager;
+
+// 1. The global helper
+dispatch(new SendWelcomeEmail($id));
+dispatch(new SendReminder($id), queue: 'emails', delay: 3600);
+
+// 2. Inject the manager (easier to test and to swap)
+public function __construct(private QueueManager $queue) {}
+
+$jobId = $this->queue->dispatch(new SendWelcomeEmail($id));
+$waiting = $this->queue->size('emails');</code></pre>
+
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-left border border-gray-300 dark:border-gray-700">
+            <thead class="bg-gray-100 dark:bg-gray-800">
+                <tr>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Argument</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Meaning</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>$job</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The job object to run.</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>queue</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Name of the queue (1&ndash;100 characters). Default: <code>default</code>.</td></tr>
+                <tr><td class="px-4 py-2"><code>delay</code></td><td class="px-4 py-2">Seconds to wait before the job may first run. Default: <code>0</code>.</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <p>Both return the new job's id. A negative delay or an invalid queue name throws <code>InvalidArgumentException</code>.</p>
+
+    <hr>
+
+    <h2>Retries</h2>
+    <p>If <code>handle()</code> throws, the job is put back and tried again after a wait. When it runs out of attempts it moves to the <a href="#failed-jobs">failed jobs</a>. Tune this per job with attributes:</p>
+    <pre><code class="language-php">use Rhapsody\Core\Queue\Attributes\Backoff;
+use Rhapsody\Core\Queue\Attributes\Timeout;
+use Rhapsody\Core\Queue\Attributes\Tries;
+
+#[Tries(5)]       // give up after 5 attempts
+#[Backoff(30)]    // wait 30s, then 60s, 120s, 240s
+#[Timeout(45)]    // abort an attempt that runs longer than 45s
+final class ImportCatalog implements JobInterface { /* ... */ }</code></pre>
+
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-left border border-gray-300 dark:border-gray-700">
+            <thead class="bg-gray-100 dark:bg-gray-800">
+                <tr>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Attribute</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Default</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">What it does</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>#[Tries(int $times)]</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">3</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Total attempts, including the first.</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>#[Backoff(int $seconds, bool $exponential = true)]</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">10s, doubling</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Wait before a retry. With <code>exponential: false</code> the wait is always the same. Capped at one day.</td></tr>
+                <tr><td class="px-4 py-2"><code>#[Timeout(int $seconds)]</code></td><td class="px-4 py-2">60s</td><td class="px-4 py-2">Longest an attempt may run. A job that exceeds it counts as a failed attempt. Needs the <code>pcntl</code> extension (see <a href="#good-to-know">Good to Know</a>).</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <hr>
+
+    <h2>Running the Worker</h2>
+    <pre><code class="language-bash">php rhapsody queue:work                          # process the "default" queue
+php rhapsody queue:work --queue=high,default     # "high" is always checked first
+php rhapsody queue:work --stop-when-empty        # drain the queue, then exit</code></pre>
+
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-left border border-gray-300 dark:border-gray-700">
+            <thead class="bg-gray-100 dark:bg-gray-800">
+                <tr>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Option</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Default</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Meaning</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>--queue=a,b</code> (<code>-q</code>)</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>default</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Queues to process, in priority order. A later queue is only looked at when the earlier ones are empty.</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>--sleep=N</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">3</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Seconds to wait when every queue is empty.</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>--max-jobs=N</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">0 (no limit)</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Stop after this many jobs.</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>--max-time=N</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">0 (no limit)</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Stop after this many seconds. Checked between jobs.</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>--memory=MB</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">128</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Stop once memory use reaches this many megabytes, so a supervisor can start a fresh worker.</td></tr>
+                <tr><td class="px-4 py-2"><code>--stop-when-empty</code></td><td class="px-4 py-2">off</td><td class="px-4 py-2">Exit as soon as every queue is empty. This is the mode for cron.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>On a Server You Control: Run It as a Daemon</h3>
+    <p>Keep the worker running with a process manager such as Supervisor, which restarts it whenever it stops. The limit options let it recycle itself regularly.</p>
+    <pre><code class="language-ini">[program:rhapsody-queue]
+command=php /var/www/app/rhapsody queue:work --queue=high,default --max-time=3600
+directory=/var/www/app
+autostart=true
+autorestart=true
+numprocs=2
+process_name=%(program_name)s_%(process_num)02d
+stopwaitsecs=70</code></pre>
+    <p>Run as many workers as you like: each job is claimed by exactly one of them. <code>stopwaitsecs</code> gives a worker time to finish its current job when the process manager stops it.</p>
+
+    <h3>On Shared Hosting: Run It from Cron</h3>
+    <p>No process manager? Start a worker every minute. It processes whatever is waiting and exits.</p>
+    <pre><code class="language-bash">* * * * * cd /path/to/app &amp;&amp; php rhapsody queue:work --stop-when-empty --max-time=55 &gt;&gt; /dev/null 2&gt;&amp;1</code></pre>
+    <p>If a run is still busy when the next one starts, that is fine: the two simply share the work.</p>
+
+    <hr>
+
+    <h2 id="failed-jobs">Failed Jobs</h2>
+    <p>A job that has used all its attempts, or whose stored data can no longer be read, is moved to the <code>failed_jobs</code> table together with the error and stack trace. Every failure is also written to <code>storage/logs/queue.log</code>.</p>
+    <pre><code class="language-bash">php rhapsody queue:failed          # list them
+php rhapsody queue:retry 12        # put one back on its queue
+php rhapsody queue:retry all       # put them all back
+php rhapsody queue:flush           # delete them all (asks first; --force skips the question)</code></pre>
+    <p>A retried job starts again with a fresh attempt count.</p>
+
+    <h2>Commands</h2>
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-left border border-gray-300 dark:border-gray-700">
+            <thead class="bg-gray-100 dark:bg-gray-800">
+                <tr>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Command</th>
+                    <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">What it does</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>queue:install [--migrate]</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Publishes the migration for the <code>jobs</code> and <code>failed_jobs</code> tables. Safe to run twice.</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>queue:work</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Processes jobs. See the options above.</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>queue:failed</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Lists failed jobs with their id, queue, time and error.</td></tr>
+                <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>queue:retry &lt;id|all&gt;</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Puts one failed job, or all of them, back on their queue.</td></tr>
+                <tr><td class="px-4 py-2"><code>queue:flush [--force]</code></td><td class="px-4 py-2">Permanently deletes every failed job.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <hr>
+
+    <h2 id="good-to-know">Good to Know</h2>
+    <ul>
+        <li><strong>A job may run more than once.</strong> If a worker dies after finishing the work but before the job is marked done, the job is handed out again. Write jobs so that running twice does no harm (check whether the email was already sent, use an upsert instead of an insert).</li>
+        <li><strong>Dispatch after you commit.</strong> Dispatch once the data the job needs is saved. A worker can pick the job up almost immediately, and it will not see changes that are still inside an open transaction.</li>
+        <li><strong>Keep <code>#[Timeout]</code> below the retry window.</strong> A reservation that is older than 90 seconds is treated as abandoned and the job is handed to another worker. The default job timeout is 60 seconds, which fits; if you raise it, raise the driver's <code>retryAfter</code> too (see below).</li>
+        <li><strong>Timeouts and a graceful stop need <code>pcntl</code>.</strong> On Linux and macOS the worker aborts a job that exceeds its timeout, and finishes its current job before exiting on <code>SIGTERM</code> or Ctrl+C. Windows (for example a local WAMP setup) has no <code>pcntl</code>: jobs run without a time limit, and stopping the worker mid-job leaves the job to be retried once its reservation expires.</li>
+        <li><strong>A crashing job cannot loop forever.</strong> Every time a job is picked up it counts as an attempt. A job that keeps killing its worker still ends up in the failed jobs once its attempts are used.</li>
+        <li><strong>Jobs are signed.</strong> Each job is stored with a signature made from your <code>APP_KEY</code>. A row that was altered, or inserted by hand, is rejected and moved to the failed jobs. If you rotate the key, list the old one in <code>APP_PREVIOUS_KEYS</code> so jobs already waiting can still be read.</li>
+        <li><strong>Renaming or deleting a job class</strong> makes waiting jobs of that class unreadable, and they go to the failed jobs. Let the queue drain first, or keep the old class until it has.</li>
+        <li><strong>Restart workers after a deploy.</strong> A running worker keeps the old code in memory. Stop it (a process manager will start a fresh one) or let <code>--max-time</code> recycle it. Cron workers pick up new code on their own.</li>
+        <li><strong>Queue order.</strong> Within a queue, jobs run oldest first. To make some work more urgent, give it its own queue and list that queue first: <code>--queue=high,default</code>.</li>
+        <li><strong>Works on every supported database.</strong> MySQL, PostgreSQL, SQL Server and SQLite use the same tables and the same queries. The <code>priority</code> and <code>meta</code> columns are reserved for add-on modules and are not used by core.</li>
+        <li><strong>If the tables are missing,</strong> the worker and <code>dispatch()</code> stop with a message telling you to run <code>queue:install --migrate</code>.</li>
+    </ul>
+
+    <hr>
+
+    <h2>Using a Different Database Connection</h2>
+    <p>By default the queue uses the same database as the rest of your app. To point it somewhere else, or to change the retry window, bind your own <code>QueueInterface</code> in your project's <code>bootstrap.php</code>. The worker, <code>dispatch()</code> and every queue command pick it up automatically.</p>
+    <pre><code class="language-php">use Rhapsody\Core\Bootstrap\ServiceRegistrar;
+use Rhapsody\Core\Contracts\QueueInterface;
+use Rhapsody\Core\Queue\DatabaseQueue;
+
+return static function (ServiceRegistrar $services): void {
+    $services->singleton(QueueInterface::class, fn () => new DatabaseQueue(
+        static fn (): PDO => new PDO($dsn, $user, $password, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]),
+        retryAfter: 120,
+    ));
+};</code></pre>
+    <p>The <code>jobs</code> and <code>failed_jobs</code> tables must exist in that database. <code>QueueInterface</code> is a small contract (<code>push</code>, <code>pop</code>, <code>release</code>, <code>delete</code>, <code>fail</code>, plus the failed-job methods), so a Redis or SQS driver can be dropped in the same way.</p>
+
+    <hr>
+
+    <h2>Related Documentation</h2>
+    <ul>
+        <li><a href="{{ base_url }}/docs/defer">Deferred Tasks</a></li>
+        <li><a href="{{ base_url }}/docs/container">The Service Container</a></li>
+        <li><a href="{{ base_url }}/docs/console-commands">Console Commands (CLI)</a></li>
+        <li><a href="{{ base_url }}/docs/encryption">Encryption</a></li>
+        <li><a href="{{ base_url }}/docs/logging">Logging</a></li>
+    </ul>
+{% endblock %}

@@ -1,0 +1,39 @@
+<?php
+
+declare (strict_types = 1);
+
+use Phinx\Db\Adapter\MysqlAdapter;
+use Phinx\Migration\AbstractMigration;
+
+/**
+ * Tables for the Rhapsody persistent queue (published by `queue:install`).
+ *
+ * Timestamps are plain unix integers so the schema behaves identically on
+ * MySQL, PostgreSQL, SQL Server and SQLite. `priority` and `meta` are
+ * reserved for queue add-on modules; core leaves them untouched.
+ */
+final class CreateQueueTables extends AbstractMigration
+{
+    public function change(): void
+    {
+        $this->table('jobs')
+            ->addColumn('queue', 'string', ['limit' => 100])
+            ->addColumn('payload', 'text', ['limit' => MysqlAdapter::TEXT_LONG])
+            ->addColumn('attempts', 'integer', ['default' => 0])
+            ->addColumn('reservation', 'string', ['limit' => 64, 'null' => true])
+            ->addColumn('reserved_at', 'integer', ['null' => true])
+            ->addColumn('available_at', 'integer')
+            ->addColumn('created_at', 'integer')
+            ->addColumn('priority', 'integer', ['default' => 0])
+            ->addColumn('meta', 'text', ['null' => true])
+            ->addIndex(['queue', 'available_at'])
+            ->create();
+
+        $this->table('failed_jobs')
+            ->addColumn('queue', 'string', ['limit' => 100])
+            ->addColumn('payload', 'text', ['limit' => MysqlAdapter::TEXT_LONG])
+            ->addColumn('exception', 'text', ['limit' => MysqlAdapter::TEXT_LONG])
+            ->addColumn('failed_at', 'integer')
+            ->create();
+    }
+}

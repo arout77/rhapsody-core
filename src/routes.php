@@ -52,6 +52,7 @@ Router::get('/docs/module-ui', [DocsController::class, 'moduleUi']);
 Router::get('/docs/modules', [DocsController::class, 'modules']);
 Router::get('/docs/pagination', [DocsController::class, 'pagination']);
 Router::get('/docs/path', [DocsController::class, 'pathHelper']);
+Router::get('/docs/queue', [DocsController::class, 'queue']);
 Router::get('/docs/react', [DocsController::class, 'reactjs']);
 Router::get('/docs/recaptcha', [DocsController::class, 'recaptcha']);
 Router::get('/docs/request', [DocsController::class, 'request']);

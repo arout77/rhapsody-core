@@ -394,6 +394,18 @@ class DocsController extends BaseController
         ]);
     }
 
+    /**
+     * Shows the persistent queue documentation.
+     */
+    public function queue(Request $request): Response
+    {
+        return $this->view('@core/docs/queue.twig', [], [
+            'title'         => 'Persistent queue – Rhapsody Documentation',
+            'description'   => 'Run work in the background with a database-backed queue: dispatch jobs, retry failures with backoff, and process them with a daemon or from cron.',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
+
     public function reactjs(Request $request): Response
     {
         return $this->view('@core/docs/react.twig', [], [

@@ -2,6 +2,8 @@
 
 use Rhapsody\Core\Container;
 use Rhapsody\Core\Contracts\DeferrerInterface;
+use Rhapsody\Core\Contracts\JobInterface;
+use Rhapsody\Core\Queue\QueueManager;
 use Rhapsody\Core\RedirectResponse;
 
 if (! function_exists('redirect')) {
@@ -15,7 +17,7 @@ if (! function_exists('redirect')) {
         if (! preg_match('#^(?:[a-z][a-z0-9+.-]*:|//)#i', $url)) {
             $configured = $_ENV['APP_BASE_URL'] ?? '';
             $base       = rtrim(is_string($configured) ? $configured : '', '/');
-            $url  = $base . '/' . ltrim($url, '/');
+            $url        = $base . '/' . ltrim($url, '/');
         }
 
         return new RedirectResponse($url, $redirectCode);
@@ -82,5 +84,18 @@ if (! function_exists('defer')) {
     function defer(callable $task): void
     {
         Container::getInstance()->resolve(DeferrerInterface::class)->defer($task);
+    }
+}
+
+if (! function_exists('dispatch')) {
+    /**
+     * Queue a job on the persistent queue.
+     *
+     * @param  int $delay Seconds before the job may first run
+     * @return int The job id
+     */
+    function dispatch(JobInterface $job, string $queue = 'default', int $delay = 0): int
+    {
+        return Container::getInstance()->resolve(QueueManager::class)->dispatch($job, $queue, $delay);
     }
 }

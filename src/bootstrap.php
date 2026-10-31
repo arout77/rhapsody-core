@@ -2,7 +2,6 @@
 
 // bootstrap.php
 use App\Providers\EventServiceProvider;
-use Closure;
 use Composer\InstalledVersions;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Types\Type;
@@ -35,6 +34,7 @@ use Rhapsody\Core\Container;
 use Rhapsody\Core\Contracts\DeferrerInterface;
 use Rhapsody\Core\Contracts\EncrypterInterface;
 use Rhapsody\Core\Contracts\PaymentGatewayInterface;
+use Rhapsody\Core\Contracts\QueueInterface;
 use Rhapsody\Core\Defer\DeferMode;
 use Rhapsody\Core\Defer\Deferrer;
 use Rhapsody\Core\Events\EventDispatcher;
@@ -46,6 +46,10 @@ use Rhapsody\Core\Mailer;
 use Rhapsody\Core\Middleware\DdosMiddleware;
 use Rhapsody\Core\Proxy\ContainerDecorator;
 use Rhapsody\Core\Proxy\LazyProxyFactory;
+use Rhapsody\Core\Queue\DatabaseQueue;
+use Rhapsody\Core\Queue\JobSerializer;
+use Rhapsody\Core\Queue\QueueManager;
+use Rhapsody\Core\Queue\Worker;
 use Rhapsody\Core\Request;
 use Rhapsody\Core\Routing\Router;
 use Rhapsody\Core\Services\Encrypter;
@@ -312,7 +316,7 @@ $container->singleton(Environment::class, function (Container $c) use ($config, 
         {
             return Session::hasFlash($name);
         }
-    };;;;
+    };;;;;;;
 
     $twig->addGlobal('flash', $flash);
 
@@ -342,6 +346,26 @@ $container->singleton(UrlSigner::class, fn(Container $c) => new UrlSigner($c->re
 $container->singleton(DeferrerInterface::class, fn() => new Deferrer(
     new Logger(Path::logs('defer.log')),
     DeferMode::detect(),
+));
+
+// --- PERSISTENT QUEUE ---
+// The database connection and the encrypter are fetched lazily, so bin/rhapsody
+// can resolve every queue command at startup without a database or APP_KEY.
+$container->singleton(QueueInterface::class, fn(Container $c) => new DatabaseQueue(
+    static fn(): PDO => $c->resolve(\Rhapsody\Core\Database::class)->getConnection(),
+));
+$container->singleton(JobSerializer::class, fn(Container $c) => new JobSerializer(
+    static fn(): EncrypterInterface => $c->resolve(EncrypterInterface::class),
+));
+$container->singleton(QueueManager::class, fn(Container $c) => new QueueManager(
+    $c->resolve(QueueInterface::class),
+    $c->resolve(JobSerializer::class),
+));
+$container->singleton(Worker::class, fn(Container $c) => new Worker(
+    $c->resolve(QueueInterface::class),
+    $c->resolve(JobSerializer::class),
+    $c,
+    new Logger(Path::logs('queue.log')),
 ));
 
 // --- OTHER CORE SERVICES ---
@@ -479,6 +503,7 @@ if (is_file($userBootstrap)) {
         Mailer::class,
         PaymentGatewayInterface::class,
         DeferrerInterface::class,
+        QueueInterface::class,
         ViewRenderer::class,
         Validator::class,
     ]));
