@@ -3,7 +3,34 @@
 {% block doc_content %}
     <h1>Persistent Queue</h1>
     <p>
-        The queue runs work <strong>in the background, outside the web request</strong>, and keeps it safe until it has run. Jobs are stored in your database, so they survive a server restart, are retried when they fail, and can be processed by one worker or many.
+        <h3>What It Is</h3>
+        A persistent queue is a background task management system that detaches time-consuming operations from the main web request-response cycle. The queue runs work <strong>in the background, outside the web request</strong>. Instead of holding transient job data solely in volatile memory (RAM), a persistent queue stores jobs reliably in non-volatile storage (such as your database or a dedicated disk-backed store). Because jobs are durably saved, they survive application crashes or server restarts, automatically handle retries upon failure, and can be distributed safely across one or multiple background worker processes.
+    </p>
+
+    <h2>Key Benefits</h2>
+    <p>
+        <ul>
+            <li>Fault Tolerance & Durability: If a worker crashes mid-task or the entire server goes down, the job remains safely stored. Once the system recovers, it resumes processing without data loss.</li>
+
+            <li>Asynchronous Execution: Heavy tasks run in the background, allowing your web application to respond instantly to users without making them wait for slow operations to finish.</li>
+
+            <li>Load Leveling & Traffic Spikes: Queues act as a buffer during high-traffic surges, catching incoming jobs and feeding them to your workers at a steady, manageable pace so your database and external APIs don't get overwhelmed.</li>
+
+            <li>Independent Scalability: You can scale your web servers and your background worker pools independently depending on where your resource bottlenecks lie.</li>
+        </ul>
+    </p>
+
+    <h2>When to Use Them (Common Use Cases)</h2>
+    <p>
+        <ul>
+            <li>Transactional & Marketing Emails / SMS: Sending password resets, welcome emails, or bulk notifications via third-party providers (like Mailgun, SendGrid, or Twilio).</li>
+
+            <li>File & Media Processing: Generating PDF reports, resizing uploaded profile images, converting video formats, or parsing large CSV/Excel imports.</li>
+
+            <li>Third-Party API Integrations: Communicating with external webhooks, payment gateways (e.g., Stripe processing webhooks), or syncing data with external CRMs where network latency or API rate limits could slow down your app.</li>
+
+            <li>Scheduled / Batch Operations: Running routine database cleanups, generating daily analytics summaries, or processing batch data updates overnight.</li>
+        </ul>
     </p>
 
     <pre><code class="language-php">// In a controller: queue the job and answer the visitor straight away
