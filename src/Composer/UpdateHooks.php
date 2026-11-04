@@ -3,8 +3,6 @@ namespace Rhapsody\Core\Composer;
 
 use Composer\Script\Event;
 use Rhapsody\Core\Commands\EnvSyncCommand;
-use Rhapsody\Core\Commands\MigrateCommand;
-use Rhapsody\Core\Database;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\ConsoleOutput;
 
@@ -80,19 +78,18 @@ class UpdateHooks
         $io       = $event->getIO();
 
         try {
-            $config = self::minimalBootstrap($basePath);
+            // Loads .env so EnvSyncCommand sees a consistent environment.
+            self::minimalBootstrap($basePath);
 
             $io->write('<info>Syncing .env from .env.example...</info>');
             self::runSymfonyCommand(new EnvSyncCommand($basePath));
-
-            $io->write('<info>Running database migrations...</info>');
-            (new MigrateCommand($basePath, Database::getInstance($config)))->execute([]);
 
             $io->write('<info>Clearing caches...</info>');
             self::clearCaches($basePath);
 
             self::maintenanceOff($basePath);
             $io->write('<info>Update complete — maintenance mode OFF.</info>');
+            $io->write('<comment>Migrations are not run automatically. Run them explicitly when ready.</comment>');
         } catch (\Throwable $e) {
             self::logFailure($basePath, $e);
             $io->writeError(sprintf(
@@ -186,7 +183,9 @@ class UpdateHooks
             throw new \RuntimeException('config/config.php must return an array.');
         }
 
-        /** @var array<string, mixed> $config */
+        /**
+         * @var array<string, mixed> $config
+         */
         return $config;
     }
 
