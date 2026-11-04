@@ -103,6 +103,16 @@
                             <td class="px-4 py-4"><code class="command-syntax text-emerald-300">php rhapsody make:middleware CheckAdmin</code></td>
                         </tr>
                         <tr>
+                            <td class="px-4 py-4 font-mono text-emerald-300">ask</td>
+                            <td class="px-4 py-4 text-slate-300">Searches the bundled framework docs and prints the best sections with links; in development with an API key, adds a short cited answer.</td>
+                            <td class="px-4 py-4"><code class="command-syntax text-emerald-300">php rhapsody ask "what does the ask command do"</code></td>
+                        </tr>
+                        <tr>
+                            <td class="px-4 py-4 font-mono text-emerald-300">docs:build</td>
+                            <td class="px-4 py-4 text-slate-300">Rebuilds the docs search index used by <code>ask</code> (framework contributors; <code>--check</code> verifies it is current).</td>
+                            <td class="px-4 py-4"><code class="command-syntax text-emerald-300">php rhapsody docs:build</code></td>
+                        </tr>
+                        <tr>
                             <td class="px-4 py-4 font-mono text-emerald-300">make:event</td>
                             <td class="px-4 py-4 text-slate-300">Creates a standard event payload container class.</td>
                             <td class="px-4 py-4"><code class="command-syntax text-emerald-300">php rhapsody make:event OrderShipped</code></td>

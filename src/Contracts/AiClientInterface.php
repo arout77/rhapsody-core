@@ -9,7 +9,7 @@ use Rhapsody\Core\Ai\Exceptions\AiServerException;
 use Rhapsody\Core\Ai\Exceptions\AiTimeoutException;
 
 /**
- * @phpstan-type AiOptions array{model?: string, temperature?: float|int, max_tokens?: int, top_p?: float|int, top_k?: int, timeout?: float|int}
+ * @phpstan-type AiOptions array{model?: string, system?: string, temperature?: float|int, max_tokens?: int, top_p?: float|int, top_k?: int, timeout?: float|int}
  * @phpstan-type ChatMessage array{role?: 'user'|'assistant', content?: string}
  *
  * A provider-agnostic contract for text/chat generation — the same
@@ -17,6 +17,12 @@ use Rhapsody\Core\Ai\Exceptions\AiTimeoutException;
  * vendor's SDK. v1 is deliberately narrow (text/chat only, no streaming,
  * multimodal, tool-calling, or embeddings) — add methods here, or a sibling
  * interface, when a real caller needs one of those.
+ *
+ * The one cross-provider option beyond sampling knobs is 'system': a system
+ * prompt that steers the whole generation. Implementations MUST honor it by
+ * mapping it onto the provider's native mechanism (Gemini systemInstruction,
+ * Anthropic `system`, an OpenAI system message, ...). Silently dropping it
+ * would let a grounding or safety instruction vanish without any error.
  */
 interface AiClientInterface
 {
@@ -25,7 +31,7 @@ interface AiClientInterface
      *
      * @param string $prompt
      * @param AiOptions $options Provider-specific overrides, e.g. 'model',
-     *   'temperature', 'max_tokens', 'top_p', 'top_k', 'timeout'.
+     *   'system', 'temperature', 'max_tokens', 'top_p', 'top_k', 'timeout'.
      * @throws AiAuthenticationException Missing/invalid API key.
      * @throws AiRateLimitException Rate limit or quota exceeded.
      * @throws AiTimeoutException Request took too long.

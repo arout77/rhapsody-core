@@ -5,9 +5,11 @@
     "minimum-stability": "stable",
     "require": {
         "php": "^8.4.1",
+        "ext-dom": "*",
         "doctrine/orm": "^2.17",
         "doctrine/dbal": "^3.7",
         "filp/whoops": "^2.18",
+        "guzzlehttp/guzzle": "^7.8",
         "intervention/image": "^3.11",
         "predis/predis": "^2.2",
         "robmorgan/phinx": "^0.16.10",

@@ -9,6 +9,7 @@ use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\ORMSetup;
 use Omnipay\Omnipay;
 use Predis\Client as RedisClient;
+use Rhapsody\Core\Ai\AiClientFactory;
 use Rhapsody\Core\Bootstrap\ServiceRegistrar;
 use Rhapsody\Core\Cache;
 use Rhapsody\Core\Cache\CacheInterface;
@@ -31,6 +32,7 @@ use Rhapsody\Core\Commands\RouteCacheCommand;
 use Rhapsody\Core\Commands\RouteClearCommand;
 use Rhapsody\Core\Commands\SkeletonSyncCommand;
 use Rhapsody\Core\Container;
+use Rhapsody\Core\Contracts\AiClientInterface;
 use Rhapsody\Core\Contracts\DeferrerInterface;
 use Rhapsody\Core\Contracts\EncrypterInterface;
 use Rhapsody\Core\Contracts\PaymentGatewayInterface;
@@ -368,6 +370,12 @@ $container->singleton(Worker::class, fn(Container $c) => new Worker(
     new Logger(Path::logs('queue.log')),
 ));
 
+// --- AI CLIENT ---
+// Lazy: nothing is built (and Guzzle isn't touched) until something resolves
+// AiClientInterface. A missing key is reported on first use, not here. Apps
+// can replace it from bootstrap.php to use another provider.
+$container->singleton(AiClientInterface::class, fn() => AiClientFactory::fromConfig($config));
+
 // --- OTHER CORE SERVICES ---
 $container->bind(\Rhapsody\Core\Contracts\AuthenticatableInterface::class, \App\Models\User::class);
 $container->singleton(PaymentGatewayInterface::class, function () use ($config) {
@@ -506,6 +514,7 @@ if (is_file($userBootstrap)) {
         QueueInterface::class,
         ViewRenderer::class,
         Validator::class,
+        AiClientInterface::class,
     ]));
 }
 

@@ -81,6 +81,13 @@ class GeminiClient implements AiClientInterface
             $body['generationConfig'] = $generationConfig;
         }
 
+        // The interface's cross-provider 'system' option maps onto Gemini's
+        // systemInstruction (a Content object, so it needs the parts wrapper).
+        $system = $options['system'] ?? null;
+        if (is_string($system) && $system !== '') {
+            $body['systemInstruction'] = ['parts' => [['text' => $system]]];
+        }
+
         // Generation can genuinely take tens of seconds for long output —
         // this default is deliberately more generous than a typical web
         // request's timeout, not a bug. Override per-call via $options['timeout']

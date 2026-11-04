@@ -1,0 +1,143 @@
+{% extends "@core/layouts/main.twig" %}
+
+{% block head_extensions %}
+<style>
+    .ask { max-width: 52rem; margin: 0 auto; }
+    .ask h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: .25rem; }
+    .ask-lead { opacity: .75; margin-bottom: 1.25rem; }
+    .ask-form { display: flex; gap: .5rem; margin-bottom: .5rem; }
+    .ask-input { flex: 1; padding: .7rem .9rem; border: 1px solid #9ca3af; border-radius: .5rem; font: inherit; background: #fff; color: #111827; }
+    .ask-btn { padding: .7rem 1.2rem; border: 0; border-radius: .5rem; background: #be185d; color: #fff; font-weight: 600; cursor: pointer; }
+    .ask-btn[disabled] { opacity: .6; cursor: wait; }
+    .ask-hint { font-size: .85rem; opacity: .7; margin-bottom: 1.5rem; }
+    .ask-card { border: 1px solid #d1d5db; border-radius: .6rem; padding: 1rem 1.1rem; margin-bottom: 1.1rem; }
+    .ask-q { font-weight: 700; margin-bottom: .6rem; }
+    .ask-answer { background: rgba(190, 24, 93, .08); border-left: 4px solid #be185d; padding: .7rem .9rem; border-radius: .3rem; margin-bottom: .8rem; white-space: pre-wrap; }
+    .ask-notice { font-size: .85rem; opacity: .8; margin-bottom: .6rem; }
+    .ask-gap { font-size: .85rem; color: #b45309; margin-bottom: .6rem; }
+    .ask-src { border-top: 1px solid #e5e7eb; padding-top: .6rem; margin-top: .6rem; }
+    .ask-src summary { cursor: pointer; font-weight: 600; }
+    .ask-src .ask-cited { font-size: .75rem; margin-left: .4rem; padding: .05rem .4rem; border-radius: 1rem; background: #be185d; color: #fff; }
+    .ask-src a { font-size: .85rem; margin-left: .5rem; }
+    .ask-pre { background: #111827; color: #e5e7eb; padding: .7rem .9rem; border-radius: .4rem; overflow-x: auto; font-size: .85rem; margin: .5rem 0; }
+    .ask-p { margin: .45rem 0; white-space: pre-wrap; }
+    .ask-err { color: #b91c1c; }
+    html.dark .ask-input { background: #1f2937; color: #f3f4f6; border-color: #4b5563; }
+    html.dark .ask-card { border-color: #374151; }
+    html.dark .ask-src { border-top-color: #374151; }
+    html.dark .ask-gap { color: #fbbf24; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ask" id="ask">
+    <h1>Ask the docs</h1>
+    <p class="ask-lead">Ask how something works in Rhapsody. Answers come from the framework's own documentation, and the pages used are always listed.</p>
+
+    <form class="ask-form" id="ask-form" autocomplete="off">
+        <input class="ask-input" id="ask-input" name="question" type="text" maxlength="500"
+               placeholder="e.g. How do I create Schema.org markup for a page?" required autofocus>
+        <button class="ask-btn" id="ask-btn" type="submit">Ask</button>
+    </form>
+    <p class="ask-hint">
+        Development tool. With a working API key you get a short cited answer; without one you still get the matching documentation sections.
+    </p>
+
+    <div id="ask-results" aria-live="polite"></div>
+</div>
+
+<script>
+(function () {
+    var form = document.getElementById('ask-form');
+    var input = document.getElementById('ask-input');
+    var button = document.getElementById('ask-btn');
+    var results = document.getElementById('ask-results');
+    var tokenMeta = document.querySelector('meta[name="csrf-token"]');
+    var endpoint = window.location.pathname.replace(/\/+$/, '') + '/query';
+
+    function el(tag, className, text) {
+        var node = document.createElement(tag);
+        if (className) { node.className = className; }
+        if (text !== undefined) { node.textContent = text; }
+        return node;
+    }
+
+    // Text is always inserted with textContent, never as HTML; code fences become <pre>.
+    function renderText(container, text) {
+        var parts = String(text).split(/```[a-zA-Z0-9]*\n?/);
+        parts.forEach(function (part, i) {
+            part = part.replace(/\s+$/, '');
+            if (part === '') { return; }
+            if (i % 2 === 1) { container.appendChild(el('pre', 'ask-pre', part)); return; }
+            var p = el('div', 'ask-p');
+            part.replace(/^\s+/, '').split(/`([^`\n]+)`/).forEach(function (piece, j) {
+                p.appendChild(j % 2 === 1 ? el('code', '', piece) : document.createTextNode(piece));
+            });
+            container.appendChild(p);
+        });
+    }
+
+    function renderResult(data) {
+        var card = el('div', 'ask-card');
+        card.appendChild(el('div', 'ask-q', data.question));
+
+        (data.notices || []).forEach(function (n) { card.appendChild(el('div', 'ask-notice', n)); });
+
+        if (data.answer) {
+            card.appendChild(el('div', 'ask-answer', data.answer));
+        } else if ((data.sources || []).length) {
+            card.appendChild(el('div', 'ask-notice', 'Best matches from the docs:'));
+        }
+
+        if (data.gap) {
+            card.appendChild(el('div', 'ask-gap', 'The docs may not cover this well. It has been noted as a docs gap.'));
+        }
+
+        (data.sources || []).forEach(function (s, i) {
+            var details = el('details', 'ask-src');
+            if (!data.answer && i === 0) { details.open = true; }
+            var summary = el('summary', '', '[' + s.n + '] ' + s.label);
+            if (s.cited) { summary.appendChild(el('span', 'ask-cited', 'cited')); }
+            var link = el('a', '', 'open page');
+            link.href = s.url;
+            summary.appendChild(link);
+            details.appendChild(summary);
+            renderText(details, s.text);
+            card.appendChild(details);
+        });
+
+        results.insertBefore(card, results.firstChild);
+    }
+
+    function renderError(message) {
+        var card = el('div', 'ask-card');
+        card.appendChild(el('div', 'ask-err', message));
+        results.insertBefore(card, results.firstChild);
+    }
+
+    form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        var question = input.value.trim();
+        if (!question) { return; }
+
+        button.disabled = true;
+        button.textContent = 'Searching…';
+
+        fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ question: question, _token: tokenMeta ? tokenMeta.content : '' })
+        })
+        .then(function (res) {
+            return res.json().catch(function () { return {}; }).then(function (data) {
+                if (!res.ok) { throw new Error(data.error || ('Request failed (' + res.status + ').')); }
+                return data;
+            });
+        })
+        .then(function (data) { renderResult(data); input.value = ''; input.focus(); })
+        .catch(function (err) { renderError(err.message); })
+        .then(function () { button.disabled = false; button.textContent = 'Ask'; });
+    });
+})();
+</script>
+{% endblock %}
