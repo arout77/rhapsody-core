@@ -64,6 +64,7 @@ final class Redactor
         '/\bAKIA[0-9A-Z]{16}\b/'                                       => self::MASK,
         '/\bgh[pousr]_[A-Za-z0-9]{30,}/'                               => self::MASK,
         '/\b((?:set-)?cookie\s*:\s*)[^\r\n]+/i'                        => '$1' . self::MASK,
+        '/([?&](?:key|api_?key|access_token|token|auth)=)[^&\s)"\'#]+/i'  => '$1' . self::MASK,
     ];
 
     /**

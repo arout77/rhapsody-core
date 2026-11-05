@@ -7,6 +7,7 @@ use Rhapsody\Core\Contracts\DeferrerInterface;
 use Rhapsody\Core\Exceptions\HttpException;
 use Rhapsody\Core\Routing\Router;
 use Rhapsody\Core\Services\NotificationService;
+use Rhapsody\Core\Ai\Assist\AssistWidget;
 use Rhapsody\Core\Snapshot\SnapshotRecorder;
 
 /**
@@ -180,7 +181,7 @@ class Kernel
         // 4xx/5xx pages are the requests most worth being able to inspect later.
         $debug = Debug::getInstance();
         $debug->end($response, $this->config, $this->container, Router::getMatchedRoute());
-        SnapshotRecorder::recordCollected($this->config);
+        $snapshotPath = SnapshotRecorder::recordCollected($this->config);
 
         $statusCode = $response->getStatusCode();
         if ($statusCode < 200 || $statusCode >= 300) {
@@ -193,7 +194,7 @@ class Kernel
             return $response;
         }
 
-        $toolbar     = new Toolbar($debug->getData());
+        $toolbar     = new Toolbar($debug->getData(), AssistWidget::tryCreate($this->config, $snapshotPath));
         $toolbarHtml = $toolbar->render();
 
         $content         = $response->getContent();

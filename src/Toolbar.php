@@ -3,6 +3,7 @@
 
 namespace Rhapsody\Core;
 
+use Rhapsody\Core\Ai\Assist\AssistWidget;
 use Rhapsody\Core\Snapshot\QueryFingerprint;
 use Rhapsody\Core\Snapshot\Redactor;
 use Rhapsody\Core\TraceablePDO;
@@ -14,7 +15,10 @@ class Toolbar
      */
     private ?Redactor $redactor = null;
 
-    public function __construct(protected array $data)
+    /**
+     * @param AssistWidget|null $assist The "Ask AI" panel, or null when AI help is off
+     */
+    public function __construct(protected array $data, private readonly ?AssistWidget $assist = null)
     {}
 
     public function render(): string
@@ -202,6 +206,10 @@ class Toolbar
         $servicesHtml    = $this->renderServicesPanel();
         $middlewareHtml  = $this->renderMiddlewarePanel();
 
+        // --- Ask AI panel (development only; absent when AI help is switched off) ---
+        $assistItem   = $this->assist === null ? '' : '<div class="toolbar-item" data-panel="panel-ai"><span class="toolbar-label">Ask AI</span></div>';
+        $assistAssets = $this->assist === null ? '' : $this->assist->assets();
+
         // --- Build panels array ---
         $panels_data  = [
             'panel-request'     => $requestHtml,
@@ -218,6 +226,10 @@ class Toolbar
             'panel-services'   => $servicesHtml,
             'panel-middleware' => $middlewareHtml,
         ];
+
+        if ($this->assist !== null) {
+            $panels_data['panel-ai'] = $this->assist->toolbarPanelHtml();
+        }
 
         $panels_json = json_encode($panels_data);
 
@@ -271,6 +283,7 @@ CSS;
         <div class="toolbar-item" data-panel="panel-cache"><span class="toolbar-label">Cache</span></div>
         <div class="toolbar-item" data-panel="panel-performance"><span class="toolbar-label">Performance</span></div>
         <div class="toolbar-item" data-panel="panel-env"><span class="toolbar-label">Environment</span></div>
+        {$assistItem}
 
         <div style="margin-left: auto; display: flex; align-items: stretch;">
             <div class="toolbar-item"><span class="toolbar-label">Time:</span> <span class="toolbar-value">{$execTime} ms</span></div>
@@ -284,6 +297,7 @@ CSS;
     </div>
 </div>
 
+{$assistAssets}
 <script>
     // Global copy function for cURL command
     function copyToClipboard(text) {
@@ -363,6 +377,9 @@ function showCopySuccess() {
                     item.classList.remove('active');
                 } else {
                     panel.innerHTML = panels[panelId];
+                    if (window.RhAssist) {
+                        window.RhAssist.mountAll(panel);
+                    }
                     panel.style.display = 'block';
                     activePanel = panelId;
                     items.forEach(i => i.classList.remove('active'));

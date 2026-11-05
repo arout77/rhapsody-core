@@ -72,7 +72,72 @@ Router::post('/chat/query', [AskController::class, 'query']);</code></pre>
 
     <h3>What leaves your machine</h3>
     <p>
-        Only your question and the text of public documentation sections are sent to the model. No request data, headers, session, environment values, or application code are included.
+        For <code>ask</code>, only your question and the text of public documentation sections are sent to the model. No request data, headers, session, environment values, or application code are included. The toolbar and error page helpers below are different: they send a masked picture of one request, and the error page also sends a few lines of your source code. They always show you that text first.
+    </p>
+
+    <hr>
+
+    <h2>Ask AI and Explain and fix</h2>
+    <p>
+        Two development tools use the AI client on the request you are looking at, built on the <a href="{{ base_url }}/docs/snapshots" class="docs-link">request snapshots</a>:
+    </p>
+    <ul>
+        <li><strong>Ask AI</strong>, a tab in the <a href="{{ base_url }}/docs/toolbar" class="docs-link">debug toolbar</a>. Ask a question about the page you just loaded, such as why it was slow or whether it ran N+1 queries.</li>
+        <li><strong>Explain and fix</strong>, a button on the error page. It explains why the request failed and can propose a change to your code.</li>
+    </ul>
+    <p>
+        Both are development-only and need a working AI client (see Setup below). Neither is active in production, and both can be switched off in config.
+    </p>
+
+    <h3>You review everything before it is sent</h3>
+    <p>
+        Clicking <em>Review and ask</em> (or <em>Review and explain</em>) sends nothing to the AI provider. It builds the message on your server and shows it to you: a list of sections with their sizes, the source files included, and the exact text under <em>Show the exact text</em>. Untick a section and the text updates. Only <em>Send</em> sends it. In the toolbar you can tick <em>Do not show this review again in this browser session</em>; the error page, which sends source code, always shows it.
+    </p>
+    <p>
+        Every message that is sent is also recorded in <code>storage/logs/ai-requests.jsonl</code> (time, mode, snapshot id, which sections, which source files, size, provider), so you can always check afterwards what left your machine.
+    </p>
+
+    <h3>What is in the message</h3>
+    <ul>
+        <li><strong>Toolbar, Ask AI:</strong> your question plus the request snapshot: method, URL, query and body, matched route, status, time and memory, database queries and N+1 findings, cache statistics and the middleware trace. Logs, environment values, container services, request headers and session keys are available but off until you tick them. The client IP is never included.</li>
+        <li><strong>Error page, Explain and fix:</strong> the exception (class, message, stack trace), the request and route, recent log lines, allowlisted environment values, and up to three source excerpts of about 30 lines around the failing lines.</li>
+        <li><strong>Masked first.</strong> Everything passes through the snapshot redactor: values under keys such as <code>password</code>, <code>token</code> or <code>api_key</code>, bearer tokens, JWTs, URL credentials and well-known key formats are replaced by <code>[REDACTED]</code>. In source code, string literals assigned to such names (<code>'api_key' =&gt; '...'</code>, <code>$password = '...'</code>, <code>define('X_SECRET', '...')</code>) are masked too.</li>
+        <li><strong>Never read:</strong> <code>.env</code> files, <code>config/</code>, <code>storage/</code>, <code>.git/</code>, <code>node_modules/</code>, files outside the project and anything that is not a source file (php, twig, js, ts, css, scss, html).</li>
+    </ul>
+    <p>
+        The message tells the model that everything in it (SQL, headers, log lines, exception messages, code comments) is untrusted data, not instructions. The model can only reply with text; it never runs anything.
+    </p>
+
+    <h3>Fixes are diffs you apply yourself</h3>
+    <p>
+        On the error page the model may propose up to three changes, each as <em>replace this exact text with that</em>. Nothing is written when the answer arrives. Each proposal is checked first and discarded, with a note, if:
+    </p>
+    <ul>
+        <li>it names a file that was not part of the message, or is in <code>vendor/</code>, <code>config/</code>, <code>storage/</code> or is a <code>.env</code> file;</li>
+        <li>the text to replace is not found, or is found more than once (so there is nothing to guess);</li>
+        <li>it contains a masked <code>[REDACTED]</code> value;</li>
+        <li>it would turn a PHP file that parses into one that does not.</li>
+    </ul>
+    <p>
+        What survives is shown as a diff. <em>Apply this change</em> needs two clicks (the first arms the button), re-checks the file, saves a copy of the original at <code>storage/debug/assist/undo/&lt;id&gt;.orig</code>, writes the change and keeps your line endings, then offers to reload the page. <em>Copy diff</em> lets you apply it yourself. The browser only ever sends the proposal's id back, so a request cannot make the server write anything the model did not propose.
+    </p>
+
+    <h3>Configuration</h3>
+    <p>Everything is optional. Add a <code>debug.assist</code> section to <code>config/config.php</code> to change the defaults:</p>
+    <pre><code class="language-php">'debug' => [
+    'assist' => [
+        'enabled'           => true,
+        'apply'             => true,   // false = show diffs only, never write files
+        'context_lines'     => 15,     // lines of source before and after the failing line
+        'max_source_files'  => 3,
+        'max_payload_bytes' => 60000,  // larger messages drop optional sections
+        'keep'              => 50,     // proposals kept on disk
+    ],
+],</code></pre>
+
+    <h3>How it is protected</h3>
+    <p>
+        The helpers talk to three URLs under <code>/_rhapsody/assist/</code> (<code>preview</code>, <code>explain</code>, <code>apply</code>) that the framework registers itself. Outside <code>app_env = development</code> they answer 404. Every call must also carry your session's CSRF token and an <code>X-Rhapsody-Assist: 1</code> header, and a browser <code>Origin</code> must match the host, so another website cannot drive them. The browser never sends request data or file contents, only a snapshot id, your question and the names of the sections to include. These URLs are never recorded as snapshots themselves.
     </p>
 
     <hr>

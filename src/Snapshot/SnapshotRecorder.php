@@ -93,6 +93,12 @@ final class SnapshotRecorder
             return false;
         }
 
+        // The framework's own development endpoints (AI assist) must never push the
+        // snapshot they are about to read out of the ring buffer.
+        if (str_contains($path, '/_rhapsody/')) {
+            return true;
+        }
+
         foreach ($settings->ignorePrefixes as $prefix) {
             if (str_contains($path, $prefix)) {
                 return true;

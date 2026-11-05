@@ -1,6 +1,7 @@
 <?php
 
 use App\Controllers\UpdatesController;
+use Rhapsody\Core\Controllers\AssistController;
 use Rhapsody\Core\Controllers\AuthController;
 use Rhapsody\Core\Controllers\DocsController;
 use Rhapsody\Core\Controllers\PaymentController;
@@ -15,6 +16,12 @@ Router::get('/forgot-password', [AuthController::class, 'showForgotPasswordForm'
 Router::post('/forgot-password', [AuthController::class, 'sendResetLink']);
 Router::get('/reset-password/{token}', [AuthController::class, 'showResetForm']);
 Router::post('/reset-password', [AuthController::class, 'resetPassword']);
+
+// Development-only AI helpers behind the toolbar "Ask AI" panel and the error page
+// "Explain and fix" button. The controller answers 404 outside app_env = development.
+Router::post('/_rhapsody/assist/preview', [AssistController::class, 'preview']);
+Router::post('/_rhapsody/assist/explain', [AssistController::class, 'explain']);
+Router::post('/_rhapsody/assist/apply', [AssistController::class, 'apply']);
 
 // Check for updates page
 Router::get('/updates', [UpdatesController::class, 'index']);

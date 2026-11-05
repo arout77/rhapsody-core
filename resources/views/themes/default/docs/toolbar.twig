@@ -365,6 +365,21 @@
 
     <hr>
 
+    <h2>Ask AI Tab</h2>
+    <p>
+        In development, when an AI client is configured (see the <a href="{{ base_url }}/docs/ai" class="docs-link">AI Assistant</a> page), the toolbar adds an <strong>Ask AI</strong> tab. Type a question about the page you just loaded, or pick one of the suggestions (why is this request slow, are there N+1 queries, what did this request do).
+    </p>
+    <ul>
+        <li><strong>You review first.</strong> <em>Review and ask</em> shows the exact text that would be sent, section by section, and lets you untick parts of it. Nothing leaves your machine until you click <em>Send</em>.</li>
+        <li><strong>Masked.</strong> The message is built from the request snapshot, so secrets are already replaced by <code>[REDACTED]</code>. Headers, session values and the client IP are not included by default.</li>
+        <li><strong>Answers are text only.</strong> The tab never changes your code. For a request that threw an exception, use <em>Explain and fix</em> on the <a href="{{ base_url }}/docs/error-handling" class="docs-link">error page</a>.</li>
+    </ul>
+    <p>
+        The tab only appears when the request was recorded as a snapshot. Turn it off with <code>debug.assist.enabled = false</code>.
+    </p>
+
+    <hr>
+
     <h2>Enabling / Disabling the Toolbar</h2>
     <p>
         The toolbar is automatically injected when <code>APP_ENV</code> is set to <code>development</code>.

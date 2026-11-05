@@ -1,6 +1,7 @@
 <?php
 namespace Rhapsody\Core;
 
+use Rhapsody\Core\Ai\Assist\AssistWidget;
 use Rhapsody\Core\Contracts\ContainerInterface;
 use Rhapsody\Core\Exceptions\HttpException;
 use Rhapsody\Core\Helpers\Path;
@@ -52,12 +53,12 @@ class ErrorHandler
     public static function handleException(\Throwable $e): void
     {
         self::logError($e);
-        self::recordSnapshot($e);
+        $snapshotPath = self::recordSnapshot($e);
 
         $isHttp404 = ($e instanceof HttpException && $e->getStatusCode() === 404);
 
         if (self::isDevelopment() && ! $isHttp404) {
-            self::renderWhoops($e);
+            self::renderWhoops($e, $snapshotPath);
         } else {
             self::renderProductionError($e);
         }
@@ -102,20 +103,44 @@ class ErrorHandler
     /**
      * Development only: keep a redacted snapshot of the request that failed.
      * SnapshotRecorder never throws, so this cannot disturb error rendering.
+     *
+     * @return string|null The snapshot file, or null when nothing was recorded
      */
-    private static function recordSnapshot(\Throwable $e): void
+    private static function recordSnapshot(\Throwable $e): ?string
     {
         $container = $GLOBALS['container'] ?? null;
 
-        SnapshotRecorder::recordFailure(self::$config, $e, $container instanceof ContainerInterface ? $container : null);
+        return SnapshotRecorder::recordFailure(self::$config, $e, $container instanceof ContainerInterface ? $container : null);
     }
 
-    private static function renderWhoops(\Throwable $e): void
+    private static function renderWhoops(\Throwable $e, ?string $snapshotPath = null): void
     {
         if (! headers_sent()) {
             $whoops = new \Whoops\Run();
             $whoops->pushHandler(new \Whoops\Handler\PrettyPageHandler());
-            $whoops->handleException($e);
+
+            // Development only: add the "Explain and fix" button to the page. Whoops
+            // is asked to hand back its HTML instead of printing it, so the button
+            // can be placed before </body>. Without the widget, Whoops prints as usual.
+            $widget = AssistWidget::tryCreate(self::$config, $snapshotPath);
+            if ($widget === null) {
+                $whoops->handleException($e);
+
+                return;
+            }
+
+            $whoops->writeToOutput(false);
+            $whoops->allowQuit(false);
+            $html = $whoops->handleException($e);
+
+            if (! headers_sent()) {
+                header('Content-Type: text/html; charset=utf-8');
+            }
+
+            $position = strripos($html, '</body>');
+            echo $position === false
+                ? $html . $widget->errorPageHtml()
+                : substr_replace($html, $widget->errorPageHtml(), $position, 0);
         } else {
             self::renderProductionError($e);
         }
