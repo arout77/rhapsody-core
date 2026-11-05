@@ -3,6 +3,8 @@
 
 namespace Rhapsody\Core;
 
+use Rhapsody\Core\Snapshot\QueryFingerprint;
+use Rhapsody\Core\Snapshot\Redactor;
 use Rhapsody\Core\TraceablePDO;
 
 class Toolbar
@@ -10,6 +12,8 @@ class Toolbar
     /**
      * @param array $data
      */
+    private ?Redactor $redactor = null;
+
     public function __construct(protected array $data)
     {}
 
@@ -17,34 +21,12 @@ class Toolbar
     {
         // --- FALLBACK: if no queries were provided, get them from TraceablePDO ---
         if (empty($this->data['queries'])) {
-            $this->data['queries']       = TraceablePDO::getQueryLog();
-            $this->data['total_queries'] = count($this->data['queries']);
+            $report = QueryFingerprint::analyze(TraceablePDO::getQueryLog());
 
-            // Also compute N+1 count (optional, but helps the panel)
-            $sqlCounts = [];
-            foreach ($this->data['queries'] as &$q) {
-                $rawSql = $q['sql'] ?? '';
-                $sql    = is_string($rawSql) ? $rawSql : '';
-                // Same normalization as Debug::end(), so both panels agree.
-                $normalized               = preg_replace('/\b\d+\b/', '?', $sql) ?? $sql;
-                $normalized               = preg_replace("/'[^']*'/", '?', $normalized) ?? $normalized;
-                $normalized               = preg_replace('/\s+/', ' ', $normalized) ?? $normalized;
-                $sqlCounts[$normalized][] = &$q;
-            }
-            unset($q);
-
-            $nPlusOneAlerts = [];
-            foreach ($sqlCounts as $queries) {
-                if (count($queries) > 3) {
-                    foreach ($queries as &$q) {
-                        $q['is_n_plus_1'] = true;
-                        $nPlusOneAlerts[] = $q;
-                    }
-                    unset($q);
-                }
-            }
-            $this->data['n_plus_one_alerts'] = $nPlusOneAlerts;
-            $this->data['n_plus_1_count']    = count($nPlusOneAlerts);
+            $this->data['queries']           = $report->queries;
+            $this->data['total_queries']     = count($report->queries);
+            $this->data['n_plus_one_alerts'] = $report->alerts;
+            $this->data['n_plus_1_count']    = count($report->alerts);
         }
         // --- Data Preparation for Toolbar Header ---
         $appVersion   = htmlspecialchars($this->data['app_version'] ?? 'N/A', ENT_QUOTES, 'UTF-8');
@@ -60,7 +42,7 @@ class Toolbar
             'memory'   => (float) $memUsage,
             'queries'  => $queryCount,
             'route'    => $this->data['route'] ?? null,
-            'nPlusOne' => $this->data['n_plus_one_alerts'] ?? [],
+            'nPlusOne' => $this->redactedAlerts(),
             'cache'    => $this->data['cache_stats'] ?? ['hits' => 0, 'misses' => 0, 'ratio' => 0],
         ], JSON_HEX_TAG | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
@@ -118,7 +100,7 @@ class Toolbar
         }
 
         // Headers
-        $headers     = $req['headers'] ?? [];
+        $headers     = $this->redactor()->redactArray($req['headers'] ?? []);
         $requestHtml .= '<h4 class="text-gray-300 font-bold mt-3 mb-2">Request Headers</h4>';
         if (empty($headers)) {
             $requestHtml .= '<p class="text-gray-400">No headers available.</p>';
@@ -133,7 +115,7 @@ class Toolbar
         }
 
         // Query Parameters
-        $query = $req['query'] ?? [];
+        $query = $this->redactor()->redactArray($req['query'] ?? []);
         if (! empty($query)) {
             $requestHtml .= '<h4 class="text-gray-300 font-bold mt-3 mb-2">Query Parameters</h4>';
             $requestHtml .= '<div class="bg-gray-800 rounded p-3 overflow-x-auto mb-3">';
@@ -146,7 +128,7 @@ class Toolbar
         }
 
         // Body (raw)
-        $body  = $req['body'] ?? null;
+        $body  = is_string($req['body'] ?? null) ? $this->redactBody($req['body']) : null;
         if ($body !== null && $body !== '') {
             $requestHtml .= '<h4 class="text-gray-300 font-bold mt-3 mb-2">Request Body</h4>';
             $decoded      = json_decode($body, true);
@@ -166,7 +148,8 @@ class Toolbar
         $requestHtml .= '</div>';
 
         // --- Format Session panel ---
-        $sessionData = $this->data['session'] ?? [];
+        // Keys stay visible; every value is replaced by its type.
+        $sessionData = $this->redactor()->maskValues($this->data['session'] ?? []);
         $sessionHtml = '<h3 class="text-white text-lg font-bold mb-4">Session Data</h3>';
         if (! empty($sessionData)) {
             $sessionHtml .= '<div class="bg-gray-800 rounded p-3 overflow-x-auto">';
@@ -411,6 +394,52 @@ HTML;
     // Helper formatting methods
     // -------------------------------------------------------------------------
 
+    private function redactor(): Redactor
+    {
+        return $this->redactor ??= new Redactor();
+    }
+
+    /**
+     * Redact a request body: structurally when it is JSON (so nested secrets are
+     * caught by key), by pattern otherwise.
+     */
+    private function redactBody(string $raw): string
+    {
+        $decoded = json_decode($raw, true);
+
+        if (is_array($decoded)) {
+            $encoded = json_encode($this->redactor()->redactArray($decoded), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+            return $encoded === false ? $this->redactor()->scrubString($raw) : $encoded;
+        }
+
+        return $this->redactor()->scrubString($raw);
+    }
+
+    /**
+     * The N+1 alerts handed to the React performance panel, with SQL text and
+     * bound parameters redacted.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function redactedAlerts(): array
+    {
+        $out = [];
+
+        foreach ($this->data['n_plus_one_alerts'] ?? [] as $alert) {
+            if (! is_array($alert)) {
+                continue;
+            }
+
+            $sql             = is_string($alert['sql'] ?? null) ? $alert['sql'] : '';
+            $alert['sql']    = $this->redactor()->scrubString($sql);
+            $alert['params'] = $this->redactor()->redactQueryParams($sql, $alert['params'] ?? null);
+            $out[]           = $alert;
+        }
+
+        return $out;
+    }
+
     /**
      * Format a session value for display (strings, arrays, objects).
      */
@@ -450,8 +479,8 @@ HTML;
         }
         $html = '';
         foreach ($queries as $query) {
-            $sql         = htmlspecialchars($query['sql'], ENT_QUOTES, 'UTF-8');
-            $params      = isset($query['params']) ? htmlspecialchars((string) json_encode($query['params']), ENT_QUOTES, 'UTF-8') : '';
+            $sql         = htmlspecialchars($this->redactor()->scrubString((string) $query['sql']), ENT_QUOTES, 'UTF-8');
+            $params      = isset($query['params']) ? htmlspecialchars((string) json_encode($this->redactor()->redactQueryParams((string) $query['sql'], $query['params'])), ENT_QUOTES, 'UTF-8') : '';
             $time        = isset($query['executionMS']) ? round($query['executionMS'] * 1000, 2) : '0';
             $caller      = isset($query['caller']['file']) ? $query['caller']['file'] . ':' . ($query['caller']['line'] ?? '-') : 'N/A';
             $isNPlusOne  = isset($query['is_n_plus_1']) && $query['is_n_plus_1'];
@@ -477,8 +506,9 @@ HTML;
     {
         $method  = strtoupper($request['method'] ?? 'GET');
         $url     = $request['full_url'] ?? '/';
-        $headers = $request['headers'] ?? [];
-        $body    = $request['body'] ?? null;
+        $headers = $this->redactor()->redactArray($request['headers'] ?? []);
+        $rawBody = $request['body'] ?? null;
+        $body    = is_string($rawBody) ? $this->redactBody($rawBody) : null;
 
         // Use curl.exe on Windows (PowerShell alias), curl on Unix
         $curlCmd = (stripos(PHP_OS, 'WIN') === 0) ? 'curl.exe' : 'curl';
@@ -609,22 +639,8 @@ HTML;
      */
     private function formatEnvValue(string $key, mixed $value): string
     {
-        $sensitivePatterns = [
-            'PASSWORD', 'SECRET', 'KEY', 'TOKEN', 'SALT', 'HASH',
-            'API_KEY', 'AUTH', 'CREDENTIAL', 'PRIVATE',
-        ];
-
-        $shouldMask = false;
-        foreach ($sensitivePatterns as $pattern) {
-            if (stripos($key, $pattern) !== false) {
-                $shouldMask = true;
-                break;
-            }
-        }
-
-        if ($shouldMask && is_string($value) && strlen($value) > 4) {
-            $masked = substr($value, 0, 2) . str_repeat('•', strlen($value) - 4) . substr($value, -2);
-            return '<span class="text-yellow-400 font-mono">' . htmlspecialchars($masked, ENT_QUOTES, 'UTF-8') . '</span>';
+        if ($this->redactor()->isSensitiveKey($key)) {
+            return '<span class="text-yellow-400 font-mono">' . Redactor::MASK . '</span>';
         }
 
         if (is_bool($value)) {
@@ -639,7 +655,7 @@ HTML;
             return '<span class="text-gray-400">(array)</span>';
         }
 
-        return htmlspecialchars(is_scalar($value) ? (string) $value : '', ENT_QUOTES, 'UTF-8');
+        return htmlspecialchars(is_scalar($value) ? $this->redactor()->scrubString((string) $value) : '', ENT_QUOTES, 'UTF-8');
     }
 
     /**

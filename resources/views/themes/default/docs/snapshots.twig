@@ -1,0 +1,221 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+    <h1>Request Snapshots</h1>
+    <p>
+        Every request your application handles in <strong>development mode</strong> (<code>APP_ENV=development</code>)
+        can be saved as a single, <strong>redacted JSON file</strong>: the request, the matched route, the response status,
+        every database query, timings, the last log lines and – if the request failed – the exception and its trace.
+        It is the same data the <a href="{{ base_url }}/docs/toolbar" class="docs-link">Debug Toolbar</a> shows, in a form you can
+        keep, diff, attach to a bug report or hand to a tool.
+    </p>
+
+    <div class="bg-blue-50 dark:bg-blue-950/40 border-l-4 border-blue-500 dark:border-blue-400 p-4 rounded-r-lg my-4">
+        <strong class="text-blue-800 dark:text-blue-300">💡 Tip:</strong>
+        <span class="text-blue-800 dark:text-blue-300">
+            Snapshots are on by default in development and do nothing in production. There is nothing to install
+            or call – make a request, then open the newest file in <code>storage/debug/snapshots</code>.
+        </span>
+    </div>
+
+    <hr>
+
+    <h2>What Gets Recorded</h2>
+    <p>
+        Snapshots are written for <strong>every response</strong>, not just successful HTML pages. That includes JSON API
+        errors, redirects, 404s and requests that ended in an uncaught exception (those are captured by the error handler,
+        because the normal end-of-request step never runs for them).
+    </p>
+
+    <table class="min-w-full text-left border border-gray-300 dark:border-gray-700 my-4">
+        <thead class="bg-gray-100 dark:bg-gray-800">
+            <tr>
+                <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Section</th>
+                <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Contents</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>framework</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">App version, environment, PHP version, SAPI, OS family</td></tr>
+            <tr><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>request</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Method, URL, IP, headers, query string, body (size-limited), route middleware</td></tr>
+            <tr><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>route</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Matched path, controller and action (or <code>null</code> if nothing matched)</td></tr>
+            <tr><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>response</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">HTTP status code</td></tr>
+            <tr><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>performance</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Execution time (ms) and memory (MB)</td></tr>
+            <tr><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>queries</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Total count, the first N queries (SQL, parameters, time, caller) and a summary of repeated query shapes</td></tr>
+            <tr><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>cache</code>, <code>middleware</code>, <code>services</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Cache hit/miss stats, middleware timings, and the 25 slowest container resolutions</td></tr>
+            <tr><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>session</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">The session's keys and value <em>types</em> – never the values</td></tr>
+            <tr><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>environment</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">An allowlist of safe variables only (see below)</td></tr>
+            <tr><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>logs</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">The last lines of the PHP and web server logs, if readable</td></tr>
+            <tr><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>exception</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>null</code>, or the class, message, location, a 15-frame trace and up to 3 previous exceptions</td></tr>
+        </tbody>
+    </table>
+
+    <h3>Example</h3>
+    {% verbatim %}
+    <pre><code class="language-json">{
+  "schema": 1,
+  "id": "20261104-180000-123456-9f3a",
+  "captured_at": "2026-11-04T18:00:00.123-05:00",
+  "request": {
+    "method": "POST",
+    "url": "http://localhost/login",
+    "headers": {
+      "Authorization": "[REDACTED]",
+      "Cookie": "[REDACTED]",
+      "User-Agent": "Mozilla/5.0 ..."
+    },
+    "body": {
+      "content": "{\"email\":\"a@b.c\",\"password\":\"[REDACTED]\"}",
+      "bytes": 52,
+      "truncated": false
+    }
+  },
+  "response": { "status": 422 },
+  "queries": {
+    "total": 14,
+    "recorded": 14,
+    "items": [ { "sql": "SELECT * FROM users WHERE email = ?", "params": "[REDACTED]", "time_ms": 0.8 } ],
+    "n_plus_one": [ { "count": 9, "total_ms": 6.1, "sql": "SELECT * FROM posts WHERE user_id = 7", "callers": ["app/Models/Post.php:41"] } ]
+  },
+  "session": { "user_id": "[REDACTED int]", "_csrf": "[REDACTED string]" },
+  "exception": null
+}</code></pre>
+    {% endverbatim %}
+
+    <hr>
+
+    <h2>Where Snapshots Are Stored</h2>
+    <p>
+        Files go to <code>storage/debug/snapshots/</code>, one per request, named by a sortable id
+        (<code>YYYYmmdd-His-microseconds-xxxx.json</code>) so the newest file is always last alphabetically.
+        Only the newest <strong>25</strong> are kept – older files are deleted as new ones arrive, so the folder never grows without bound.
+    </p>
+    <ul>
+        <li>Writes are atomic (temp file, then rename), so you never read a half-written snapshot.</li>
+        <li>The folder gets a deny-all <code>.htaccess</code> and an empty <code>index.html</code> the first time it is created, in case your web root ever includes <code>storage/</code>.</li>
+        <li>Add <code>/storage/debug</code> to <code>.gitignore</code> (new skeletons already do).</li>
+    </ul>
+
+    <hr>
+
+    <h2>Configuration</h2>
+    <p>Everything is optional. Add a <code>debug.snapshots</code> section to <code>config/config.php</code> to change the defaults:</p>
+    {% verbatim %}
+    <pre><code class="language-php">'debug' => [
+    'snapshots' => [
+        'enabled'         => Env::bool('DEBUG_SNAPSHOTS', true),
+        'keep'            => Env::int('DEBUG_SNAPSHOTS_KEEP', 25),
+        'max_body_bytes'  => 8192,
+        'max_queries'     => 100,
+        'log_lines'       => 20,
+        'redact_keys'     => [],
+        'env_allowlist'   => [],
+        'ignore_prefixes' => ['/img/'],
+    ],
+],</code></pre>
+    {% endverbatim %}
+
+    <table class="min-w-full text-left border border-gray-300 dark:border-gray-700 my-4">
+        <thead class="bg-gray-100 dark:bg-gray-800">
+            <tr>
+                <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Option</th>
+                <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Default</th>
+                <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Meaning</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>enabled</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>true</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Turn recording off without touching <code>APP_ENV</code> (<code>DEBUG_SNAPSHOTS=false</code>)</td></tr>
+            <tr><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>keep</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>25</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">How many snapshot files to keep</td></tr>
+            <tr><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>max_body_bytes</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>8192</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Request bodies longer than this are cut off (<code>truncated: true</code>)</td></tr>
+            <tr><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>max_queries</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>100</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Individual queries listed; the true total is still reported</td></tr>
+            <tr><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>log_lines</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>20</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Log lines included from each log</td></tr>
+            <tr><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>redact_keys</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>[]</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Extra key names to mask, e.g. <code>['ssn', 'iban']</code></td></tr>
+            <tr><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>env_allowlist</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>[]</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Extra environment variable names to include</td></tr>
+            <tr><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>ignore_prefixes</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700"><code>['/img/']</code></td><td class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Requests whose path contains any of these are not recorded (keeps image requests from pushing out useful snapshots)</td></tr>
+        </tbody>
+    </table>
+
+    <hr>
+
+    <h2>Redaction</h2>
+    <p>
+        A snapshot is meant to be shared, so secrets are removed <strong>while it is built</strong> – an unredacted
+        version never exists on disk. The <code>Redactor</code> works in two layers:
+    </p>
+
+    <h3>1. By key name</h3>
+    <p>
+        Any header, query parameter, form or JSON field, or route parameter whose name looks sensitive has its whole value replaced with
+        <code>[REDACTED]</code>. Names are compared ignoring case and separators, so <code>X-Api-Key</code>, <code>api_key</code> and <code>apiKey</code> all match. Built in:
+        <code>password</code>, <code>secret</code>, <code>token</code>, <code>apikey</code>, <code>authorization</code>, <code>cookie</code>,
+        <code>credential</code>, <code>private</code>, <code>signature</code>, <code>csrf</code>, <code>bearer</code>, <code>jwt</code>,
+        <code>salt</code>, <code>hash</code>, <code>phpsessid</code>, plus the whole words <code>pass</code>, <code>pwd</code>, <code>key</code>,
+        <code>auth</code>, <code>sig</code> and <code>sid</code>. JSON bodies are redacted field by field, at any depth.
+    </p>
+
+    <h3>2. By value shape</h3>
+    <p>Free text – bodies, SQL, log lines, exception messages, URLs – is scrubbed for things that look like secrets wherever they appear:</p>
+    <ul>
+        <li><code>Bearer …</code> and <code>Basic …</code> credentials, and JSON Web Tokens</li>
+        <li>Credentials inside URLs (<code>mysql://user:pass@host</code>)</li>
+        <li>Stripe, Google, AWS and GitHub key formats</li>
+        <li><code>Cookie:</code> / <code>Set-Cookie:</code> lines</li>
+        <li><code>password=…</code>, <code>"token": "…"</code> and similar key/value pairs</li>
+    </ul>
+
+    <h3>Special cases</h3>
+    <ul>
+        <li><strong>SQL parameters</strong> have no names, so they are masked as a whole whenever the statement mentions a sensitive column or table (for example <code>UPDATE users SET password = ?</code>).</li>
+        <li><strong>Session</strong> data keeps its shape but every value becomes its type, e.g. <code>[REDACTED int]</code>.</li>
+        <li><strong>Environment</strong> variables are never dumped wholesale. Only an allowlist is included (<code>APP_ENV</code>, <code>DB_HOST</code>, <code>DB_NAME</code>, <code>CACHE_DRIVER</code> and a few others); add your own with <code>env_allowlist</code>.</li>
+    </ul>
+
+    <div class="bg-amber-50 dark:bg-amber-950/40 border-l-4 border-amber-500 dark:border-amber-400 p-4 rounded-r-lg my-4">
+        <strong class="text-amber-800 dark:text-amber-300">⚠️ Redaction is best effort:</strong>
+        <span class="text-amber-800 dark:text-amber-300">
+            Pattern matching cannot recognise every secret. A field called <code>note</code> that happens to hold a password
+            will not be caught. Skim a snapshot before posting it publicly, and add your own field names to <code>redact_keys</code>.
+        </span>
+    </div>
+
+    <hr>
+
+    <h2>Repeated Queries (N+1)</h2>
+    <p>
+        Queries are grouped by <em>shape</em>: literals are replaced by <code>?</code>, <code>IN (…)</code> lists are collapsed and whitespace is normalised,
+        so <code>WHERE id = 7</code> and <code>WHERE id = 912</code> count as the same query. A shape that runs <strong>more than three times</strong> in one request is flagged.
+        The <code>queries.n_plus_one</code> section lists each flagged shape with its count, total time, an example and up to three callers, so you can see
+        <em>where</em> the loop is. The Debug Toolbar's database tab uses the same logic, so both always agree.
+    </p>
+
+    <hr>
+
+    <h2>Reading Snapshots from Code</h2>
+    <p>The storage and redaction classes are plain, reusable classes in <code>Rhapsody\Core\Snapshot</code>:</p>
+    {% verbatim %}
+    <pre><code class="language-php">use Rhapsody\Core\Helpers\Path;
+use Rhapsody\Core\Snapshot\Redactor;
+use Rhapsody\Core\Snapshot\SnapshotStore;
+
+// The most recent request
+$store  = new SnapshotStore(Path::storage('debug/snapshots'));
+$latest = $store->latestPath();
+$data   = $latest === null ? null : $store->read($latest);
+
+// Newest first
+foreach ($store->paths() as $path) { /* ... */ }
+
+// Mask anything of your own before logging or sending it
+$safe = (new Redactor(['ssn']))->redactArray($payload);
+$text = (new Redactor())->scrubString($message);</code></pre>
+    {% endverbatim %}
+
+    <hr>
+
+    <h2>Limitations</h2>
+    <ul>
+        <li>Development only. Nothing is recorded or written when <code>APP_ENV</code> is anything but <code>development</code>.</li>
+        <li>Recording can never break a request: if the disk is full or the folder is not writable, the snapshot is silently skipped.</li>
+        <li>The snapshot is built from the Debug Toolbar's collected data, so it has the same blind spots (for example, response bodies are not stored).</li>
+        <li>Long-running <a href="{{ base_url }}/docs/roadrunner" class="docs-link">RoadRunner</a> workers have not been verified with snapshots yet; use the standard front controller when you need them.</li>
+    </ul>
+{% endblock %}

@@ -118,6 +118,15 @@
         </span>
     </div>
 
+    <div class="bg-amber-50 dark:bg-amber-950/40 border-l-4 border-amber-500 dark:border-amber-400 p-4 rounded-r-lg my-4">
+        <strong class="text-amber-800 dark:text-amber-300">🔒 Secrets are masked:</strong>
+        <span class="text-amber-800 dark:text-amber-300">
+            <code>Authorization</code> and <code>Cookie</code> headers, tokens and password fields are replaced with <code>[REDACTED]</code>
+            in the Request tab and in the copied command. Replace them by hand if you need to replay an authenticated request.
+            See <a href="{{ base_url }}/docs/snapshots" class="docs-link">Request Snapshots</a> for the full redaction rules.
+        </span>
+    </div>
+
     <h4>Why use cURL instead of just viewing page source?</h4>
     <p>
         You might wonder: <em>"I can already see the page source in my browser – why do I need a cURL command?"</em>
@@ -251,17 +260,11 @@
 
     <h2>Session Tab</h2>
     <p>
-        Shows the contents of <code>$_SESSION</code> in a clean key‑value table.
-        Nested arrays are rendered as indented lists for readability.
-        Values are colour‑coded:
+        Shows the <em>shape</em> of <code>$_SESSION</code>: every key, with nested arrays rendered as indented lists.
+        To keep secrets out of screenshots and shared snapshots, values are never displayed &ndash; each one is replaced by
+        its type, for example <code>[REDACTED int]</code> or <code>[REDACTED string]</code>.
     </p>
-    <ul>
-        <li><span class="text-green-400">true</span> / <span class="text-red-400">false</span> – booleans</li>
-        <li><span class="text-gray-500">null</span> – null values</li>
-        <li><span class="text-yellow-400">Object</span> – objects (class name shown)</li>
-        <li><span class="text-cyan-400">Keys</span> – array keys</li>
-    </ul>
-    <p>This is invaluable for debugging authentication state, flash messages, and user‑specific data.</p>
+    <p>This is still handy for checking that authentication state, flash messages and user&#8209;specific keys exist when you expect them to. To inspect an actual value, use <code>dd($_SESSION['key'])</code>.</p>
 
     <hr>
 
@@ -315,7 +318,7 @@
     <h3>Environment Variables</h3>
     <p>
         Displays all environment variables (<code>$_ENV</code>) in a sortable table.
-        Sensitive values (passwords, secrets, API keys) are partially masked for your security.
+        Any variable whose name looks sensitive (passwords, secrets, tokens, API keys) is fully masked, and secret-shaped values are scrubbed.
         This is useful for verifying that your <code>.env</code> settings are correctly loaded.
     </p>
 

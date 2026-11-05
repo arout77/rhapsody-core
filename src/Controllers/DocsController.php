@@ -553,6 +553,18 @@ class DocsController extends BaseController
         ]);
     }
 
+    /**
+     * Shows the request snapshots documentation.
+     */
+    public function snapshots(Request $request): Response
+    {
+        return $this->view('@core/docs/snapshots.twig', [], [
+            'title'         => 'Request Snapshots – Rhapsody Documentation',
+            'description'   => 'Save every development request as a redacted JSON snapshot: queries, timings, logs and exceptions, with secrets masked.',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
+
     public function toolbar(Request $request): Response
     {
         return $this->view('@core/docs/toolbar.twig', [], [

@@ -62,6 +62,7 @@ Router::get('/docs/routing', [DocsController::class, 'routing']);
 Router::get('/docs/security', [DocsController::class, 'security']);
 Router::get('/docs/seo', [DocsController::class, 'seo']);
 Router::get('/docs/session', [DocsController::class, 'session']);
+Router::get('/docs/snapshots', [DocsController::class, 'snapshots']);
 Router::get('/docs/social-auth', [DocsController::class, 'socialAuth']);
 Router::get('/docs/support', [DocsController::class, 'support']);
 Router::get('/docs/testing', [DocsController::class, 'testing']);

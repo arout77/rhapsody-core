@@ -6,6 +6,7 @@ use Rhapsody\Core\Contracts\ContainerInterface;
 use Rhapsody\Core\Middleware\MiddlewareTracer;
 use Rhapsody\Core\QueryLogger;
 use Rhapsody\Core\Routing\Route;
+use Rhapsody\Core\Snapshot\QueryFingerprint;
 
 /**
  * A simple data collector for the developer toolbar.
@@ -20,6 +21,8 @@ class Debug
     private array $data = [];
     private float $startTime;
     private int $startMemory;
+    private bool $started   = false;
+    private bool $collected = false;
 
     private function __construct()
     {}
@@ -62,6 +65,8 @@ class Debug
         $this->startTime           = microtime(true);
         $this->startMemory         = memory_get_usage();
         $this->data['php_version'] = phpversion();
+        $this->started             = true;
+        $this->collected           = false;
 
         // Reset cache hit/miss counters for this request
         Cache::resetStats();
@@ -73,17 +78,36 @@ class Debug
     /**
      * Gathers final data points at the end of the request.
      *
-     * @param Response           $response
-     * @param array<string,      mixed>          $config
-     * @param ContainerInterface $container
-     * @param Route|null         $matchedRoute
+     * @param array<string, mixed> $config
      */
     public function end(Response $response, array $config, ContainerInterface $container, ?Route $matchedRoute = null): void
     {
+        $this->collect($response->getStatusCode(), $config, $container, $matchedRoute);
+    }
+
+    /**
+     * Same collection as end(), but takes a bare status code and an optional
+     * container, so it also works for a request that ended in an exception and
+     * never produced a Response.
+     *
+     * @param array<string, mixed> $config
+     */
+    public function collect(int $statusCode, array $config, ?ContainerInterface $container, ?Route $matchedRoute = null): void
+    {
+        if (! $this->started) {
+            // start() never ran (worker or CLI entry point): fall back to "now"
+            // rather than reading uninitialized timers.
+            $this->startTime   = microtime(true);
+            $this->startMemory = 0;
+            $this->started     = true;
+        }
+        $this->collected = true;
+
         $this->data['execution_time'] = round((microtime(true) - $this->startTime) * 1000, 2);
         $this->data['memory_usage']   = round((memory_get_peak_usage() - $this->startMemory) / 1024 / 1024, 2);
-        $this->data['response_code']  = $response->getStatusCode();
+        $this->data['response_code']  = $statusCode;
         $this->data['app_version']    = $config['app_version'] ?? 'N/A';
+        $this->data['app_env']        = $config['app_env'] ?? 'production';
         $this->data['session']        = $_SESSION ?? [];
 
         // --- Enhanced HTTP Request data ---
@@ -97,7 +121,7 @@ class Debug
             'full_url'   => ($https !== '' && $https !== 'off' ? 'https' : 'http') . '://' . self::serverString('HTTP_HOST', 'localhost') . $requestUri,
             'ip'         => self::serverString('REMOTE_ADDR', '127.0.0.1'),
             'timestamp'  => date('Y-m-d H:i:s', is_int($requestTime) ? $requestTime : time()),
-            'headers'    => getallheaders() ?: [],
+            'headers'    => self::requestHeaders(),
             'query'      => $_GET,
             'body'       => file_get_contents('php://input') ?: null,
             'middleware' => $matchedRoute ? $matchedRoute->getMiddleware() : [],
@@ -109,7 +133,7 @@ class Debug
         $stackQueries = [];
 
         // Also get Doctrine DebugStack if available (for backward compatibility)
-        if ($container->has(DebugStack::class)) {
+        if ($container !== null && $container->has(DebugStack::class)) {
             $stack        = $container->resolve(DebugStack::class);
             $stackQueries = $stack->queries;
         }
@@ -123,27 +147,15 @@ class Debug
             $stackQueries
         );
 
-        // Detect N+1 queries: group by normalized SQL, flag any shape seen more than 3 times
-        $groups = [];
-        foreach ($queries as $index => $query) {
-            $sql                                                       = $query['sql'] ?? '';
-            $groups[self::normalizeSql(is_string($sql) ? $sql : '')][] = $index;
-        }
+        // Group by query shape and flag any shape that repeats more than
+        // QueryFingerprint::REPEAT_THRESHOLD times in this request.
+        $report = QueryFingerprint::analyze($queries);
 
-        $nPlusOneAlerts = [];
-        foreach ($groups as $indexes) {
-            if (count($indexes) > 3) {
-                foreach ($indexes as $index) {
-                    $queries[$index]['is_n_plus_1'] = true;
-                    $nPlusOneAlerts[]               = $queries[$index];
-                }
-            }
-        }
-
-        $this->data['queries']           = $queries;
-        $this->data['total_queries']     = count($queries);
-        $this->data['n_plus_one_alerts'] = $nPlusOneAlerts;
-        $this->data['n_plus_1_count']    = count($nPlusOneAlerts);
+        $this->data['queries']           = $report->queries;
+        $this->data['total_queries']     = count($report->queries);
+        $this->data['query_groups']      = $report->groups;
+        $this->data['n_plus_one_alerts'] = $report->alerts;
+        $this->data['n_plus_1_count']    = count($report->alerts);
 
         // Cache stats
         $this->data['cache_stats'] = Cache::getStats();
@@ -222,6 +234,22 @@ class Debug
     }
 
     /**
+     * Whether start() ran for this request.
+     */
+    public function isStarted(): bool
+    {
+        return $this->started;
+    }
+
+    /**
+     * Whether end()/collect() has already gathered this request's data.
+     */
+    public function hasCollected(): bool
+    {
+        return $this->collected;
+    }
+
+    /**
      * Read a $_SERVER value as a string, falling back to $default when the
      * key is missing or holds a non-string value.
      */
@@ -246,13 +274,31 @@ class Debug
     }
 
     /**
-     * Collapse literals and whitespace so structurally identical queries compare equal.
+     * Request headers from getallheaders() where it exists, rebuilt from
+     * $_SERVER where it does not (CLI, RoadRunner workers).
+     *
+     * @return array<string, string>
      */
-    private static function normalizeSql(string $sql): string
+    private static function requestHeaders(): array
     {
-        $sql = preg_replace('/\b\d+\b/', '?', $sql) ?? $sql;
-        $sql = preg_replace("/'[^']*'/", '?', $sql) ?? $sql;
+        $headers = [];
 
-        return preg_replace('/\s+/', ' ', $sql) ?? $sql;
+        if (function_exists('getallheaders')) {
+            foreach (getallheaders() ?: [] as $name => $value) {
+                if (is_string($name) && is_string($value)) {
+                    $headers[$name] = $value;
+                }
+            }
+
+            return $headers;
+        }
+
+        foreach ($_SERVER as $key => $value) {
+            if (is_string($value) && str_starts_with($key, 'HTTP_')) {
+                $headers[ucwords(strtolower(str_replace('_', '-', substr($key, 5))), '-')] = $value;
+            }
+        }
+
+        return $headers;
     }
 }

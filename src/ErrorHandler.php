@@ -4,6 +4,7 @@ namespace Rhapsody\Core;
 use Rhapsody\Core\Contracts\ContainerInterface;
 use Rhapsody\Core\Exceptions\HttpException;
 use Rhapsody\Core\Helpers\Path;
+use Rhapsody\Core\Snapshot\SnapshotRecorder;
 use Rhapsody\Core\Logger;
 use Rhapsody\Core\Support\Env;
 
@@ -51,6 +52,7 @@ class ErrorHandler
     public static function handleException(\Throwable $e): void
     {
         self::logError($e);
+        self::recordSnapshot($e);
 
         $isHttp404 = ($e instanceof HttpException && $e->getStatusCode() === 404);
 
@@ -95,6 +97,17 @@ class ErrorHandler
             ),
             'ERROR'
         );
+    }
+
+    /**
+     * Development only: keep a redacted snapshot of the request that failed.
+     * SnapshotRecorder never throws, so this cannot disturb error rendering.
+     */
+    private static function recordSnapshot(\Throwable $e): void
+    {
+        $container = $GLOBALS['container'] ?? null;
+
+        SnapshotRecorder::recordFailure(self::$config, $e, $container instanceof ContainerInterface ? $container : null);
     }
 
     private static function renderWhoops(\Throwable $e): void
@@ -306,6 +319,7 @@ class ErrorHandler
     {
         self::$config = $config;
         self::logError($e);
+        self::recordSnapshot($e);
 
         ob_start();
         self::renderProductionError($e);

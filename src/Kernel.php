@@ -7,6 +7,7 @@ use Rhapsody\Core\Contracts\DeferrerInterface;
 use Rhapsody\Core\Exceptions\HttpException;
 use Rhapsody\Core\Routing\Router;
 use Rhapsody\Core\Services\NotificationService;
+use Rhapsody\Core\Snapshot\SnapshotRecorder;
 
 /**
  * The application Kernel: the single seam between "I have a Request" and
@@ -165,14 +166,21 @@ class Kernel
     /**
      * Post-response housekeeping that shouldn't change what the response
      * means, only what's delivered: the dev debug toolbar and the
-     * framework-update banner. Safe to skip entirely (e.g. in production,
-     * or for non-HTML/non-2xx responses).
+     * framework-update banner, plus (in development) recording a redacted
+     * request snapshot. Skipped entirely in production; the toolbar and banner
+     * are skipped for non-HTML/non-2xx responses.
      */
     public function terminate(Request $request, Response $response): Response
     {
         if (($this->config['app_env'] ?? 'production') !== 'development') {
             return $response;
         }
+
+        // Collect for every response, not only 2xx HTML: JSON errors, redirects and
+        // 4xx/5xx pages are the requests most worth being able to inspect later.
+        $debug = Debug::getInstance();
+        $debug->end($response, $this->config, $this->container, Router::getMatchedRoute());
+        SnapshotRecorder::recordCollected($this->config);
 
         $statusCode = $response->getStatusCode();
         if ($statusCode < 200 || $statusCode >= 300) {
@@ -185,10 +193,6 @@ class Kernel
             return $response;
         }
 
-        $matchedRoute = Router::getMatchedRoute();
-
-        $debug = Debug::getInstance();
-        $debug->end($response, $this->config, $this->container, $matchedRoute);
         $toolbar     = new Toolbar($debug->getData());
         $toolbarHtml = $toolbar->render();
 

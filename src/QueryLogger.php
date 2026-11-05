@@ -2,6 +2,7 @@
 namespace Rhapsody\Core;
 
 use Doctrine\DBAL\Logging\SQLLogger;
+use Rhapsody\Core\Snapshot\QueryFingerprint;
 
 /**
  * A simple SQL logger that counts and times queries.
@@ -34,15 +35,15 @@ class QueryLogger implements SQLLogger
      */
     public function startQuery($sql, ?array $params = null, ?array $types = null)
     {
-        // Simple normalization: replace numeric/string literals with '?'
-        $fingerprint = preg_replace("/\b(\d+|'[^']+')\b/", '?', $sql) ?? $sql;
+        // Same shape rule as Debug and Toolbar (QueryFingerprint is the single source of truth)
+        $fingerprint = QueryFingerprint::normalize($sql);
 
         $this->fingerprints[$fingerprint] = ($this->fingerprints[$fingerprint] ?? 0) + 1;
         $this->start_time                 = microtime(true);
         $this->queries[]                  = [
             'sql'         => $sql,
             'fingerprint' => $fingerprint,
-            'is_n_plus_1' => $this->fingerprints[$fingerprint] > 3,
+            'is_n_plus_1' => $this->fingerprints[$fingerprint] > QueryFingerprint::REPEAT_THRESHOLD,
             'params'      => $params,
             'types'       => $types,
             'executionMS' => 0,
