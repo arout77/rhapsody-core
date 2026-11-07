@@ -57,8 +57,23 @@ class UpdateHooks
 {
     public static function maintenanceOn(Event $event): void
     {
-        $basePath = self::basePath($event);
-        $flag     = $basePath . '/storage/framework/down';
+        self::enableMaintenance(self::basePath($event));
+
+        $event->getIO()->write('<info>Maintenance mode ON — updating...</info>');
+    }
+
+    /**
+     * Puts the site into maintenance mode without needing a Composer Event.
+     *
+     * The skeleton's own scripts/pre-update.php calls this. That script exists because
+     * `composer create-project` fires pre-update-cmd before vendor/ (and therefore this
+     * class) is autoloadable, so the hook cannot be registered as a plain
+     * "Class::method" string without printing an "is not autoloadable" warning on every
+     * fresh install. The script skips that first run and calls this method on real updates.
+     */
+    public static function enableMaintenance(string $basePath): void
+    {
+        $flag = $basePath . '/storage/framework/down';
 
         if (! is_dir(dirname($flag))) {
             mkdir(dirname($flag), 0755, true);
@@ -68,8 +83,6 @@ class UpdateHooks
             'time'   => date('c'),
             'reason' => 'composer update in progress',
         ]));
-
-        $event->getIO()->write('<info>Maintenance mode ON — updating...</info>');
     }
 
     public static function postUpdate(Event $event): void
