@@ -1,0 +1,1382 @@
+{% extends "@core/docs/_layout.twig" %}
+
+{% block doc_content %}
+<h1>Tutorial: Build a Complete Page</h1>
+<p>
+    Every other page in these docs explains one feature. This one puts them together. You will build the <strong>Recipe Box</strong>: a public gallery of community recipes with photos, pagination, a "save to favorites" button and a form for logged-in users to share their own recipe. By the end you will have used almost every part of the framework in a single, realistic feature, and seen where each piece belongs.
+</p>
+
+<p>The code follows the same rules as the framework itself: PHP 8.4, strict types, and everything is written to pass PHPStan level 9.</p>
+
+<div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
+    <strong>How to use this page:</strong> follow the steps in order and you will end with a working feature. If you only need one technique, every step stands on its own and links to the full reference page for that feature.
+</div>
+
+<hr>
+
+<h2 id="map">What You Will Use</h2>
+<p>Here is every feature the Recipe Box touches, and where it shows up.</p>
+
+<div class="overflow-x-auto">
+<table class="min-w-full text-left border border-gray-300 dark:border-gray-700">
+<thead class="bg-gray-100 dark:bg-gray-800"><tr>
+<th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Feature</th>
+<th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Where it appears</th>
+<th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Reference</th>
+</tr></thead><tbody>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Controllers &amp; dependency injection</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>RecipeController</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><a href="{{ base_url }}/docs/controllers">Controllers</a>, <a href="{{ base_url }}/docs/container">Container</a></td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Doctrine entities</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Recipe</code> (writes)</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><a href="{{ base_url }}/docs/doctrine">Doctrine ORM</a></td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">PDO models &amp; pagination</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>RecipeCatalog</code> (reads)</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><a href="{{ base_url }}/docs/models">Models</a>, <a href="{{ base_url }}/docs/pagination">Pagination</a></td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Migrations</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>CreateRecipesTable</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><a href="{{ base_url }}/docs/console-commands">Console Commands</a></td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Named routes &amp; middleware</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>routes/web.php</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><a href="{{ base_url }}/docs/routing">Routing</a>, <a href="{{ base_url }}/docs/middleware">Middleware</a></td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Twig views, flash messages, CSRF</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>views/recipes/</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><a href="{{ base_url }}/docs/views">Views</a>, <a href="{{ base_url }}/docs/security">Security</a></td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Validation</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>store()</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><a href="{{ base_url }}/docs/validation">Validation</a></td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">File uploads</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>store()</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><a href="{{ base_url }}/docs/file-uploader">File Uploader</a></td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Image resizing &amp; signed URLs</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>imageSet()</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><a href="{{ base_url }}/docs/image-processing">Image Processing</a></td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Events &amp; listeners</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>RecipePublished</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><a href="{{ base_url }}/docs/events">Events</a></td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>defer()</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">view counter, JSON export</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><a href="{{ base_url }}/docs/defer">Deferred Tasks</a></td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Persistent queue</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>EmailRecipeConfirmation</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><a href="{{ base_url }}/docs/queue">Persistent Queue</a></td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Sessions</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">favorites, recently viewed</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><a href="{{ base_url }}/docs/session">Sessions</a></td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Cache</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">popular recipes</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><a href="{{ base_url }}/docs/caching">Caching</a></td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Support helpers &amp; Path</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Config</code>, <code>Fs</code>, <code>Json</code>, <code>Path</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><a href="{{ base_url }}/docs/support">Support Helpers</a>, <a href="{{ base_url }}/docs/path">Path Helper</a></td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">SEO helpers</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">meta tags, Schema.org, <code>Sluggify</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><a href="{{ base_url }}/docs/seo">SEO Helpers</a></td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">React Islands</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>FavoriteButton</code>, <code>ServingScaler</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><a href="{{ base_url }}/docs/react">React + Rhapsody</a></td></tr>
+<tr><td class="px-4 py-2">Mailer &amp; Logger</td><td class="px-4 py-2">the queue job, a listener</td><td class="px-4 py-2"><a href="{{ base_url }}/docs/mailer">Mailer</a>, <a href="{{ base_url }}/docs/logging">Logging</a></td></tr>
+</tbody></table></div>
+
+<h3>How a recipe gets published</h3>
+<p>This is the request you will build in Steps 5 to 10. Notice that each tool does a different job: some work happens inside the request, some right after it, and some in a separate process.</p>
+<pre><code class="language-plaintext">POST /recipes
+ |- CSRF check (global middleware), then the "auth" route middleware
+ |- Validator            -&gt; are the form fields acceptable?
+ |- FileUploader         -&gt; store the photo (checked by real MIME type)
+ |- Doctrine             -&gt; persist() + flush() the Recipe entity
+ |- EventDispatcher      -&gt; RecipePublished: clear caches, write a log line   (in the request)
+ |- defer()              -&gt; rebuild the JSON export                           (after the response)
+ |- QueueManager         -&gt; EmailRecipeConfirmation                           (a worker process, retried)
+ '- redirect + flash      -&gt; GET /recipes/{slug}</code></pre>
+
+<hr>
+
+<h2 id="prep">Before You Start</h2>
+<p>You need a working Rhapsody application (see <a href="{{ base_url }}/docs/installation">Installation &amp; Setup</a>) with <code>APP_URL</code> and your database settings in <code>.env</code>. Then run these commands once. Each one is explained in the step that uses it.</p>
+<pre><code class="language-bash"># Users table, so recipes have authors (skip if you already ran it)
+php rhapsody auth:install
+
+# React bridge for the islands in Step 11 (skip if you already ran it)
+php rhapsody react:install
+npm install
+
+# Tables for the persistent queue used in Step 10
+php rhapsody queue:install --migrate</code></pre>
+
+<div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 my-4"><strong>Tip:</strong> Keep <code>APP_URL</code> set even on a local install. <code>redirect()</code> and <code>route()</code> both build addresses from <code>APP_URL</code> and <code>APP_BASE_URL</code>, and a few lines in this tutorial rely on that.</div>
+
+<hr>
+
+<h2 id="layout">Project Layout</h2>
+<p>These are the files you will create or change. Everything else already exists in the skeleton.</p>
+<pre><code class="language-plaintext">app/
+  Controllers/RecipeController.php      Step 6   (generated, then rewritten)
+  Entities/Recipe.php                   Step 3
+  Events/RecipePublished.php            Step 8   (generated, then edited)
+  Jobs/EmailRecipeConfirmation.php      Step 10
+  Listeners/ClearRecipeCaches.php       Step 8   (generated, then edited)
+  Listeners/LogRecipeActivity.php       Step 8   (generated, then edited)
+  Models/RecipeCatalog.php              Step 4   (generated, then rewritten)
+  Providers/EventServiceProvider.php    Step 8   (edited)
+  Services/RecipeExporter.php           Step 9
+config/config.php                       Step 1   (edited)
+db/migrations/..._create_recipes_table.php   Step 2 (generated, then edited)
+resources/js/components/FavoriteButton.jsx   Step 11 (generated, then edited)
+resources/js/components/ServingScaler.jsx    Step 11 (generated, then edited)
+routes/web.php                          Step 5   (edited)
+views/recipes/index.twig, _card.twig, show.twig, create.twig    Step 7</code></pre>
+
+<hr>
+
+<h2 id="config">Step 1: Configuration</h2>
+<p>Put tunable values in configuration, not in controller code. Read them from the environment with <a href="{{ base_url }}/docs/support"><code>Env</code></a> inside <code>config/config.php</code>, where it is allowed to touch the environment, and read them everywhere else through the typed <code>Config</code> service.</p>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">config/config.php (add this key to the array the file returns)</p>
+<pre><code class="language-php">'recipes' =&gt; [
+    'per_page'       =&gt; Env::int('RECIPES_PER_PAGE', 9),
+    'export_enabled' =&gt; Env::bool('RECIPES_EXPORT', true),
+],</code></pre>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">.env</p>
+<pre><code class="language-bash">RECIPES_PER_PAGE=9
+RECIPES_EXPORT=true</code></pre>
+<p>Later, <code>$this->config->int('recipes.per_page', 9)</code> returns a real <code>int</code>, using dot notation to reach the nested key. If a key is missing and you gave no default, <code>Config</code> throws immediately instead of letting a <code>null</code> travel through your code.</p>
+
+<hr>
+
+<h2 id="database">Step 2: The Database Table</h2>
+<p>Rhapsody uses Phinx for migrations, so the same file works on MySQL, PostgreSQL, SQL Server and SQLite. Generate the file, then fill in <code>change()</code>.</p>
+<pre><code class="language-bash">php rhapsody make:migration CreateRecipesTable</code></pre>
+<p>Open the new file in <code>db/migrations/</code> and replace its body:</p>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">db/migrations/20261106120000_create_recipes_table.php</p>
+<pre><code class="language-php">&lt;?php
+
+declare(strict_types=1);
+
+use Phinx\Migration\AbstractMigration;
+
+final class CreateRecipesTable extends AbstractMigration
+{
+    public function change(): void
+    {
+        $this-&gt;table('recipes')
+            -&gt;addColumn('author_id', 'string', ['limit' =&gt; 255])
+            -&gt;addColumn('title', 'string', ['limit' =&gt; 160])
+            -&gt;addColumn('slug', 'string', ['limit' =&gt; 190])
+            -&gt;addColumn('summary', 'string', ['limit' =&gt; 300])
+            -&gt;addColumn('ingredients', 'text')
+            -&gt;addColumn('steps', 'text')
+            -&gt;addColumn('servings', 'integer', ['default' =&gt; 4])
+            -&gt;addColumn('photo', 'string', ['limit' =&gt; 100, 'null' =&gt; true])
+            -&gt;addColumn('views', 'integer', ['default' =&gt; 0])
+            -&gt;addColumn('created_at', 'timestamp', ['default' =&gt; 'CURRENT_TIMESTAMP'])
+            -&gt;addIndex(['slug'], ['unique' =&gt; true])
+            -&gt;addIndex(['author_id'])
+            -&gt;create();
+    }
+}</code></pre>
+<p>Your file name will carry its own timestamp. Now create the table:</p>
+<pre><code class="language-bash">php rhapsody migrate</code></pre>
+<p><code>author_id</code> holds the <code>user_id</code> of the built-in <code>users</code> table. We use a plain column rather than a database foreign key to keep the tutorial focused, but adding one is a good exercise.</p>
+
+<hr>
+
+<h2 id="entity">Step 3: The Entity (Writes)</h2>
+<p>Use a Doctrine entity when you create or change data. The <code>EntityManager</code> tracks the object and writes only what changed. Entities live in <code>app/Entities/</code>, which the framework scans automatically.</p>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">app/Entities/Recipe.php</p>
+<pre><code class="language-php">&lt;?php
+
+declare(strict_types=1);
+
+namespace App\Entities;
+
+use DateTimeImmutable;
+use Doctrine\ORM\Mapping as ORM;
+
+#[ORM\Entity]
+#[ORM\Table(name: 'recipes')]
+class Recipe
+{
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
+    private ?int $id = null;
+
+    #[ORM\Column(name: 'author_id', type: 'string', length: 255)]
+    private string $authorId;
+
+    #[ORM\Column(type: 'string', length: 160)]
+    private string $title;
+
+    #[ORM\Column(type: 'string', length: 190, unique: true)]
+    private string $slug;
+
+    #[ORM\Column(type: 'string', length: 300)]
+    private string $summary;
+
+    #[ORM\Column(type: 'text')]
+    private string $ingredients;
+
+    #[ORM\Column(type: 'text')]
+    private string $steps;
+
+    #[ORM\Column(type: 'integer')]
+    private int $servings;
+
+    #[ORM\Column(type: 'string', length: 100, nullable: true)]
+    private ?string $photo;
+
+    #[ORM\Column(name: 'created_at', type: 'datetime_immutable')]
+    private DateTimeImmutable $createdAt;
+
+    public function __construct(
+        string $authorId,
+        string $title,
+        string $slug,
+        string $summary,
+        string $ingredients,
+        string $steps,
+        int $servings,
+        ?string $photo = null,
+    ) {
+        $this-&gt;authorId    = $authorId;
+        $this-&gt;title       = $title;
+        $this-&gt;slug        = $slug;
+        $this-&gt;summary     = $summary;
+        $this-&gt;ingredients = $ingredients;
+        $this-&gt;steps       = $steps;
+        $this-&gt;servings    = $servings;
+        $this-&gt;photo       = $photo;
+        $this-&gt;createdAt   = new DateTimeImmutable();
+    }
+
+    public function getId(): ?int
+    {
+        return $this-&gt;id;
+    }
+
+    public function getAuthorId(): string
+    {
+        return $this-&gt;authorId;
+    }
+
+    public function getTitle(): string
+    {
+        return $this-&gt;title;
+    }
+
+    public function getSlug(): string
+    {
+        return $this-&gt;slug;
+    }
+
+    public function getPhoto(): ?string
+    {
+        return $this-&gt;photo;
+    }
+}</code></pre>
+<p>The <code>views</code> column from the migration is deliberately <em>not</em> mapped. Doctrine leaves unmapped columns alone, so a new row simply gets the database default of <code>0</code>, and the view counter in Step 9 can update it with one cheap query instead of loading the whole entity.</p>
+
+<hr>
+
+<h2 id="model">Step 4: A Read Model (Reads)</h2>
+<p>Pages that mostly <em>read</em> data, such as lists, sidebars and counters, are a good fit for a plain PDO model: one explicit query, no object hydration. Generate it, then replace the contents.</p>
+<pre><code class="language-bash">php rhapsody make:model RecipeCatalog</code></pre>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">app/Models/RecipeCatalog.php</p>
+<pre><code class="language-php">&lt;?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use PDO;
+use Rhapsody\Core\BaseModel;
+
+/**
+ * @phpstan-type RecipeRow array{id: int|string, title: string, slug: string, summary: string, photo: string|null, servings: int|string, views: int|string, created_at: string, author_name: string}
+ * @phpstan-type RecipeDetail array{id: int|string, author_id: string, title: string, slug: string, summary: string, ingredients: string, steps: string, servings: int|string, photo: string|null, views: int|string, created_at: string, author_name: string}
+ */
+final class RecipeCatalog extends BaseModel
+{
+    private const string CARD_COLUMNS = 'r.id, r.title, r.slug, r.summary, r.photo, r.servings, r.views, r.created_at, u.name AS author_name';
+
+    public function countAll(): int
+    {
+        $stmt = $this-&gt;db-&gt;prepare('SELECT COUNT(*) FROM recipes');
+        $stmt-&gt;execute();
+        $count = $stmt-&gt;fetchColumn();
+
+        return is_numeric($count) ? (int) $count : 0;
+    }
+
+    /**
+     * @return list&lt;RecipeRow&gt;
+     */
+    public function findPaginated(int $limit, int $offset): array
+    {
+        $stmt = $this-&gt;db-&gt;prepare(
+            'SELECT ' . self::CARD_COLUMNS . '
+               FROM recipes r
+               JOIN users u ON u.user_id = r.author_id
+              ORDER BY r.created_at DESC, r.id DESC
+              LIMIT :limit OFFSET :offset'
+        );
+        $stmt-&gt;bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt-&gt;bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt-&gt;execute();
+
+        /** @var list&lt;RecipeRow&gt; $rows */
+        $rows = $stmt-&gt;fetchAll(PDO::FETCH_ASSOC);
+
+        return $rows;
+    }
+
+    /**
+     * @return list&lt;RecipeRow&gt;
+     */
+    public function popular(int $limit): array
+    {
+        $stmt = $this-&gt;db-&gt;prepare(
+            'SELECT ' . self::CARD_COLUMNS . '
+               FROM recipes r
+               JOIN users u ON u.user_id = r.author_id
+              ORDER BY r.views DESC, r.id DESC
+              LIMIT :limit'
+        );
+        $stmt-&gt;bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt-&gt;execute();
+
+        /** @var list&lt;RecipeRow&gt; $rows */
+        $rows = $stmt-&gt;fetchAll(PDO::FETCH_ASSOC);
+
+        return $rows;
+    }
+
+    /**
+     * @return RecipeDetail|null
+     */
+    public function findBySlug(string $slug): ?array
+    {
+        $stmt = $this-&gt;db-&gt;prepare(
+            'SELECT r.*, u.name AS author_name
+               FROM recipes r
+               JOIN users u ON u.user_id = r.author_id
+              WHERE r.slug = :slug
+              LIMIT 1'
+        );
+        $stmt-&gt;execute([':slug' =&gt; $slug]);
+
+        /** @var RecipeDetail|false $row */
+        $row = $stmt-&gt;fetch(PDO::FETCH_ASSOC);
+
+        return $row === false ? null : $row;
+    }
+
+    public function incrementViews(int $id): void
+    {
+        $stmt = $this-&gt;db-&gt;prepare('UPDATE recipes SET views = views + 1 WHERE id = :id');
+        $stmt-&gt;execute([':id' =&gt; $id]);
+    }
+}</code></pre>
+<p>The <code>@phpstan-type</code> lines describe the exact shape of a row, so the rest of the code (and PHPStan) knows which keys exist. Every value that came from a visitor is bound as a parameter, never concatenated into the SQL.</p>
+
+<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 my-4"><strong>Portability:</strong> <code>LIMIT :limit OFFSET :offset</code> works on MySQL, PostgreSQL and SQLite. SQL Server uses <code>ORDER BY ... OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY</code> instead. If you target SQL Server, swap that clause in the two paginated queries.</div>
+
+<hr>
+
+<h2 id="routes">Step 5: Named Routes</h2>
+<p>Give every route a name and refer to it by name from then on. Links keep working if you ever change a URL, or install the site in a subdirectory.</p>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">routes/web.php (add these lines)</p>
+<pre><code class="language-php">&lt;?php
+
+use App\Controllers\RecipeController;
+use Rhapsody\Core\Routing\Router;
+
+Router::get('/recipes', [RecipeController::class, 'index'])-&gt;name('recipes.index');
+
+// Static paths go BEFORE the {slug} wildcard: the first matching route wins,
+// so /recipes/new would otherwise be read as a recipe called "new".
+Router::get('/recipes/new', [RecipeController::class, 'create'])
+    -&gt;name('recipes.create')
+    -&gt;middleware('auth');
+Router::post('/recipes', [RecipeController::class, 'store'])
+    -&gt;name('recipes.store')
+    -&gt;middleware('auth');
+
+Router::get('/recipes/{slug}', [RecipeController::class, 'show'])-&gt;name('recipes.show');
+Router::post('/recipes/{id}/favorite', [RecipeController::class, 'favorite'])-&gt;name('recipes.favorite');</code></pre>
+<ul>
+    <li>The router passes the <code>Request</code> to every action first, then the route parameters in order: <code>show(Request $request, string $slug)</code>.</li>
+    <li><code>->middleware('auth')</code> uses the key from <code>config/config.php</code>. Visitors who are not logged in are sent to <code>/login</code> before your controller runs.</li>
+    <li>CSRF protection is global middleware, so every <code>POST</code> here is checked automatically. You only have to send the token (Steps 7 and 11).</li>
+    <li>If you use the route cache, run <code>php rhapsody route:clear</code> after adding routes, or the new URLs will 404.</li>
+</ul>
+
+<hr>
+
+<h2 id="controller">Step 6: The Controller</h2>
+<p>Generate the file, then replace its contents with the code below. The class is built in six parts; they all belong in the same file, in this order.</p>
+<pre><code class="language-bash">php rhapsody make:controller RecipeController</code></pre>
+
+<h3>6.1 Dependencies</h3>
+<p>Type-hint what you need in the constructor and the container supplies it. <code>BaseController</code> already gives you <code>$this->twig</code>, <code>$this->cache</code> and <code>$this->schema</code>, so only add what is specific to this controller.</p>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">app/Controllers/RecipeController.php</p>
+<pre><code class="language-php">&lt;?php
+
+declare(strict_types=1);
+
+namespace App\Controllers;
+
+use App\Entities\Recipe;
+use App\Events\RecipePublished;
+use App\Jobs\EmailRecipeConfirmation;
+use App\Models\RecipeCatalog;
+use App\Services\RecipeExporter;
+use Doctrine\ORM\EntityManager;
+use Rhapsody\Core\BaseController;
+use Rhapsody\Core\Events\EventDispatcher;
+use Rhapsody\Core\Exceptions\HttpException;
+use Rhapsody\Core\FileUploader;
+use Rhapsody\Core\Helpers\ImageSigner;
+use Rhapsody\Core\Helpers\Path;
+use Rhapsody\Core\Pagination;
+use Rhapsody\Core\Queue\QueueManager;
+use Rhapsody\Core\Request;
+use Rhapsody\Core\Response;
+use Rhapsody\Core\Routing\Router;
+use Rhapsody\Core\SEO\Sluggify;
+use Rhapsody\Core\Session;
+use Rhapsody\Core\Support\Config;
+use Rhapsody\Core\Validator;
+use Twig\Environment;
+
+/**
+ * @phpstan-import-type RecipeRow from RecipeCatalog
+ */
+final class RecipeController extends BaseController
+{
+    public function __construct(
+        Environment $twig,
+        private readonly EntityManager $em,
+        private readonly RecipeCatalog $catalog,
+        private readonly RecipeExporter $exporter,
+        private readonly Validator $validator,
+        private readonly EventDispatcher $events,
+        private readonly QueueManager $queue,
+        private readonly Config $config,
+    ) {
+        parent::__construct($twig);
+    }</code></pre>
+
+<h3>6.2 The list page</h3>
+<p>This action combines pagination, typed configuration, the cache, and per-page SEO metadata. <code>Request::int()</code> always returns an integer, so a visitor typing <code>?page=abc</code> simply gets page 1.</p>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">app/Controllers/RecipeController.php (continued)</p>
+<pre><code class="language-php">    public function index(Request $request): Response
+    {
+        $pagination = new Pagination(
+            $this-&gt;catalog-&gt;countAll(),
+            $this-&gt;config-&gt;int('recipes.per_page', 9),
+            max(1, $request-&gt;int('page', 1)),
+        );
+
+        $recipes = array_map(
+            $this-&gt;withCardImage(...),
+            $this-&gt;catalog-&gt;findPaginated($pagination-&gt;getLimit(), $pagination-&gt;getOffset()),
+        );
+
+        return $this-&gt;view('recipes/index.twig', [
+            'recipes'    =&gt; $recipes,
+            'pagination' =&gt; $pagination,
+            'popular'    =&gt; $this-&gt;popular(),
+            'recent'     =&gt; $this-&gt;recentRecipes(),
+        ], [
+            'title'         =&gt; 'Recipe Box: home cooking shared by the community',
+            'description'   =&gt; 'Browse home-cooked recipes with photos and ingredient lists that scale to any number of servings.',
+            'canonical_url' =&gt; $request-&gt;getCanonicalUrl(),
+        ]);
+    }</code></pre>
+<p>The third argument to <code>view()</code> becomes the page's <code>&lt;title&gt;</code>, meta description and canonical link (see <a href="{{ base_url }}/docs/seo">SEO Helpers</a>).</p>
+
+<h3>6.3 The recipe page</h3>
+<p>Three things happen here that make the page fast and findable: the view counter is <code>defer()</code>red so the visitor never waits for the database write, the visit is remembered in the <strong>session</strong>, and a <strong>Schema.org</strong> <code>Recipe</code> block is added so search engines can show rich results.</p>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">app/Controllers/RecipeController.php (continued)</p>
+<pre><code class="language-php">    public function show(Request $request, string $slug): Response
+    {
+        $recipe = $this-&gt;catalog-&gt;findBySlug($slug);
+
+        if ($recipe === null) {
+            throw new HttpException(404, 'That recipe does not exist.');
+        }
+
+        $id = (int) $recipe['id'];
+
+        // Counting a view is not worth making the visitor wait: run it after the response.
+        defer(fn () =&gt; $this-&gt;catalog-&gt;incrementViews($id));
+
+        $this-&gt;rememberVisit($recipe['slug'], $recipe['title']);
+
+        $ingredients = $this-&gt;lines($recipe['ingredients']);
+        $steps       = $this-&gt;lines($recipe['steps']);
+        $photo       = $recipe['photo'] === null ? null : $this-&gt;imageSet($recipe['photo'], 960, 640);
+
+        $this-&gt;schema-&gt;add('Recipe', array_filter([
+            'name'               =&gt; $recipe['title'],
+            'description'        =&gt; $recipe['summary'],
+            'image'              =&gt; $photo['src'] ?? null,
+            'author'             =&gt; ['@type' =&gt; 'Person', 'name' =&gt; $recipe['author_name']],
+            'datePublished'      =&gt; substr($recipe['created_at'], 0, 10),
+            'recipeYield'        =&gt; $recipe['servings'] . ' servings',
+            'recipeIngredient'   =&gt; $ingredients,
+            'recipeInstructions' =&gt; array_map(
+                static fn (string $step): array =&gt; ['@type' =&gt; 'HowToStep', 'text' =&gt; $step],
+                $steps,
+            ),
+        ], static fn (mixed $value): bool =&gt; $value !== null));
+
+        return $this-&gt;view('recipes/show.twig', [
+            'recipe'      =&gt; $recipe,
+            'ingredients' =&gt; $ingredients,
+            'steps'       =&gt; $steps,
+            'photo'       =&gt; $photo,
+            'favorite'    =&gt; in_array($id, $this-&gt;favoriteIds(), true),
+        ], [
+            'title'         =&gt; $recipe['title'] . ' | Recipe Box',
+            'description'   =&gt; $recipe['summary'],
+            'canonical_url' =&gt; $request-&gt;getCanonicalUrl(),
+        ]);
+    }</code></pre>
+<p>Throwing <code>HttpException</code> hands the request to the framework's error handler, so a missing recipe renders your theme's <code>errors/404.twig</code> page.</p>
+
+<h3>6.4 Sharing a recipe</h3>
+<p>This is the heart of the tutorial. Read it top to bottom: validate, upload, save, announce, defer, queue, redirect.</p>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">app/Controllers/RecipeController.php (continued)</p>
+<pre><code class="language-php">    public function create(): Response
+    {
+        return $this-&gt;view('recipes/create.twig', ['old' =&gt; [], 'errors' =&gt; []], [
+            'title' =&gt; 'Share a recipe | Recipe Box',
+        ]);
+    }
+
+    public function store(Request $request): Response
+    {
+        // 1. Validate. Typed accessors never throw; they turn bad input into a safe default.
+        $input = [
+            'title'       =&gt; trim($request-&gt;string('title')),
+            'summary'     =&gt; trim($request-&gt;string('summary')),
+            'ingredients' =&gt; trim($request-&gt;string('ingredients')),
+            'steps'       =&gt; trim($request-&gt;string('steps')),
+            'servings'    =&gt; $request-&gt;int('servings'),
+        ];
+
+        $valid = $this-&gt;validator-&gt;validate($input, [
+            'title'       =&gt; 'required|min:3|max:160',
+            'summary'     =&gt; 'required|max:300',
+            'ingredients' =&gt; 'required|min:10',
+            'steps'       =&gt; 'required|min:10',
+            'servings'    =&gt; 'required|numeric|min:1|max:50',
+        ]);
+        $errors = $this-&gt;validator-&gt;getErrors();
+
+        // 2. Store the photo (optional). Only touch the disk once the text is valid.
+        $upload = null;
+
+        if ($valid &amp;&amp; $this-&gt;hasPhoto($request)) {
+            $upload = new FileUploader($request)
+                -&gt;images()
+                -&gt;maxSize('4MB')
+                -&gt;to(Path::public('images/recipes'))
+                -&gt;store('photo');
+
+            if ($upload-&gt;failed()) {
+                $valid           = false;
+                $errors['photo'] = [$upload-&gt;firstError() ?? 'The photo could not be uploaded.'];
+            }
+        }
+
+        if (! $valid) {
+            return $this-&gt;view('recipes/create.twig', ['old' =&gt; $input, 'errors' =&gt; $errors])
+                -&gt;setStatusCode(422);
+        }
+
+        // 3. Save with Doctrine.
+        $authorId = Session::string('user_id');
+        $slug     = $this-&gt;uniqueSlug($input['title']);
+
+        $recipe = new Recipe(
+            authorId: $authorId,
+            title: $input['title'],
+            slug: $slug,
+            summary: $input['summary'],
+            ingredients: $input['ingredients'],
+            steps: $input['steps'],
+            servings: $input['servings'],
+            photo: $upload?-&gt;first()?-&gt;filename,
+        );
+
+        $this-&gt;em-&gt;persist($recipe);
+        $this-&gt;em-&gt;flush();
+
+        $id = $recipe-&gt;getId() ?? throw new \LogicException('Doctrine did not assign an id.');
+
+        // 4. Announce it. Listeners react without this controller knowing they exist.
+        $this-&gt;events-&gt;dispatch(new RecipePublished($id, $slug, $authorId));
+
+        // 5. Quick, best-effort work after the response: defer().
+        if ($this-&gt;config-&gt;bool('recipes.export_enabled', true)) {
+            defer($this-&gt;exporter-&gt;export(...));
+        }
+
+        // 6. Work that must not be lost: the persistent queue.
+        $this-&gt;queue-&gt;dispatch(new EmailRecipeConfirmation($id), queue: 'emails');
+
+        // 7. Flash message + redirect to the new page, using its route name.
+        return redirect(Router::generateUrl('recipes.show', ['slug' =&gt; $slug]))
+            -&gt;with('success', 'Your recipe is live!');
+    }</code></pre>
+<ul>
+    <li><strong>Validation errors</strong> come back as a list per field, which is what the template in Step 7 expects. The <code>422</code> status tells browsers and tools the submission was understood but rejected.</li>
+    <li><strong>The uploader</strong> checks the file's real type from its contents, never the name the browser sent, renames it to a random name, and rejects SVG because SVG can carry scripts. See <a href="{{ base_url }}/docs/file-uploader">File Uploader</a>.</li>
+    <li><strong>The flash message</strong> set by <code>with()</code> lives for exactly one more request, which is the page you redirect to.</li>
+</ul>
+
+<h3>6.5 The favorite button's endpoint</h3>
+<p>One route serves two kinds of client. A React island asks for JSON; a plain form post (or a visitor with JavaScript disabled) gets a redirect. <code>Request::wantsJson()</code> is how the action tells them apart.</p>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">app/Controllers/RecipeController.php (continued)</p>
+<pre><code class="language-php">    public function favorite(Request $request, string $id): Response
+    {
+        $recipeId = (int) $id;
+
+        if ($this-&gt;em-&gt;find(Recipe::class, $recipeId) === null) {
+            throw new HttpException(404, 'That recipe does not exist.');
+        }
+
+        $favorites  = $this-&gt;favoriteIds();
+        $isFavorite = in_array($recipeId, $favorites, true);
+
+        $favorites = $isFavorite
+            ? array_values(array_diff($favorites, [$recipeId]))
+            : [...$favorites, $recipeId];
+
+        Session::set('favorites', $favorites);
+
+        if ($request-&gt;wantsJson()) {
+            return $this-&gt;json(['favorite' =&gt; ! $isFavorite, 'count' =&gt; count($favorites)]);
+        }
+
+        return redirect(Router::generateUrl('recipes.index'))
+            -&gt;with('success', $isFavorite ? 'Removed from your favorites.' : 'Saved to your favorites.');
+    }</code></pre>
+
+<h3>6.6 Private helpers</h3>
+<p>Small private methods keep the actions readable. Notice how much of the framework shows up here in a few lines: the cache, the session, signed image URLs and the slug helper.</p>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">app/Controllers/RecipeController.php (continued)</p>
+<pre><code class="language-php">    /**
+     * The five most-viewed recipes, cached for ten minutes. The cache stores JSON,
+     * so we cache plain arrays (not objects).
+     *
+     * @return list&lt;RecipeRow&gt;
+     */
+    private function popular(): array
+    {
+        /** @var list&lt;RecipeRow&gt; $rows */
+        $rows = $this-&gt;cache-&gt;remember('recipes.popular', 10, fn (): array =&gt; $this-&gt;catalog-&gt;popular(5));
+
+        return $rows;
+    }
+
+    /**
+     * Recipe ids this visitor has saved, kept in their session.
+     *
+     * @return list&lt;int&gt;
+     */
+    private function favoriteIds(): array
+    {
+        $stored = Session::get('favorites', []);
+        $ids    = [];
+
+        if (is_array($stored)) {
+            foreach ($stored as $value) {
+                if (is_int($value)) {
+                    $ids[] = $value;
+                }
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Newest first, at most five: slug =&gt; title.
+     *
+     * @return array&lt;string, string&gt;
+     */
+    private function recentRecipes(): array
+    {
+        $stored = Session::get('recent_recipes', []);
+        $recent = [];
+
+        if (is_array($stored)) {
+            foreach ($stored as $slug =&gt; $title) {
+                if (is_string($title)) {
+                    $recent[(string) $slug] = $title;
+                }
+            }
+        }
+
+        return $recent;
+    }
+
+    private function rememberVisit(string $slug, string $title): void
+    {
+        $recent = $this-&gt;recentRecipes();
+        unset($recent[$slug]);
+
+        Session::set('recent_recipes', array_slice([$slug =&gt; $title] + $recent, 0, 5, true));
+    }
+
+    /**
+     * Resized, cropped WebP URLs for 1x and 2x screens. Every URL is signed, so
+     * visitors cannot ask the server for arbitrary sizes.
+     *
+     * @return array{src: string, srcset: string}
+     */
+    private function imageSet(string $file, int $width, int $height): array
+    {
+        $variant = static fn (int $factor): string =&gt; ImageSigner::url('recipes/' . $file, [
+            'w'   =&gt; $width * $factor,
+            'h'   =&gt; $height * $factor,
+            'fit' =&gt; 'crop',
+            'fm'  =&gt; 'webp',
+            'q'   =&gt; 80,
+        ]);
+
+        return [
+            'src'    =&gt; $variant(1),
+            'srcset' =&gt; $variant(1) . ' ' . $width . 'w, ' . $variant(2) . ' ' . ($width * 2) . 'w',
+        ];
+    }
+
+    /**
+     * Swaps a row's photo filename for its image URLs, ready for the template.
+     *
+     * @param  RecipeRow            $row
+     * @return array&lt;string, mixed&gt;
+     */
+    private function withCardImage(array $row): array
+    {
+        return array_merge($row, [
+            'photo' =&gt; $row['photo'] === null ? null : $this-&gt;imageSet($row['photo'], 480, 320),
+        ]);
+    }
+
+    /**
+     * Turns a textarea into a clean list: one entry per non-empty line.
+     *
+     * @return list&lt;string&gt;
+     */
+    private function lines(string $text): array
+    {
+        $lines = preg_split('/\R/', $text) ?: [];
+
+        return array_values(array_filter(
+            array_map('trim', $lines),
+            static fn (string $line): bool =&gt; $line !== '',
+        ));
+    }
+
+    private function uniqueSlug(string $title): string
+    {
+        $base = Sluggify::transform($title);
+        $slug = $base;
+
+        for ($suffix = 2; $this-&gt;em-&gt;getRepository(Recipe::class)-&gt;findOneBy(['slug' =&gt; $slug]) !== null; $suffix++) {
+            $slug = $base . '-' . $suffix;
+        }
+
+        return $slug;
+    }
+
+    private function hasPhoto(Request $request): bool
+    {
+        $photo = $request-&gt;getFiles()['photo'] ?? null;
+
+        return is_array($photo) &amp;&amp; ($photo['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+    }
+}</code></pre>
+
+<div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 my-4"><strong>Why images are signed:</strong> every distinct set of resize options creates a new cached file. Signing means only sizes your own code asked for can be generated. That is also why the URLs are built here in PHP and handed to the template ready to use: a URL assembled in JavaScript could not be signed.</div>
+
+<hr>
+
+<h2 id="views">Step 7: The Views</h2>
+<p>Views go in <code>views/recipes/</code>. They extend the theme's layout, which already prints flash messages and loads the React bridge, so these templates only describe their own content. Twig escapes every <code>&#123;&#123; &#125;&#125;</code> value automatically.</p>
+
+<h3>The list page</h3>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">views/recipes/index.twig</p>
+<pre><code class="language-twig">&#123;% extends "layouts/main.twig" %&#125;
+
+&#123;% block content %&#125;
+&lt;div class="flex flex-wrap items-center justify-between gap-4 mb-8"&gt;
+    &lt;h1 class="text-3xl font-bold"&gt;Recipe Box&lt;/h1&gt;
+
+    &#123;% if auth.check %&#125;
+        &lt;a href="&#123;{ route('recipes.create') &#125;&#125;"
+           class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"&gt;Share a recipe&lt;/a&gt;
+    &#123;% else %&#125;
+        &lt;a href="&#123;{ base_url &#125;&#125;/login" class="text-blue-600 dark:text-blue-400 underline"&gt;Log in to share a recipe&lt;/a&gt;
+    &#123;% endif %&#125;
+&lt;/div&gt;
+
+&lt;div class="grid gap-8 lg:grid-cols-4"&gt;
+    &lt;div class="lg:col-span-3"&gt;
+        &lt;div class="grid gap-6 sm:grid-cols-2 xl:grid-cols-3"&gt;
+            &#123;% for recipe in recipes %&#125;
+                &#123;% include 'recipes/_card.twig' %&#125;
+            &#123;% else %&#125;
+                &lt;p class="col-span-full text-gray-500"&gt;No recipes yet. Be the first to share one!&lt;/p&gt;
+            &#123;% endfor %&#125;
+        &lt;/div&gt;
+
+        &lt;div class="flex justify-center mt-10"&gt;
+            &#123;{ pagination.render()|raw &#125;&#125;
+        &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;aside class="space-y-8"&gt;
+        &lt;section&gt;
+            &lt;h2 class="text-lg font-bold mb-2"&gt;Most viewed&lt;/h2&gt;
+            &lt;ul class="space-y-1"&gt;
+                &#123;% for item in popular %&#125;
+                    &lt;li&gt;&lt;a class="text-blue-600 dark:text-blue-400" href="&#123;{ route('recipes.show', {slug: item.slug}) &#125;&#125;"&gt;&#123;{ item.title &#125;&#125;&lt;/a&gt;&lt;/li&gt;
+                &#123;% endfor %&#125;
+            &lt;/ul&gt;
+        &lt;/section&gt;
+
+        &#123;% if recent %&#125;
+        &lt;section&gt;
+            &lt;h2 class="text-lg font-bold mb-2"&gt;You looked at&lt;/h2&gt;
+            &lt;ul class="space-y-1"&gt;
+                &#123;% for slug, title in recent %&#125;
+                    &lt;li&gt;&lt;a class="text-blue-600 dark:text-blue-400" href="&#123;{ route('recipes.show', {slug: slug}) &#125;&#125;"&gt;&#123;{ title &#125;&#125;&lt;/a&gt;&lt;/li&gt;
+                &#123;% endfor %&#125;
+            &lt;/ul&gt;
+        &lt;/section&gt;
+        &#123;% endif %&#125;
+    &lt;/aside&gt;
+&lt;/div&gt;
+&#123;% endblock %&#125;</code></pre>
+<p><code>pagination.render()</code> returns ready-made HTML, so it needs the <code>|raw</code> filter. It also keeps any other query parameters (such as a future <code>?sort=</code>) on every page link.</p>
+
+<h3>The recipe card</h3>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">views/recipes/_card.twig</p>
+<pre><code class="language-twig">&lt;article class="rounded-lg overflow-hidden shadow bg-white dark:bg-gray-900"&gt;
+    &lt;a href="&#123;{ route('recipes.show', {slug: recipe.slug}) &#125;&#125;" class="block"&gt;
+        &#123;% if recipe.photo %&#125;
+            &lt;img src="&#123;{ recipe.photo.src &#125;&#125;" srcset="&#123;{ recipe.photo.srcset &#125;&#125;"
+                 sizes="(min-width: 1280px) 22vw, (min-width: 640px) 45vw, 100vw"
+                 width="480" height="320" loading="lazy" alt="&#123;{ recipe.title &#125;&#125;" class="w-full h-auto"&gt;
+        &#123;% endif %&#125;
+        &lt;div class="p-4"&gt;
+            &lt;h2 class="text-xl font-bold"&gt;&#123;{ recipe.title &#125;&#125;&lt;/h2&gt;
+            &lt;p class="mt-1 text-gray-600 dark:text-gray-400"&gt;&#123;{ recipe.summary &#125;&#125;&lt;/p&gt;
+            &lt;p class="mt-3 text-sm text-gray-500"&gt;by &#123;{ recipe.author_name &#125;&#125; &amp;middot; &#123;{ recipe.views &#125;&#125; views&lt;/p&gt;
+        &lt;/div&gt;
+    &lt;/a&gt;
+&lt;/article&gt;</code></pre>
+
+<h3>The recipe page</h3>
+<p>Two React islands appear here. Everything else is plain server-rendered HTML, which keeps the page fast and search-friendly. The <code>&lt;noscript&gt;</code> list means the ingredients are still readable if JavaScript is blocked.</p>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">views/recipes/show.twig</p>
+<pre><code class="language-twig">&#123;% extends "layouts/main.twig" %&#125;
+
+&#123;% block content %&#125;
+&lt;article class="max-w-3xl mx-auto"&gt;
+    &lt;p class="mb-4"&gt;&lt;a class="text-blue-600 dark:text-blue-400" href="&#123;{ route('recipes.index') &#125;&#125;"&gt;&amp;larr; All recipes&lt;/a&gt;&lt;/p&gt;
+
+    &lt;h1 class="text-4xl font-bold"&gt;&#123;{ recipe.title &#125;&#125;&lt;/h1&gt;
+    &lt;p class="mt-2 text-gray-500"&gt;
+        By &#123;{ recipe.author_name &#125;&#125; &amp;middot; &#123;{ recipe.created_at|date('F j, Y') &#125;&#125; &amp;middot; &#123;{ recipe.views &#125;&#125; views
+    &lt;/p&gt;
+
+    &#123;% if photo %&#125;
+        &lt;img src="&#123;{ photo.src &#125;&#125;" srcset="&#123;{ photo.srcset &#125;&#125;" sizes="(min-width: 768px) 48rem, 100vw"
+             width="960" height="640" alt="&#123;{ recipe.title &#125;&#125;" class="w-full h-auto rounded-lg mt-6"&gt;
+    &#123;% endif %&#125;
+
+    &lt;p class="mt-6 text-lg"&gt;&#123;{ recipe.summary &#125;&#125;&lt;/p&gt;
+
+    &lt;div class="mt-4"&gt;
+        &#123;{ react_component('FavoriteButton', {
+            endpoint: route('recipes.favorite', {id: recipe.id}),
+            token: csrf_token(),
+            initial: favorite
+        }) &#125;&#125;
+    &lt;/div&gt;
+
+    &lt;h2 class="text-2xl font-bold mt-10 mb-3"&gt;Ingredients&lt;/h2&gt;
+    &#123;{ react_component('ServingScaler', {baseServings: recipe.servings, ingredients: ingredients}) &#125;&#125;
+    &lt;noscript&gt;
+        &lt;ul class="list-disc pl-6"&gt;
+            &#123;% for line in ingredients %&#125;&lt;li&gt;&#123;{ line &#125;&#125;&lt;/li&gt;&#123;% endfor %&#125;
+        &lt;/ul&gt;
+    &lt;/noscript&gt;
+
+    &lt;h2 class="text-2xl font-bold mt-10 mb-3"&gt;Method&lt;/h2&gt;
+    &lt;ol class="list-decimal pl-6 space-y-3"&gt;
+        &#123;% for step in steps %&#125;&lt;li&gt;&#123;{ step &#125;&#125;&lt;/li&gt;&#123;% endfor %&#125;
+    &lt;/ol&gt;
+&lt;/article&gt;
+&#123;% endblock %&#125;</code></pre>
+
+<h3>The share form</h3>
+<p>Two details matter here. <code>csrf_field()</code> adds the hidden token that the global middleware checks, and <code>enctype="multipart/form-data"</code> is required for the file input.</p>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">views/recipes/create.twig</p>
+<pre><code class="language-twig">&#123;% extends "layouts/main.twig" %&#125;
+
+&#123;% block content %&#125;
+&lt;div class="max-w-2xl mx-auto"&gt;
+    &lt;h1 class="text-3xl font-bold mb-6"&gt;Share a recipe&lt;/h1&gt;
+
+    &lt;form method="post" action="&#123;{ route('recipes.store') &#125;&#125;" enctype="multipart/form-data" class="space-y-5"&gt;
+        &#123;{ csrf_field() &#125;&#125;
+
+        &lt;div&gt;
+            &lt;label for="title" class="block font-bold mb-1"&gt;Title&lt;/label&gt;
+            &lt;input id="title" name="title" type="text" maxlength="160" required value="&#123;{ old.title|default('') &#125;&#125;"
+                   class="w-full rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-900 p-2"&gt;
+            &#123;% if errors.title %&#125;&lt;p class="text-red-600 text-sm mt-1"&gt;&#123;{ errors.title|first &#125;&#125;&lt;/p&gt;&#123;% endif %&#125;
+        &lt;/div&gt;
+
+        &lt;div&gt;
+            &lt;label for="summary" class="block font-bold mb-1"&gt;One-line summary&lt;/label&gt;
+            &lt;input id="summary" name="summary" type="text" maxlength="300" required value="&#123;{ old.summary|default('') &#125;&#125;"
+                   class="w-full rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-900 p-2"&gt;
+            &#123;% if errors.summary %&#125;&lt;p class="text-red-600 text-sm mt-1"&gt;&#123;{ errors.summary|first &#125;&#125;&lt;/p&gt;&#123;% endif %&#125;
+        &lt;/div&gt;
+
+        &lt;div&gt;
+            &lt;label for="servings" class="block font-bold mb-1"&gt;Servings&lt;/label&gt;
+            &lt;input id="servings" name="servings" type="number" min="1" max="50" required value="&#123;{ old.servings|default(4) &#125;&#125;"
+                   class="w-32 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-900 p-2"&gt;
+            &#123;% if errors.servings %&#125;&lt;p class="text-red-600 text-sm mt-1"&gt;&#123;{ errors.servings|first &#125;&#125;&lt;/p&gt;&#123;% endif %&#125;
+        &lt;/div&gt;
+
+        &lt;div&gt;
+            &lt;label for="ingredients" class="block font-bold mb-1"&gt;Ingredients &lt;span class="font-normal text-gray-500"&gt;(one per line, quantity first: "1 1/2 cups flour")&lt;/span&gt;&lt;/label&gt;
+            &lt;textarea id="ingredients" name="ingredients" rows="6" required
+                      class="w-full rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-900 p-2"&gt;&#123;{ old.ingredients|default('') &#125;&#125;&lt;/textarea&gt;
+            &#123;% if errors.ingredients %&#125;&lt;p class="text-red-600 text-sm mt-1"&gt;&#123;{ errors.ingredients|first &#125;&#125;&lt;/p&gt;&#123;% endif %&#125;
+        &lt;/div&gt;
+
+        &lt;div&gt;
+            &lt;label for="steps" class="block font-bold mb-1"&gt;Method &lt;span class="font-normal text-gray-500"&gt;(one step per line)&lt;/span&gt;&lt;/label&gt;
+            &lt;textarea id="steps" name="steps" rows="6" required
+                      class="w-full rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-900 p-2"&gt;&#123;{ old.steps|default('') &#125;&#125;&lt;/textarea&gt;
+            &#123;% if errors.steps %&#125;&lt;p class="text-red-600 text-sm mt-1"&gt;&#123;{ errors.steps|first &#125;&#125;&lt;/p&gt;&#123;% endif %&#125;
+        &lt;/div&gt;
+
+        &lt;div&gt;
+            &lt;label for="photo" class="block font-bold mb-1"&gt;Photo &lt;span class="font-normal text-gray-500"&gt;(JPG, PNG, GIF or WebP, up to 4 MB)&lt;/span&gt;&lt;/label&gt;
+            &lt;input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/gif,image/webp"&gt;
+            &#123;% if errors.photo %&#125;&lt;p class="text-red-600 text-sm mt-1"&gt;&#123;{ errors.photo|first &#125;&#125;&lt;/p&gt;&#123;% endif %&#125;
+        &lt;/div&gt;
+
+        &lt;button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"&gt;Publish recipe&lt;/button&gt;
+    &lt;/form&gt;
+&lt;/div&gt;
+&#123;% endblock %&#125;</code></pre>
+<p>Browsers never re-fill a file input after a failed submit, so a visitor who hits a validation error has to choose the photo again. That is normal browser behaviour. For multi-file uploads with live progress bars, see the bundled <code>rhapsody-uploader.js</code> in the <a href="{{ base_url }}/docs/file-uploader">File Uploader</a> docs.</p>
+
+<hr>
+
+<h2 id="events">Step 8: Events and Listeners</h2>
+<p>When a recipe is published, several things should happen: caches go stale, an activity line is logged, and one day maybe a newsletter is queued. The controller should not know about any of that. It announces <em>what happened</em>, and listeners decide <em>what to do about it</em>.</p>
+<pre><code class="language-bash">php rhapsody make:event RecipePublished
+php rhapsody make:listener ClearRecipeCaches
+php rhapsody make:listener LogRecipeActivity</code></pre>
+
+<h3>The event</h3>
+<p>An event is a small data object. Fill in the constructor generated for you with the facts listeners will need:</p>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">app/Events/RecipePublished.php</p>
+<pre><code class="language-php">&lt;?php
+
+declare(strict_types=1);
+
+namespace App\Events;
+
+use Rhapsody\Core\Events\Event;
+
+final class RecipePublished extends Event
+{
+    public function __construct(
+        public readonly int $recipeId,
+        public readonly string $slug,
+        public readonly string $authorId,
+    ) {
+    }
+}</code></pre>
+
+<h3>The listeners</h3>
+<p>A listener is a class with a <code>handle()</code> method. The container builds it, so anything it type-hints in its constructor (the cache, the mailer, the entity manager) is injected for you.</p>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">app/Listeners/ClearRecipeCaches.php</p>
+<pre><code class="language-php">&lt;?php
+
+declare(strict_types=1);
+
+namespace App\Listeners;
+
+use App\Events\RecipePublished;
+use Rhapsody\Core\Cache;
+
+final class ClearRecipeCaches
+{
+    public function __construct(private readonly Cache $cache)
+    {
+    }
+
+    public function handle(RecipePublished $event): void
+    {
+        $this-&gt;cache-&gt;forget('recipes.popular');
+    }
+}</code></pre>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">app/Listeners/LogRecipeActivity.php</p>
+<pre><code class="language-php">&lt;?php
+
+declare(strict_types=1);
+
+namespace App\Listeners;
+
+use App\Events\RecipePublished;
+use Rhapsody\Core\Helpers\Path;
+use Rhapsody\Core\Logger;
+
+final class LogRecipeActivity
+{
+    public function handle(RecipePublished $event): void
+    {
+        new Logger(Path::logs('recipes.log'))-&gt;log(
+            "Recipe #{$event-&gt;recipeId} ({$event-&gt;slug}) published by {$event-&gt;authorId}",
+        );
+    }
+}</code></pre>
+
+<h3>Register them</h3>
+<p>Map the event to its listeners in the provider. They run in the order listed.</p>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">app/Providers/EventServiceProvider.php (add to the $listen array, with the matching use lines)</p>
+<pre><code class="language-php">RecipePublished::class =&gt; [
+    ClearRecipeCaches::class,
+    LogRecipeActivity::class,
+],</code></pre>
+
+<div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 my-4"><strong>Tip:</strong> You can also attach a listener in code, for example inside a service: <code>$dispatcher->listen(RecipePublished::class, fn (RecipePublished $event) => ...);</code>. Listeners are matched by the <strong>exact</strong> event class.</div>
+<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 my-4"><strong>Warning:</strong> A listener that throws is logged and skipped; it never breaks the request. That makes listeners the right place for side effects (logging, cache clearing, notifications) and the wrong place for anything the user's action <em>depends</em> on, such as saving the recipe itself. That belongs in the controller, as in Step 6.4.</div>
+
+<hr>
+
+<h2 id="defer">Step 9: Work After the Response with defer()</h2>
+<p>Some jobs are quick and nice-to-have: counting a view, refreshing a file. <code>defer()</code> runs them right after the visitor has their page. You have already used it twice in the controller. Here is the service behind the second one:</p>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">app/Services/RecipeExporter.php</p>
+<pre><code class="language-php">&lt;?php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+use App\Models\RecipeCatalog;
+use Rhapsody\Core\Helpers\Path;
+use Rhapsody\Core\Support\Fs;
+use Rhapsody\Core\Support\Json;
+
+final readonly class RecipeExporter
+{
+    public function __construct(private RecipeCatalog $catalog)
+    {
+    }
+
+    /**
+     * Writes the newest recipes to storage/exports/recipes.json.
+     */
+    public function export(): void
+    {
+        $directory = Path::storage('exports');
+
+        if (! is_dir($directory) &amp;&amp; ! mkdir($directory, 0755, true) &amp;&amp; ! is_dir($directory)) {
+            throw new \RuntimeException('Unable to create the export directory.');
+        }
+
+        Fs::write(
+            Path::storage('exports/recipes.json'),
+            Json::encode($this-&gt;catalog-&gt;findPaginated(500, 0), JSON_PRETTY_PRINT),
+            LOCK_EX,
+        );
+    }
+}</code></pre>
+<ul>
+    <li><code>Path::storage()</code> builds a reliable absolute path that works from a web request, a CLI command or a worker alike.</li>
+    <li><code>Fs::write()</code> and <code>Json::encode()</code> throw a clear exception on failure instead of returning <code>false</code>. Inside a deferred task that exception is written to <code>storage/logs/defer.log</code> and never reaches the visitor.</li>
+    <li><code>$this->exporter->export(...)</code> is a first-class callable, so <code>defer()</code> receives the method directly with nothing to wrap.</li>
+</ul>
+<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 my-4"><strong>Warning:</strong> Deferred tasks cannot change the response and cannot write to the session (it is already closed), and they are lost if the server stops while they wait. Keep them small, and capture plain values such as an id.</div>
+
+<hr>
+
+<h2 id="queue">Step 10: Work That Must Not Be Lost: the Queue</h2>
+<p>A confirmation email is different from a view counter: if the mail server hiccups, you want a retry, not silence. A queued job is stored in the database first, then run by a worker process, with automatic retries.</p>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">app/Jobs/EmailRecipeConfirmation.php</p>
+<pre><code class="language-php">&lt;?php
+
+declare(strict_types=1);
+
+namespace App\Jobs;
+
+use App\Entities\Recipe;
+use App\Entities\User;
+use Doctrine\ORM\EntityManager;
+use Rhapsody\Core\Contracts\JobInterface;
+use Rhapsody\Core\Mailer;
+use Rhapsody\Core\Queue\Attributes\Backoff;
+use Rhapsody\Core\Queue\Attributes\Timeout;
+use Rhapsody\Core\Queue\Attributes\Tries;
+
+#[Tries(5)]
+#[Backoff(30)]
+#[Timeout(45)]
+final class EmailRecipeConfirmation implements JobInterface
+{
+    public function __construct(public readonly int $recipeId)
+    {
+    }
+
+    public function handle(EntityManager $em, Mailer $mailer): void
+    {
+        $recipe = $em-&gt;find(Recipe::class, $this-&gt;recipeId);
+
+        if ($recipe === null) {
+            return; // Deleted before the worker got to it: nothing left to do.
+        }
+
+        $author = $em-&gt;find(User::class, $recipe-&gt;getAuthorId());
+
+        if ($author === null) {
+            return;
+        }
+
+        $name  = htmlspecialchars($author-&gt;getName(), ENT_QUOTES, 'UTF-8');
+        $title = htmlspecialchars($recipe-&gt;getTitle(), ENT_QUOTES, 'UTF-8');
+
+        $mailer-&gt;send(
+            $author-&gt;getEmail(),
+            'Your recipe is live: ' . $recipe-&gt;getTitle(),
+            "&lt;p&gt;Hi {$name},&lt;/p&gt;&lt;p&gt;&amp;ldquo;{$title}&amp;rdquo; has been published on Recipe Box.&lt;/p&gt;",
+        );
+    }
+}</code></pre>
+<ul>
+    <li><strong>The constructor holds only an id.</strong> The job stores plain values, then loads fresh data inside <code>handle()</code>. That also avoids emailing about a recipe that has since been deleted.</li>
+    <li><strong><code>handle()</code> gets its services from the container</strong>, exactly like a controller constructor.</li>
+    <li><strong>The attributes</strong> tune retries: up to 5 attempts, waiting 30s, 60s, 120s... between them, and no single attempt may run longer than 45 seconds.</li>
+    <li><strong>A job may run twice</strong> if a worker dies at the wrong moment, so write <code>handle()</code> to be safe to repeat.</li>
+</ul>
+<p>The controller already dispatches it, onto a queue named <code>emails</code>. Start a worker to process the queue (see the <a href="{{ base_url }}/docs/queue">Persistent Queue</a> page for running it under Supervisor or from cron):</p>
+<pre><code class="language-bash">php rhapsody queue:work --queue=emails,default</code></pre>
+
+<div class="overflow-x-auto">
+    <table class="min-w-full text-left border border-gray-300 dark:border-gray-700">
+        <thead class="bg-gray-100 dark:bg-gray-800">
+            <tr>
+                <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Tool</th>
+                <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Runs</th>
+                <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">If it fails</th>
+                <th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Use it for</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Controller code</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">In the request</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The visitor sees an error</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Anything the action depends on</td></tr>
+            <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Event listener</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">In the request</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Logged, then skipped</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Decoupled side effects</td></tr>
+            <tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>defer()</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Right after the response</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Logged to <code>defer.log</code>, not retried</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Quick, best-effort work</td></tr>
+            <tr><td class="px-4 py-2"><strong>Queue job</strong></td><td class="px-4 py-2">In a worker process</td><td class="px-4 py-2">Retried with backoff, then kept as a failed job</td><td class="px-4 py-2">Anything that must not be lost</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<hr>
+
+<h2 id="react">Step 11: React Islands</h2>
+<p>An island is a small React component dropped into an otherwise server-rendered page. Use one only where the page needs real interactivity: here, a favorite toggle and an ingredient list that rescales as you change the servings. The bridge from <code>react:install</code> finds every island and mounts it, and the theme layout already loads it.</p>
+<pre><code class="language-bash">php rhapsody make:react FavoriteButton
+php rhapsody make:react ServingScaler</code></pre>
+
+<h3>The favorite button</h3>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">resources/js/components/FavoriteButton.jsx</p>
+<pre><code class="language-javascript">import React, { useState } from 'react';
+
+export default function FavoriteButton({ endpoint, token, initial = false }) {
+    const [favorite, setFavorite] = useState(initial);
+    const [busy, setBusy] = useState(false);
+
+    async function toggle() {
+        setBusy(true);
+
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                // The CSRF middleware reads "_token" from the request body.
+                body: JSON.stringify({ _token: token }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Request failed with status ${response.status}`);
+            }
+
+            const data = await response.json();
+            setFavorite(Boolean(data.favorite));
+        } catch (error) {
+            console.error('[FavoriteButton]', error);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    return (
+        &lt;button
+            type="button"
+            onClick={toggle}
+            disabled={busy}
+            aria-pressed={favorite}
+            className="rounded border border-blue-500 px-4 py-2 font-bold text-blue-600 dark:text-blue-400 disabled:opacity-50"
+        &gt;
+            {favorite ? '♥ Saved' : '♡ Save'}
+        &lt;/button&gt;
+    );
+}</code></pre>
+<p>Two things to notice. First, the <code>Accept: application/json</code> header is what makes <code>wantsJson()</code> true in Step 6.5. Second, the token travels in the JSON body as <code>_token</code>, which is where the CSRF middleware looks for it.</p>
+
+<h3>The serving scaler</h3>
+<p class="text-sm font-mono text-gray-500 dark:text-gray-400 mb-1">resources/js/components/ServingScaler.jsx</p>
+<pre><code class="language-javascript">import React, { useState } from 'react';
+
+const QUANTITY = /^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)(.*)$/;
+
+function toNumber(raw) {
+    const mixed = raw.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+    if (mixed) {
+        return Number(mixed[1]) + Number(mixed[2]) / Number(mixed[3]);
+    }
+
+    const fraction = raw.match(/^(\d+)\/(\d+)$/);
+    if (fraction) {
+        return Number(fraction[1]) / Number(fraction[2]);
+    }
+
+    return Number(raw);
+}
+
+function scale(line, factor) {
+    const match = line.match(QUANTITY);
+    if (!match) {
+        return line;
+    }
+
+    return `${Math.round(toNumber(match[1]) * factor * 100) / 100}${match[2]}`;
+}
+
+export default function ServingScaler({ baseServings, ingredients }) {
+    const base = Number(baseServings) || 1;
+    const [servings, setServings] = useState(base);
+    const factor = servings / base;
+
+    return (
+        &lt;div&gt;
+            &lt;div className="mb-3 flex items-center gap-3"&gt;
+                &lt;button type="button" aria-label="Fewer servings"
+                        onClick={() =&gt; setServings((n) =&gt; Math.max(1, n - 1))}
+                        className="h-8 w-8 rounded border border-gray-400"&gt;-&lt;/button&gt;
+                &lt;span aria-live="polite"&gt;{servings} {servings === 1 ? 'serving' : 'servings'}&lt;/span&gt;
+                &lt;button type="button" aria-label="More servings"
+                        onClick={() =&gt; setServings((n) =&gt; n + 1)}
+                        className="h-8 w-8 rounded border border-gray-400"&gt;+&lt;/button&gt;
+            &lt;/div&gt;
+
+            &lt;ul className="list-disc pl-6 space-y-1"&gt;
+                {ingredients.map((line, index) =&gt; (
+                    &lt;li key={index}&gt;{scale(line, factor)}&lt;/li&gt;
+                ))}
+            &lt;/ul&gt;
+        &lt;/div&gt;
+    );
+}</code></pre>
+
+<h3>Run it</h3>
+<pre><code class="language-bash"># Development: set VITE_DEV_SERVER=true in .env, then
+npm run dev
+
+# Production: set VITE_DEV_SERVER=false, then
+npm run build</code></pre>
+<p>Props travel from Twig to React as JSON in a non-executable <code>&lt;script&gt;</code> block, escaped so user text can never break out of it. Only pass the island what it needs: the CSRF token is fine because it only goes to the page that asked for it.</p>
+
+<hr>
+
+<h2 id="session">Sessions at a Glance</h2>
+<p>You used the session in four different ways without ever starting it: the front controller does that once per request.</p>
+
+<div class="overflow-x-auto">
+<table class="min-w-full text-left border border-gray-300 dark:border-gray-700">
+<thead class="bg-gray-100 dark:bg-gray-800"><tr>
+<th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">What</th>
+<th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">How</th>
+<th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Where</th>
+</tr></thead><tbody>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Who is logged in</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Session::string('user_id')</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>store()</code>; the <code>auth</code> middleware checks the same key</td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">One-time messages</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>redirect(...)-&gt;with('success', ...)</code>, shown by the layout</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>store()</code>, <code>favorite()</code></td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Favorites</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Session::set('favorites', ...)</code> and <code>Session::get()</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>favorite()</code>, <code>show()</code></td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Recently viewed</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>Session::set('recent_recipes', ...)</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>rememberVisit()</code></td></tr>
+<tr><td class="px-4 py-2">CSRF token</td><td class="px-4 py-2"><code>csrf_field()</code> and <code>csrf_token()</code></td><td class="px-4 py-2"><code>create.twig</code>, <code>show.twig</code></td></tr>
+</tbody></table></div>
+<p>Favorites live in the session, so they belong to one browser and disappear when it closes. To keep them for good, store them in a table keyed by <code>user_id</code>: the controller code barely changes.</p>
+
+<hr>
+
+<h2 id="try">Step 12: Try It</h2>
+<ol>
+    <li>Start the worker in a second terminal: <code>php rhapsody queue:work --queue=emails,default</code>.</li>
+    <li>Register or log in, open <code>/recipes/new</code>, and share a recipe with a photo.</li>
+    <li>You land on the new recipe with a "Your recipe is live!" message. Click <strong>Save</strong> and change the servings.</li>
+    <li>Check the side effects:</li>
+</ol>
+
+<div class="overflow-x-auto">
+<table class="min-w-full text-left border border-gray-300 dark:border-gray-700">
+<thead class="bg-gray-100 dark:bg-gray-800"><tr>
+<th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Look at</th>
+<th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">You should see</th>
+</tr></thead><tbody>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>storage/logs/recipes.log</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">A line from <code>LogRecipeActivity</code> (Step 8)</td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>storage/exports/recipes.json</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The exported catalog, written by the deferred task (Step 9)</td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The worker terminal / <code>storage/logs/queue.log</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>EmailRecipeConfirmation</code> completing (Step 10)</td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>/img/recipes/...?w=480&amp;h=320...&amp;s=...</code> in the page source</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">A signed, resized image URL (Step 6.6)</td></tr>
+<tr><td class="px-4 py-2">The debug toolbar (development mode)</td><td class="px-4 py-2">The matched route, queries, session contents and cache hits for the request</td></tr>
+</tbody></table></div>
+
+<h3>If something goes wrong</h3>
+<div class="overflow-x-auto">
+<table class="min-w-full text-left border border-gray-300 dark:border-gray-700">
+<thead class="bg-gray-100 dark:bg-gray-800"><tr>
+<th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Symptom</th>
+<th class="px-4 py-2 border-b border-gray-300 dark:border-gray-700">Likely cause and fix</th>
+</tr></thead><tbody>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>419 CSRF token mismatch</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The form is missing <code>{% verbatim %}{{ csrf_field() }}{% endverbatim %}</code>, or the island is not sending <code>_token</code> in the JSON body.</td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700"><code>/recipes/new</code> shows a recipe or a 404</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The <code>{slug}</code> route is registered before the static one, or the route cache is stale. Reorder, then run <code>php rhapsody route:clear</code>.</td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Images return <code>403</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The URL was not signed. Build it with <code>ImageSigner::url()</code>, as in <code>imageSet()</code>.</td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Images return <code>404</code></td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The Glide path is relative to <code>public/images/</code>. The file must be at <code>public/images/recipes/...</code>.</td></tr>
+<tr><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">The islands do not appear</td><td class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">Run <code>npm run dev</code> with <code>VITE_DEV_SERVER=true</code> (or <code>npm run build</code> with it set to <code>false</code>) and check the browser console.</td></tr>
+<tr><td class="px-4 py-2">Queued mail never arrives</td><td class="px-4 py-2">Is a worker running? Did you run <code>queue:install --migrate</code>? Is <code>MAIL_HOST</code> set in <code>.env</code>? Failed jobs show up with <code>php rhapsody queue:failed</code>.</td></tr>
+</tbody></table></div>
+
+<hr>
+
+<h2 id="production">Before You Go Live</h2>
+<ul>
+    <li><strong>Set <code>APP_ENV=production</code> and a strong <code>APP_KEY</code>.</strong> The key also signs your image URLs and queued jobs.</li>
+    <li><strong>Build the front end:</strong> <code>VITE_DEV_SERVER=false</code> and <code>npm run build</code>.</li>
+    <li><strong>Cache routes and templates:</strong> <code>php rhapsody route:cache</code> and <code>php rhapsody app:cache-warm</code>. Re-run <code>route:clear</code> then <code>route:cache</code> whenever you add a route.</li>
+    <li><strong>Keep the queue worker alive</strong> with Supervisor, or from cron on shared hosting, and restart it after each deploy so it loads the new code.</li>
+    <li><strong>Make the directories writable:</strong> <code>storage/</code> (cache, logs, exports) and <code>public/images/recipes/</code>.</li>
+    <li><strong>Run PHPStan at level 9</strong> before you ship.</li>
+</ul>
+
+<h3>Security notes worth repeating</h3>
+<ul>
+    <li>Uploaded files are checked by content, renamed randomly and never allowed to keep an executable extension. We store recipe photos under <code>public/images/</code> so the image resizer can reach them. If you would rather keep originals private, upload to the default <code>storage/uploads</code> instead and point the <code>source</code> setting in <code>ImageController</code> there (see <a href="{{ base_url }}/docs/image-processing">Image Processing</a>).</li>
+    <li>Twig escapes everything by default. The only <code>|raw</code> in this tutorial is the pagination HTML, which the framework builds itself.</li>
+    <li>Every query that includes visitor input uses bound parameters.</li>
+</ul>
+
+<hr>
+
+<h2 id="next">Where to Go Next</h2>
+<p>You now have a pattern you can copy for any feature. A few ways to extend the Recipe Box and practise:</p>
+<ul>
+    <li><strong>Edit and delete</strong> a recipe, allowing only its author: compare <code>Session::string('user_id')</code> to <code>getAuthorId()</code> and throw <code>HttpException(403)</code> otherwise.</li>
+    <li><strong>Move the sort and page size into the URL</strong> and let the <a href="{{ base_url }}/docs/pagination">AJAX pagination</a> helper swap the list without a page reload.</li>
+    <li><strong>Add a rate limit</strong> to the share form with your own <a href="{{ base_url }}/docs/middleware">middleware</a>.</li>
+    <li><strong>Persist favorites</strong> in a table so they follow the user between devices.</li>
+    <li><strong>Test it:</strong> start from the <a href="{{ base_url }}/docs/testing">Unit Testing</a> guide.</li>
+</ul>
+
+<h3>Related Documentation</h3>
+<ul>
+    <li><a href="{{ base_url }}/docs/routing">Routing</a></li>
+    <li><a href="{{ base_url }}/docs/controllers">Controllers &amp; DI</a></li>
+    <li><a href="{{ base_url }}/docs/events">Events &amp; Listeners</a></li>
+    <li><a href="{{ base_url }}/docs/defer">Deferred Tasks</a> and <a href="{{ base_url }}/docs/queue">Persistent Queue</a></li>
+    <li><a href="{{ base_url }}/docs/react">React + Rhapsody</a></li>
+    <li><a href="{{ base_url }}/docs/file-uploader">File Uploader</a> and <a href="{{ base_url }}/docs/image-processing">Image Processing</a></li>
+</ul>
+
+{% endblock %}

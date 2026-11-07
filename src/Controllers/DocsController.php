@@ -167,6 +167,18 @@ class DocsController extends BaseController
     }
 
     /**
+     * Shows the "build a complete page" tutorial.
+     */
+    public function tutorial(Request $request): Response
+    {
+        return $this->view('@core/docs/tutorial.twig', [], [
+            'title'         => 'Tutorial: Build a Complete Page – Rhapsody Documentation',
+            'description'   => 'Build a full Recipe Box feature step by step: routing, controllers, Doctrine, validation, uploads, images, events, defer(), queues, sessions and React islands.',
+            'canonical_url' => $request->getCanonicalUrl(),
+        ]);
+    }
+
+    /**
      * Shows the Doctrine ORM documentation.
      */
     public function doctrine(Request $request): Response
