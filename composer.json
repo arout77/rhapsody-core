@@ -27,6 +27,9 @@
         }
     },
     "extra": {
+        "rhapsody": {
+            "version": "1.0.0"
+        },
         "branch-alias": {
             "dev-main": "1.1.x-dev"
         }

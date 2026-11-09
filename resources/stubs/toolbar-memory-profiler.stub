@@ -6,7 +6,7 @@ import React from 'react';
  *
  * Props (injected by Toolbar.php via a React island):
  *   memory.used_mb  — current peak memory in MB
- *   memory.limit_mb — php.ini memory_limit
+ *   memory.limit_mb — fixed 64 MB bar ceiling
  *   memory.percent  — used / limit × 100
  *   memory.status   — 'ok' | 'warning' | 'critical'
  */
@@ -40,7 +40,7 @@ export default function MemoryProfiler({ memory }) {
             {/* Visual capacity bar */}
             <div
                 className="w-24 h-2 bg-gray-900 rounded-full overflow-hidden border border-gray-700"
-                title={`Limit: ${limit_mb} MB`}
+                title={`Scale: ${limit_mb} MB (fixed)`}
             >
                 <div
                     className={`h-full ${barColor} transition-all duration-500 ease-out`}

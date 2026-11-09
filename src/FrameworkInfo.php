@@ -169,15 +169,27 @@ class FrameworkInfo
     }
 
     /**
-     * The plain top-level "version" field of the framework's composer.json.
-     *
-     * Composer's own docs recommend against hand-maintaining this field (it
-     * can drift from the real tag), so it must be bumped as part of the
-     * release process. It is only consulted for branch installs.
+     * The base release a branch install (e.g. `dev-main`) is built on, read
+     * from `extra.rhapsody.version` (or the legacy top-level "version") in the
+     * framework's composer.json. Bump it as part of the release process. It
+     * is only consulted for branch installs — tagged installs report their
+     * own tag. Without it, a branch install would resolve to the
+     * "1.1.x-dev" branch alias, which the update check deliberately skips.
      */
     protected static function readDeclaredVersion(): ?string
     {
-        $version = self::readComposerData()['version'] ?? null;
+        $data = self::readComposerData();
+
+        // Preferred: `extra.rhapsody.version`. Unlike the top-level "version"
+        // field, Packagist ignores it, so it can't conflict with git tags.
+        $extra    = $data['extra'] ?? null;
+        $rhapsody = is_array($extra) ? ($extra['rhapsody'] ?? null) : null;
+        $version  = is_array($rhapsody) ? ($rhapsody['version'] ?? null) : null;
+
+        if (! is_string($version) || $version === '') {
+            // Legacy: the plain top-level "version" field.
+            $version = $data['version'] ?? null;
+        }
 
         return is_string($version) && $version !== '' ? $version : null;
     }

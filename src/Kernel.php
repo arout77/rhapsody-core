@@ -5,10 +5,13 @@ use Doctrine\ORM\EntityManager;
 use Rhapsody\Core\Contracts\ContainerInterface;
 use Rhapsody\Core\Contracts\DeferrerInterface;
 use Rhapsody\Core\Exceptions\HttpException;
+use Rhapsody\Core\Helpers\Path;
 use Rhapsody\Core\Routing\Router;
 use Rhapsody\Core\Services\NotificationService;
 use Rhapsody\Core\Ai\Assist\AssistWidget;
 use Rhapsody\Core\Snapshot\SnapshotRecorder;
+use Rhapsody\Core\Theming\AreaThemes;
+use Twig\Environment;
 
 /**
  * The application Kernel: the single seam between "I have a Request" and
@@ -46,6 +49,8 @@ class Kernel
         $this->resetState();
 
         try {
+            $this->applyAreaTheme($request);
+
             return $this->dispatch($request);
         } catch (\Throwable $e) {
             // A failed request must not leave its deferred work behind: in a
@@ -53,6 +58,24 @@ class Kernel
             $this->deferrer()?->discard();
             throw $e;
         }
+    }
+
+    /**
+     * Switches the Twig theme for URL areas configured in `theme_areas`
+     * (e.g. "/marketplace" => "cadence"). Does nothing when none are set.
+     */
+    private function applyAreaTheme(Request $request): void
+    {
+        if (empty($this->config['theme_areas'])) {
+            return;
+        }
+
+        $twig = $this->container->resolve(Environment::class);
+        if (! $twig instanceof Environment) {
+            return;
+        }
+
+        AreaThemes::apply($twig, Path::root(), $request->getPath(), $this->config);
     }
 
     /**

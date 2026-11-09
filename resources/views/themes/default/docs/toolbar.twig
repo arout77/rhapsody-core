@@ -44,7 +44,7 @@
     <ul>
         <li><strong>Request Status</strong> – HTTP status code of the response (green = 200, red = 4xx/5xx).</li>
         <li><strong>Execution Time</strong> – total time taken to process the request (in milliseconds).</li>
-        <li><strong>Memory Peak</strong> – a visual bar showing peak memory usage relative to the <code>memory_limit</code>; colour‑coded: green (safe), amber (warning), red (critical).</li>
+        <li><strong>Memory Peak</strong> – a visual bar showing peak memory usage relative to a fixed 64MB ceiling (independent of <code>memory_limit</code>); colour‑coded: green (safe), amber (warning), red (critical).</li>
     </ul>
 
     <hr>
@@ -299,7 +299,7 @@
     </p>
     <ul>
         <li><strong>Execution Time</strong> – same as the header, with a progress bar scaled to 1000ms</li>
-        <li><strong>Memory Usage</strong> – current memory peak (MB) with a bar scaled to 16MB</li>
+        <li><strong>Memory Usage</strong> – current memory peak (MB) with a bar scaled to a fixed 64MB</li>
         <li><strong>Database Queries</strong> – total query count, scaled to 100 queries</li>
         <li><strong>Cache Hit Ratio</strong> – the same cache ratio as the Cache tab</li>
         <li><strong>N+1 Detection</strong> – summary of any potential N+1 patterns, with a collapsible detail list</li>

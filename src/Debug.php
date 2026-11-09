@@ -36,24 +36,10 @@ class Debug
     }
 
     /**
-     * Converts php.ini memory shorthand (e.g., '128M', '2G') into absolute bytes.
+     * Fixed reference ceiling (in bytes) the toolbar's memory bar is scaled against.
+     * Deliberately independent of php.ini's memory_limit.
      */
-    private function getMemoryLimitBytes(): int
-    {
-        $limit = trim((string) ini_get('memory_limit'));
-        if ($limit === '-1') {
-            return -1; // Unlimited
-        }
-
-        $bytes = (int) $limit;
-
-        return match (strtolower(substr($limit, -1))) {
-            'g'     => $bytes * 1024 ** 3,
-            'm'     => $bytes * 1024 ** 2,
-            'k'     => $bytes * 1024,
-            default => $bytes,
-        };
-    }
+    private const MEMORY_BAR_LIMIT_BYTES = 64 * 1024 * 1024;
 
     /**
      * Starts the timer and records initial memory usage.
@@ -176,13 +162,10 @@ class Debug
 
         // Memory details
         $peakUsage  = memory_get_peak_usage();
-        $limitBytes = $this->getMemoryLimitBytes();
+        $limitBytes = self::MEMORY_BAR_LIMIT_BYTES;
         $usedMb     = round($peakUsage / 1024 / 1024, 2);
-        $limitMb    = $limitBytes === -1 ? 'Unlimited' : round($limitBytes / 1024 / 1024, 2);
-        $percentage = 0;
-        if ($limitBytes > 0) {
-            $percentage = round(($peakUsage / $limitBytes) * 100, 2);
-        }
+        $limitMb    = round($limitBytes / 1024 / 1024, 2);
+        $percentage = round(($peakUsage / $limitBytes) * 100, 2);
         $status = 'ok';
         if ($percentage > 80) {
             $status = 'warning';
