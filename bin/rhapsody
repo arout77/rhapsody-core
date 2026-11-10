@@ -235,8 +235,9 @@ try {
     $matched = $commandRegistry[$commandName];
     
     if ($matched['type'] === 'rhapsody') {
-        // Custom internal command processing requires the shifted arguments array
-        $matched['instance']->execute($args);
+        // Rhapsody-style commands receive only the arguments AFTER the command
+        // name (e.g. `migrate -e production` => ['-e', 'production']).
+        $matched['instance']->execute(array_slice($args, 1));
     } else {
         // Symfony expects element 0 to be the script name, and element 1 to be the FIRST actual argument
         // We strip out the command name ('make:controller', 'cache:clear') so Symfony doesn't parse it as data
