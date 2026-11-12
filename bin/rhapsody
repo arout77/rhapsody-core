@@ -16,6 +16,11 @@ if (!file_exists($autoloader)) {
 
 require_once $autoloader;
 
+// Helper functions (dispatch(), defer(), redirect() ...). index.php and worker.php load these for web
+// requests; without them here a queued job that calls dispatch() fails under queue:work.
+// Every helper is wrapped in function_exists(), so loading the file twice is harmless.
+require_once dirname(__DIR__) . '/src/helpers.php';
+
 if (!defined('ROOT_DIR')) {
     define('ROOT_DIR', $basePath);
 }
