@@ -318,7 +318,7 @@ $container->singleton(Environment::class, function (Container $c) use ($config, 
         {
             return Session::hasFlash($name);
         }
-    };;;;;;;
+    };;;;;;;;
 
     $twig->addGlobal('flash', $flash);
 
@@ -326,6 +326,8 @@ $container->singleton(Environment::class, function (Container $c) use ($config, 
         $token = Session::csrfToken();
         return new \Twig\Markup('<input type="hidden" name="_token" value="' . $token . '">', 'UTF-8');
     }));
+
+    \Rhapsody\Core\Twig\TemplateHintsExtension::register($twig, $isDevelopment);
 
     return $twig;
 });
