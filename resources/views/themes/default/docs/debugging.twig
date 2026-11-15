@@ -55,6 +55,37 @@ d($result); // Dump and continue
     </p>
     <p>If VarDumper is not available, the helpers fall back to simple <code>var_dump()</code>.</p>
 
+    <h2>Template Hints</h2>
+    <p>
+        Template hints answer the question "which template produced this part of the page?". With them on, every template on the page is outlined with a dashed border and a label showing its file path and render time. Click a label to copy the path. Twig blocks can be outlined too.
+    </p>
+    <p>
+        Template hints are switched on from Rhapsody Server (<strong>Profiler &rarr; Tools &rarr; Template hints</strong>, one switch per site). Nothing is stored in your project: Rhapsody Server sets the <code>RHAPSODY_TEMPLATE_HINTS</code> environment variable for the sites you choose and loads the overlay into the page.
+    </p>
+
+    <h3>How it works</h3>
+    <p>
+        The <code>TemplateHintsExtension</code> Twig extension wraps each template, and optionally each block, in a pair of HTML comments. The overlay reads those comments back and draws the outlines.
+    </p>
+    {% verbatim %}
+    <pre><code class="language-html">&lt;!--rs:tpl {"e":"open","k":"template","p":"views/partials/card.twig","n":"partials/card.twig"}--&gt;
+    &lt;div class="card"&gt;...&lt;/div&gt;
+&lt;!--rs:tpl {"e":"close","ms":0.12}--&gt;</code></pre>
+    {% endverbatim %}
+    <p>
+        It is registered in <code>bootstrap.php</code> with <code>TemplateHintsExtension::register($twig, $isDevelopment)</code>, right after the Twig environment is created.
+    </p>
+
+    <h3>When markers are written</h3>
+    <ul>
+        <li>Only when <code>APP_ENV=development</code> <em>and</em> <code>RHAPSODY_TEMPLATE_HINTS</code> is set. Otherwise the extension is not registered at all and costs nothing.</li>
+        <li>Never from the command line, and never when the response is not HTML.</li>
+        <li>Never in email, text, JSON, XML, CSS, JavaScript, SVG, CSV or Markdown templates, and not for metadata blocks such as <code>title</code> or <code>description</code>.</li>
+    </ul>
+    <p>
+        Set <code>RHAPSODY_TEMPLATE_HINTS=blocks</code> instead of <code>1</code> to include blocks. Rhapsody Server does this for you when you tick <em>Also mark blocks</em>. Templates and blocks use separate compiled-template caches, so switching between them never serves stale output.
+    </p>
+
     <h2>Best Practices</h2>
     <ul>
         <li><strong>Never commit <code>dd()</code> or <code>d()</code> to production code.</strong> They are strictly for local development.</li>
