@@ -8,6 +8,21 @@ class TraceablePDO extends PDO
     /** @var list<array<string, mixed>> */
     private static array $log = [];
 
+    /** Most statements kept for the debug toolbar. A long-running process (queue worker, CLI sim) would otherwise grow without bound. */
+    private const MAX_LOGGED = 500;
+
+    /** Record one statement for the toolbar: not at all outside a web request, and only the newest MAX_LOGGED entries. */
+    private function record(array $entry): void
+    {
+        if (PHP_SAPI === 'cli' || PHP_SAPI === 'phpdbg') {
+            return;
+        }
+        self::$log[] = $entry;
+        if (count(self::$log) > self::MAX_LOGGED * 2) {
+            self::$log = array_slice(self::$log, -self::MAX_LOGGED);
+        }
+    }
+
     /**
      * @param string $dsn
      * @param string|null $username
@@ -30,12 +45,12 @@ class TraceablePDO extends PDO
         $result = parent::query($query, $fetchMode, ...$fetch_mode_args);
         $time   = microtime(true) - $start;
 
-        self::$log[] = [
+        $this->record([
             'sql'         => $query,
             'params'      => [],
             'executionMS' => $time,
-            'caller'      => $this->findQueryCaller(),
-        ];
+            'caller'      => PHP_SAPI === 'cli' ? null : $this->findQueryCaller(),
+        ]);
 
         return $result;
     }
@@ -50,12 +65,12 @@ class TraceablePDO extends PDO
         // but we still want to log the origin of the statement.
         $statement = parent::prepare($query, $options);
 
-        self::$log[] = [
+        $this->record([
             'sql'         => '[PREPARED] ' . $query,
             'params'      => [],
             'executionMS' => 0,
-            'caller'      => $this->findQueryCaller(),
-        ];
+            'caller'      => PHP_SAPI === 'cli' ? null : $this->findQueryCaller(),
+        ]);
 
         return $statement;
     }
